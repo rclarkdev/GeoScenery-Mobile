@@ -29,15 +29,15 @@ const routes: Routes = [
                     },
                      {
                         path: 'new',
-                        loadChildren: '.my-scenes/new-scene/new-scene.module#NewScenePageModule'
+                        loadChildren: './my-scenes/new-scene/new-scene.module#NewScenePageModule'
                     },
                     {
                         path: 'edit:/sceneId',
-                        loadChildren: '.my-scenes/edit-scene/edit-scene.module#EditScenePageModule'
+                        loadChildren: './my-scenes/edit-scene/edit-scene.module#EditScenePageModule'
                     },
                     {
                         path: ':sceneId',
-                        loadChildren: '.my-scenes/share-scenery/share-scenery.module#ShareSceneryPageModule'
+                        loadChildren: './my-scenes/share-scenery/share-scenery.module#ShareSceneryPageModule'
                     }
                 ]
             },
