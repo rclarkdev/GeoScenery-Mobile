@@ -1,4 +1,6 @@
 import { Component, OnInit } from '@angular/core';
+import { SceneryService } from '../scenery.service';
+import { Scene } from '../scene.model';
 
 @Component({
   selector: 'app-observe',
@@ -7,9 +9,15 @@ import { Component, OnInit } from '@angular/core';
 })
 export class ObservePage implements OnInit {
 
-  constructor() { }
+  loadedScenery: Scene[];
+
+  constructor(private sceneryService: SceneryService) { }
 
   ngOnInit() {
+    // TODO: update this to handle page caching
+
+    this.loadedScenery = this.sceneryService.scenery;
+
   }
 
 }
