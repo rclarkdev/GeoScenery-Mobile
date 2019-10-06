@@ -1,9 +1,12 @@
 <ion-header>
   <ion-toolbar>
-    <ion-title>scene-detail</ion-title>
+    <ion-buttons slot="start">
+      <ion-back-button defaultHref="/scenery/tabs/observe"></ion-back-button>
+    </ion-buttons>
+    <ion-title>Scene Details</ion-title>
   </ion-toolbar>
 </ion-header>
 
 <ion-content>
-
+  <ion-button color="primary" margin (click)="onVisitScene()">Visit</ion-button>
 </ion-content>

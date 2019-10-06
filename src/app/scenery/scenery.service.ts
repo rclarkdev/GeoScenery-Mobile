@@ -27,5 +27,10 @@ export class SceneryService {
   get scenery() {
     return [...this._scenery];
   }
+
   constructor() { }
-}
+
+  getScene(id: string) {
+    return {...this._scenery.find(scene => scene.id ===  id)};
+    }
+  }

@@ -1,4 +1,6 @@
 import { Component, OnInit } from '@angular/core';
+import { Scene } from '../scene.model';
+import { SceneryService } from '../scenery.service';
 
 @Component({
   selector: 'app-my-scenes',
@@ -7,9 +9,14 @@ import { Component, OnInit } from '@angular/core';
 })
 export class MyScenesPage implements OnInit {
 
-  constructor() { }
+  myScenes: Scene[];
+
+  constructor(private sceneryService: SceneryService) { }
 
   ngOnInit() {
-  }
+    // TODO: update this to handle page caching
 
+    this.myScenes = this.sceneryService.scenery;
+
+  }
 }

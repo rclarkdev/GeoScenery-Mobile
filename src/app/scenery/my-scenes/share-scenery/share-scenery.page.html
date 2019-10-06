@@ -1,9 +1,16 @@
 <ion-header>
   <ion-toolbar>
-    <ion-title>share-scenery</ion-title>
+    <ion-buttons slot="start">
+      <ion-back-button defaultHref="/scenery/tabs/my-scenes"></ion-back-button>
+    </ion-buttons>
+   <ion-title>{{ scene.title }}</ion-title>
   </ion-toolbar>
 </ion-header>
 
-<ion-content>
-
+<ion-content padding>
+  <ion-button 
+    margin 
+    color="primary" 
+    [routerLink]="['/', 'scenery', 'tabs', 'my-scenes', 'edit', scene.id]"
+  >Edit</ion-button>
 </ion-content>

@@ -1,4 +1,6 @@
 import { Component, OnInit } from '@angular/core';
+import { Router } from '@angular/router';
+import { NavController } from '@ionic/angular';
 
 @Component({
   selector: 'app-scene-detail',
@@ -7,9 +9,13 @@ import { Component, OnInit } from '@angular/core';
 })
 export class SceneDetailPage implements OnInit {
 
-  constructor() { }
+  constructor(private router: Router, private navCtrl: NavController) { }
 
   ngOnInit() {
   }
 
+  onVisitScene() {
+    // this.router.navigateByUrl('/scenery/tabs/observe');
+    this.navCtrl.navigateBack('/scenery/tabs/observe');
+  }
 }
