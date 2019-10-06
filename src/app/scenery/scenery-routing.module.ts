@@ -32,7 +32,7 @@ const routes: Routes = [
                         loadChildren: './my-scenes/new-scene/new-scene.module#NewScenePageModule'
                     },
                     {
-                        path: 'edit:/sceneId',
+                        path: 'edit/:sceneId',
                         loadChildren: './my-scenes/edit-scene/edit-scene.module#EditScenePageModule'
                     },
                     {
