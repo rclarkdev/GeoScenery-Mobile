@@ -1,6 +1,8 @@
 import { Component, OnInit } from '@angular/core';
-import { Router } from '@angular/router';
+import { ActivatedRoute } from '@angular/router';
 import { NavController } from '@ionic/angular';
+import { SceneryService } from '../../scenery.service';
+import { Scene } from '../../scene.model';
 
 @Component({
   selector: 'app-scene-detail',
@@ -9,9 +11,20 @@ import { NavController } from '@ionic/angular';
 })
 export class SceneDetailPage implements OnInit {
 
-  constructor(private router: Router, private navCtrl: NavController) { }
+  scene: Scene;
+
+  constructor(
+    private navCtrl: NavController,
+    private route: ActivatedRoute,
+    private sceneryService: SceneryService) { }
 
   ngOnInit() {
+    this.route.paramMap.subscribe(paramMap => {
+      if (!paramMap.has('sceneId')) {
+        this.navCtrl.navigateBack('/scenery/tabs/observe');
+      }
+      this.scene = this.sceneryService.getScene(paramMap.get('sceneId'));
+    });
   }
 
   onVisitScene() {

@@ -16,6 +16,6 @@ export class MyScenesPage implements OnInit {
   ngOnInit() {
     // TODO: update this to handle page caching
     this.myScenes = this.sceneryService.scenery;
-
+ 
   }
 }
