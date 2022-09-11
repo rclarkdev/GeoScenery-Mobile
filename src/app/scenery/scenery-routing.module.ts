@@ -12,11 +12,11 @@ const routes: Routes = [
                 children: [
                     {
                         path: '',
-                        loadChildren: './observe/observe.module#ObservePageModule'
+                        loadChildren: () => import('./observe/observe.module').then(m => m.ObservePageModule)
                     },
                     {
                         path: ':sceneId',
-                        loadChildren: './observe/scene-detail/scene-detail.module#SceneDetailPageModule'
+                        loadChildren: () => import('./observe/scene-detail/scene-detail.module').then(m => m.SceneDetailPageModule)
                     }
                 ]
             },
@@ -25,19 +25,19 @@ const routes: Routes = [
                 children: [
                     {
                         path: '',
-                        loadChildren: './my-scenes/my-scenes.module#MyScenesPageModule'
+                        loadChildren: () => import('./my-scenes/my-scenes.module').then(m => m.MyScenesPageModule)
                     },
                      {
                         path: 'new',
-                        loadChildren: './my-scenes/new-scene/new-scene.module#NewScenePageModule'
+                        loadChildren: () => import('./my-scenes/new-scene/new-scene.module').then(m => m.NewScenePageModule)
                     },
                     {
                         path: 'edit/:sceneId',
-                        loadChildren: './my-scenes/edit-scene/edit-scene.module#EditScenePageModule'
+                        loadChildren: () => import('./my-scenes/edit-scene/edit-scene.module').then(m => m.EditScenePageModule)
                     },
                     {
                         path: ':sceneId',
-                        loadChildren: './my-scenes/share-scenery/share-scenery.module#ShareSceneryPageModule'
+                        loadChildren: () => import('./my-scenes/share-scenery/share-scenery.module').then(m => m.ShareSceneryPageModule)
                     }
                 ]
             },

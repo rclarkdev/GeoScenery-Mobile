@@ -3,14 +3,14 @@ import { PreloadAllModules, RouterModule, Routes } from '@angular/router';
 
 const routes: Routes = [
   { path: '', redirectTo: 'scenery', pathMatch: 'full' },
-  { path: 'auth', loadChildren: './auth/auth.module#AuthPageModule' },
-  { path: 'scenery', loadChildren: './scenery/scenery.module#SceneryPageModule' },
-  { path: 'visits', loadChildren: './visits/visits.module#VisitsPageModule' }
+  { path: 'auth', loadChildren: () => import('./auth/auth.module').then(m => m.AuthPageModule) },
+  { path: 'scenery', loadChildren: () => import('./scenery/scenery.module').then(m => m.SceneryPageModule) },
+  { path: 'visits', loadChildren: () => import('./visits/visits.module').then(m => m.VisitsPageModule) }
 ];
 
 @NgModule({
   imports: [
-    RouterModule.forRoot(routes, { preloadingStrategy: PreloadAllModules })
+    RouterModule.forRoot(routes, { preloadingStrategy: PreloadAllModules, relativeLinkResolution: 'legacy' })
   ],
   exports: [RouterModule]
 })
