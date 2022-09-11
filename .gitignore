@@ -30,3 +30,6 @@ npm-debug.log*
 /platforms
 /plugins
 /www
+/.vs/slnx.sqlite
+/.vs/GeoScenery-Mobile/FileContentIndex/a00e050e-333d-42c4-a59f-8c60024ecd2d.vsidx
+/.vs/GeoScenery-Mobile/FileContentIndex
