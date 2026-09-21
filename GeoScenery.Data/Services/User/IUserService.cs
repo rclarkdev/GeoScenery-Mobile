@@ -1,15 +1,12 @@
-﻿using System.Collections.Generic;
-using System.Threading.Tasks;
-using GeoScenery.Data.Models;
+﻿using GeoScenery.Data.Models;
 
-namespace GeoScenery.Data.Services
+namespace GeoScenery.Data.Services;
+
+public interface IUserService
 {
-    public interface IUserService
-    {
-        Task Insert(User user);
-        Task Update();
-        Task Delete(User user);
-        Task<List<User>> GetAll();
-        Task<User?> GetById(long id);
-    }
+    Task<IReadOnlyList<User>> GetAllAsync(CancellationToken cancellationToken = default);
+    Task<User?> GetByIdAsync(long id, CancellationToken cancellationToken = default);
+    Task<User> CreateAsync(User user, CancellationToken cancellationToken = default);
+    Task<User?> UpdateAsync(long id, User user, CancellationToken cancellationToken = default);
+    Task<bool> DeleteAsync(long id, CancellationToken cancellationToken = default);
 }

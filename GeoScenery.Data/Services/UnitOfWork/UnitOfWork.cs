@@ -17,9 +17,9 @@ namespace GeoScenery.Data.Services
 
         #endregion
 
-        public UnitOfWork()
+        public UnitOfWork(MyProjectDbContext dbContext)
         {
-            _dbContext = new MyProjectDbContext();
+            _dbContext = dbContext;
         }
         public async Task Commit()
         {

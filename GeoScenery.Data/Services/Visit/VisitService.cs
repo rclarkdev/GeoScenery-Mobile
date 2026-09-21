@@ -1,0 +1,82 @@
+using GeoScenery.Data.Context;
+using GeoScenery.Data.Models;
+using Microsoft.EntityFrameworkCore;
+
+namespace GeoScenery.Data.Services;
+
+public sealed class VisitService : IVisitService
+{
+    private readonly MyProjectDbContext _dbContext;
+
+    public VisitService(MyProjectDbContext dbContext)
+    {
+        _dbContext = dbContext;
+    }
+
+    public async Task<IReadOnlyList<Visit>> GetAllAsync(CancellationToken cancellationToken = default)
+    {
+        return await _dbContext.Visits
+            .AsNoTracking()
+            .Include(visit => visit.Scene)
+            .OrderByDescending(visit => visit.VisitedAt)
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<Visit>> GetByUserIdAsync(long userId, CancellationToken cancellationToken = default)
+    {
+        return await _dbContext.Visits
+            .AsNoTracking()
+            .Include(visit => visit.Scene)
+            .Where(visit => visit.UserId == userId)
+            .OrderByDescending(visit => visit.VisitedAt)
+            .ToListAsync(cancellationToken);
+    }
+
+    public Task<Visit?> GetByIdAsync(long id, CancellationToken cancellationToken = default)
+    {
+        return _dbContext.Visits
+            .AsNoTracking()
+            .Include(visit => visit.Scene)
+            .FirstOrDefaultAsync(visit => visit.Id == id, cancellationToken);
+    }
+
+    public async Task<Visit> CreateAsync(Visit visit, CancellationToken cancellationToken = default)
+    {
+        if (visit.VisitedAt == default)
+        {
+            visit.VisitedAt = DateTimeOffset.UtcNow;
+        }
+
+        _dbContext.Visits.Add(visit);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        return visit;
+    }
+
+    public async Task<Visit?> UpdateAsync(long id, Visit visit, CancellationToken cancellationToken = default)
+    {
+        var existingVisit = await _dbContext.Visits.FindAsync([id], cancellationToken);
+        if (existingVisit is null)
+        {
+            return null;
+        }
+
+        existingVisit.SceneId = visit.SceneId;
+        existingVisit.UserId = visit.UserId;
+        existingVisit.VisitedAt = visit.VisitedAt;
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        return existingVisit;
+    }
+
+    public async Task<bool> DeleteAsync(long id, CancellationToken cancellationToken = default)
+    {
+        var visit = await _dbContext.Visits.FindAsync([id], cancellationToken);
+        if (visit is null)
+        {
+            return false;
+        }
+
+        _dbContext.Visits.Remove(visit);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        return true;
+    }
+}
