@@ -9,6 +9,8 @@ export interface SceneRequest {
   description: string;
   imageUrl: string;
   rating: number;
+  latitude?: number | null;
+  longitude?: number | null;
   ownerUserId?: number;
 }
 

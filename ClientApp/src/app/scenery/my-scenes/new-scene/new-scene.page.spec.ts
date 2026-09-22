@@ -47,7 +47,9 @@ describe('NewScenePage', () => {
       title: 'New scene',
       description: 'A description',
       imageUrl: 'https://example.com/image.jpg',
-      rating: 8
+      rating: 8,
+      latitude: null,
+      longitude: null
     });
 
     component.onSave();

@@ -1,6 +1,8 @@
 import { Component, OnInit } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 import { FormBuilder, Validators } from '@angular/forms';
+import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
+import { Geolocation } from '@capacitor/geolocation';
 import { SceneryService } from '../../scenery.service';
 import { NavController } from '@ionic/angular';
 import { Scene } from '../../scene.model';
@@ -15,11 +17,15 @@ export class EditScenePage implements OnInit {
   scene?: Scene;
   isSaving = false;
   saveError = false;
+  isLocating = false;
+  locationError = false;
   readonly sceneForm = this.formBuilder.nonNullable.group({
     title: ['', [Validators.required, Validators.maxLength(200)]],
     description: ['', [Validators.required, Validators.maxLength(4000)]],
-    imageUrl: ['', [Validators.required, Validators.maxLength(2048), Validators.pattern(/^https?:\/\/.+/i)]],
-    rating: [0, [Validators.min(0), Validators.max(10)]]
+    imageUrl: ['', [Validators.required]],
+    rating: [0, [Validators.min(0), Validators.max(10)]],
+    latitude: this.formBuilder.control<number | null>(null, [Validators.min(-90), Validators.max(90)]),
+    longitude: this.formBuilder.control<number | null>(null, [Validators.min(-180), Validators.max(180)])
   });
 
   constructor(
@@ -46,11 +52,46 @@ export class EditScenePage implements OnInit {
           title: scene.title,
           description: scene.description,
           imageUrl: scene.imageUrl,
-          rating: scene.rating
+          rating: scene.rating,
+          latitude: scene.latitude ?? null,
+          longitude: scene.longitude ?? null
         });
       });
 
     });
+  }
+
+  async useCurrentLocation() {
+    this.isLocating = true;
+    this.locationError = false;
+    try {
+      const position = await Geolocation.getCurrentPosition();
+      this.sceneForm.patchValue({
+        latitude: position.coords.latitude,
+        longitude: position.coords.longitude
+      });
+    } catch {
+      this.locationError = true;
+    } finally {
+      this.isLocating = false;
+    }
+  }
+
+  async onPickImage() {
+    try {
+      // Prompt lets the user choose between the camera and their photo library
+      const photo = await Camera.getPhoto({
+        quality: 80,
+        resultType: CameraResultType.DataUrl,
+        source: CameraSource.Prompt
+      });
+      if (photo.dataUrl) {
+        this.sceneForm.patchValue({ imageUrl: photo.dataUrl });
+        this.sceneForm.controls.imageUrl.markAsTouched();
+      }
+    } catch {
+      // user cancelled the picker
+    }
   }
 
   onSave() {

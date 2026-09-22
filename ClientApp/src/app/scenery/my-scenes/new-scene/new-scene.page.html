@@ -23,16 +23,32 @@
       Enter a description.
     </ion-note>
 
-    <ion-item>
-      <ion-input label="Image URL" labelPlacement="stacked" type="url" formControlName="imageUrl"></ion-input>
-    </ion-item>
+    <ion-img *ngIf="sceneForm.controls.imageUrl.value" [src]="sceneForm.controls.imageUrl.value"></ion-img>
+    <ion-button expand="block" fill="outline" type="button" (click)="onPickImage()">
+      <ion-icon slot="start" name="camera-outline"></ion-icon>
+      {{ sceneForm.controls.imageUrl.value ? 'Change photo' : 'Add photo' }}
+    </ion-button>
     <ion-note color="danger" *ngIf="sceneForm.controls.imageUrl.touched && sceneForm.controls.imageUrl.invalid">
-      Enter a valid image URL.
+      Add a photo.
     </ion-note>
 
     <ion-item>
       <ion-input label="Rating" labelPlacement="stacked" type="number" formControlName="rating"></ion-input>
     </ion-item>
+
+    <ion-item>
+      <ion-input label="Latitude" labelPlacement="stacked" type="number" formControlName="latitude"></ion-input>
+    </ion-item>
+    <ion-item>
+      <ion-input label="Longitude" labelPlacement="stacked" type="number" formControlName="longitude"></ion-input>
+    </ion-item>
+    <ion-button expand="block" fill="outline" type="button" [disabled]="isLocating" (click)="useCurrentLocation()">
+      <ion-icon slot="start" name="locate-outline"></ion-icon>
+      {{ isLocating ? 'Locating...' : 'Use current location' }}
+    </ion-button>
+    <ion-note color="danger" *ngIf="locationError">
+      Couldn't get your current location. You can enter it manually above.
+    </ion-note>
 
     <ion-button expand="block" type="submit" [disabled]="isSaving">
       {{ isSaving ? 'Saving...' : 'Save scene' }}

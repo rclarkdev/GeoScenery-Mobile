@@ -5,6 +5,8 @@ export class Scene {
         public description: string,
         public imageUrl: string,
         public rating: number,
+        public latitude?: number,
+        public longitude?: number,
         public ownerUserId?: number,
         public createdAt?: string,
         public updatedAt?: string
