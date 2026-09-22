@@ -9,14 +9,12 @@ import { Scene } from '../scene.model';
 })
 export class ObservePage implements OnInit {
 
-  loadedScenery: Scene[];
+  loadedScenery: Scene[] = [];
 
   constructor(private sceneryService: SceneryService) { }
 
   ngOnInit() {
-    // TODO: update this to handle page caching
-
-    this.loadedScenery = this.sceneryService.scenery;
+    this.sceneryService.getScenery().subscribe(scenery => this.loadedScenery = scenery);
 
   }
 

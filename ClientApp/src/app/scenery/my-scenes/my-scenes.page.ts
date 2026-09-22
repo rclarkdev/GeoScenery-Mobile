@@ -9,13 +9,12 @@ import { SceneryService } from '../scenery.service';
 })
 export class MyScenesPage implements OnInit {
 
-  myScenes: Scene[];
+  myScenes: Scene[] = [];
 
   constructor(private sceneryService: SceneryService) { }
 
   ngOnInit() {
-    // TODO: update this to handle page caching
-    this.myScenes = this.sceneryService.scenery;
+    this.sceneryService.getScenery().subscribe(scenes => this.myScenes = scenes);
  
   }
 }

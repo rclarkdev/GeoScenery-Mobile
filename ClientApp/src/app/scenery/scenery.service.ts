@@ -1,36 +1,42 @@
 import { Injectable } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+import { Observable } from 'rxjs';
 import { Scene } from './scene.model';
+import { environment } from '../../environments/environment';
+
+export interface SceneRequest {
+  title: string;
+  description: string;
+  imageUrl: string;
+  rating: number;
+  ownerUserId?: number;
+}
 
 @Injectable({
   providedIn: 'root'
 })
 export class SceneryService {
-  private _scenery: Scene[] = [
-    new Scene('s1',
-    'Observation Point 1',
-    'This is a cool scene',
-    'https://s27363.pcdn.co/wp-content/uploads/2017/06/Observation-Point-Zion-1129x752.jpg.optimal.jpg',
-    9),
-    new Scene('s2',
-    'Observation Point 2',
-    'This is a cool scene as well',
-    'https://o7fe62guj6g73vlj30xpogpm-wpengine.netdna-ssl.com/wp-content/uploads/2019/04/Black-Rock-City-Aerial-Image-2015-665x375.jpg',
-    10),
-    new Scene('s3',
-    'Observation Point 3',
-    'Another cool scene',
-    'https://i.ytimg.com/vi/ruxB29F5hZY/maxresdefault.jpg',
-    8)
+  private readonly scenesUrl = `${environment.apiUrl}/api/scenes`;
 
-  ];
+  constructor(private http: HttpClient) { }
 
-  get scenery() {
-    return [...this._scenery];
+  getScenery(): Observable<Scene[]> {
+    return this.http.get<Scene[]>(this.scenesUrl);
   }
 
-  constructor() { }
-
-  getScene(id: string) {
-    return {...this._scenery.find(scene => scene.id ===  id)};
-    }
+  getScene(id: number): Observable<Scene> {
+    return this.http.get<Scene>(`${this.scenesUrl}/${id}`);
   }
+
+  createScene(scene: SceneRequest): Observable<Scene> {
+    return this.http.post<Scene>(this.scenesUrl, scene);
+  }
+
+  updateScene(id: number, scene: SceneRequest): Observable<Scene> {
+    return this.http.put<Scene>(`${this.scenesUrl}/${id}`, scene);
+  }
+
+  deleteScene(id: number): Observable<void> {
+    return this.http.delete<void>(`${this.scenesUrl}/${id}`);
+  }
+}

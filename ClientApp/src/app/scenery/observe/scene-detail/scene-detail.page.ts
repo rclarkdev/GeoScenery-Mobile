@@ -11,7 +11,7 @@ import { Scene } from '../../scene.model';
 })
 export class SceneDetailPage implements OnInit {
 
-  scene: Scene;
+  scene?: Scene;
 
   constructor(
     private navCtrl: NavController,
@@ -23,7 +23,12 @@ export class SceneDetailPage implements OnInit {
       if (!paramMap.has('sceneId')) {
         this.navCtrl.navigateBack('/scenery/tabs/observe');
       }
-      this.scene = this.sceneryService.getScene(paramMap.get('sceneId'));
+      const sceneId = Number(paramMap.get('sceneId'));
+      if (!Number.isInteger(sceneId)) {
+        this.navCtrl.navigateBack('/scenery/tabs/observe');
+        return;
+      }
+      this.sceneryService.getScene(sceneId).subscribe(scene => this.scene = scene);
     });
   }
 

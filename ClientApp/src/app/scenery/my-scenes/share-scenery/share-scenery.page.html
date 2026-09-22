@@ -3,12 +3,12 @@
     <ion-buttons slot="start">
       <ion-back-button defaultHref="/scenery/tabs/my-scenes"></ion-back-button>
     </ion-buttons>
-   <ion-title>{{ scene.title }}</ion-title>
+  <ion-title>{{ scene?.title }}</ion-title>
   </ion-toolbar>
 </ion-header>
 
 <ion-content padding>
-  <ion-button 
+  <ion-button *ngIf="scene"
     margin 
     color="primary" 
     [routerLink]="['/', 'scenery', 'tabs', 'my-scenes', 'edit', scene.id]"

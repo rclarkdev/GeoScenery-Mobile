@@ -11,7 +11,7 @@ import { SceneryService } from '../../scenery.service';
 })
 export class ShareSceneryPage implements OnInit {
 
-  scene: Scene;
+  scene?: Scene;
 
   constructor(private route: ActivatedRoute, private navCtrl: NavController, private sceneryService: SceneryService) { }
 
@@ -21,7 +21,12 @@ export class ShareSceneryPage implements OnInit {
         this.navCtrl.navigateBack('/scenery/tabs/my-scenes');
         return;
       }
-      this.scene = this.sceneryService.getScene(paramMap.get('sceneId'));
+      const sceneId = Number(paramMap.get('sceneId'));
+      if (!Number.isInteger(sceneId)) {
+        this.navCtrl.navigateBack('/scenery/tabs/my-scenes');
+        return;
+      }
+      this.sceneryService.getScene(sceneId).subscribe(scene => this.scene = scene);
     });
   }
 

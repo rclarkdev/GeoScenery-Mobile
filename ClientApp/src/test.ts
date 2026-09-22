@@ -17,6 +17,15 @@ getTestBed().initTestEnvironment(
 }
 );
 // Then we find all the tests.
-const context = require.context('./', true, /\.spec\.ts$/);
 // And load the modules.
-context.keys().map(context);
+import './app/app.component.spec';
+import './app/auth/auth.page.spec';
+import './app/scenery/scenery.page.spec';
+import './app/scenery/scenery.service.spec';
+import './app/scenery/observe/observe.page.spec';
+import './app/scenery/observe/scene-detail/scene-detail.page.spec';
+import './app/scenery/my-scenes/my-scenes.page.spec';
+import './app/scenery/my-scenes/new-scene/new-scene.page.spec';
+import './app/scenery/my-scenes/edit-scene/edit-scene.page.spec';
+import './app/scenery/my-scenes/share-scenery/share-scenery.page.spec';
+import './app/visits/visits.page.spec';
