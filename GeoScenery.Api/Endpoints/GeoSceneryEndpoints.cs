@@ -53,7 +53,10 @@ public static class GeoSceneryEndpoints
             var user = await service.UpdateAsync(id, new User
             {
                 DisplayName = request.DisplayName,
-                Email = request.Email
+                Email = request.Email,
+                ProfileImageUrl = request.ProfileImageUrl,
+                Latitude = request.Latitude,
+                Longitude = request.Longitude
             }, cancellationToken);
             return user is null ? TypedResults.NotFound() : TypedResults.Ok(ToResponse(user));
         });
@@ -95,6 +98,8 @@ public static class GeoSceneryEndpoints
                 Description = request.Description,
                 ImageUrl = request.ImageUrl,
                 Rating = request.Rating,
+                Latitude = request.Latitude,
+                Longitude = request.Longitude,
                 OwnerUserId = GetUserId(principal)
             }, cancellationToken);
             return TypedResults.Created($"/api/scenes/{scene.Id}", ToResponse(scene));
@@ -111,6 +116,8 @@ public static class GeoSceneryEndpoints
                 Description = request.Description,
                 ImageUrl = request.ImageUrl,
                 Rating = request.Rating,
+                Latitude = request.Latitude,
+                Longitude = request.Longitude,
                 OwnerUserId = GetUserId(principal)
             }, GetUserId(principal), cancellationToken);
             return scene is null ? TypedResults.NotFound() : TypedResults.Ok(ToResponse(scene));
@@ -173,10 +180,10 @@ public static class GeoSceneryEndpoints
     }
 
     private static UserResponse ToResponse(User user) =>
-        new(user.Id, user.DisplayName, user.Email, user.CreatedAt);
+        new(user.Id, user.DisplayName, user.Email, user.ProfileImageUrl, user.Latitude, user.Longitude, user.CreatedAt);
 
     private static SceneResponse ToResponse(Scene scene) =>
-        new(scene.Id, scene.Title, scene.Description, scene.ImageUrl, scene.Rating, scene.OwnerUserId, scene.CreatedAt, scene.UpdatedAt);
+        new(scene.Id, scene.Title, scene.Description, scene.ImageUrl, scene.Rating, scene.Latitude, scene.Longitude, scene.OwnerUserId, scene.CreatedAt, scene.UpdatedAt);
 
     private static VisitResponse ToResponse(Visit visit) =>
         new(visit.Id, visit.SceneId, visit.UserId, visit.Scene?.Title, visit.VisitedAt);

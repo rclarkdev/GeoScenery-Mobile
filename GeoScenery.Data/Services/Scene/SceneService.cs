@@ -50,6 +50,8 @@ public sealed class SceneService : ISceneService
         existingScene.Description = scene.Description;
         existingScene.ImageUrl = scene.ImageUrl;
         existingScene.Rating = scene.Rating;
+        existingScene.Latitude = scene.Latitude;
+        existingScene.Longitude = scene.Longitude;
         existingScene.UpdatedAt = DateTimeOffset.UtcNow;
         await _dbContext.SaveChangesAsync(cancellationToken);
         return existingScene;

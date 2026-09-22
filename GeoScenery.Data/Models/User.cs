@@ -15,6 +15,14 @@ public class User
     [Required]
     public string PasswordHash { get; set; } = string.Empty;
 
+    public string? ProfileImageUrl { get; set; }
+
+    [Range(-90, 90)]
+    public double? Latitude { get; set; }
+
+    [Range(-180, 180)]
+    public double? Longitude { get; set; }
+
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
 
     public ICollection<Scene> Scenes { get; set; } = new List<Scene>();

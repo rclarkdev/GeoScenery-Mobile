@@ -9,6 +9,8 @@ public sealed record SceneResponse(
     string Description,
     string ImageUrl,
     decimal Rating,
+    double? Latitude,
+    double? Longitude,
     long? OwnerUserId,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt);
@@ -22,11 +24,17 @@ public sealed record CreateSceneRequest
     [Required, MaxLength(4000)]
     public required string Description { get; init; }
 
-    [Required, MaxLength(2048), Url]
+    [Required]
     public required string ImageUrl { get; init; }
 
     [Range(0, 10)]
     public decimal Rating { get; init; }
+
+    [Range(-90, 90)]
+    public double? Latitude { get; init; }
+
+    [Range(-180, 180)]
+    public double? Longitude { get; init; }
 
 }
 
@@ -39,16 +47,29 @@ public sealed record UpdateSceneRequest
     [Required, MaxLength(4000)]
     public required string Description { get; init; }
 
-    [Required, MaxLength(2048), Url]
+    [Required]
     public required string ImageUrl { get; init; }
 
     [Range(0, 10)]
     public decimal Rating { get; init; }
 
+    [Range(-90, 90)]
+    public double? Latitude { get; init; }
+
+    [Range(-180, 180)]
+    public double? Longitude { get; init; }
+
 }
 
 /// <summary>Represents a user returned by the API.</summary>
-public sealed record UserResponse(long Id, string DisplayName, string Email, DateTimeOffset CreatedAt);
+public sealed record UserResponse(
+    long Id,
+    string DisplayName,
+    string Email,
+    string? ProfileImageUrl,
+    double? Latitude,
+    double? Longitude,
+    DateTimeOffset CreatedAt);
 
 /// <summary>Payload for creating a user.</summary>
 public sealed record CreateUserRequest
@@ -68,6 +89,14 @@ public sealed record UpdateUserRequest
 
     [Required, EmailAddress, MaxLength(320)]
     public required string Email { get; init; }
+
+    public string? ProfileImageUrl { get; init; }
+
+    [Range(-90, 90)]
+    public double? Latitude { get; init; }
+
+    [Range(-180, 180)]
+    public double? Longitude { get; init; }
 }
 
 /// <summary>Represents a recorded scene visit.</summary>
