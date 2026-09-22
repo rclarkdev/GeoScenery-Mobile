@@ -134,9 +134,15 @@ public static class GeoSceneryEndpoints
 
     private static void MapSceneEndpoints(RouteGroupBuilder group)
     {
-        group.MapGet("", async (ISceneService service, CancellationToken cancellationToken) =>
-            TypedResults.Ok((await service.GetAllAsync(cancellationToken)).Select(ToResponse)))
-            .WithName("GetScenes");
+        group.MapGet("", async (string? tags, double? latitude, double? longitude, double? radiusKm, ISceneService service, CancellationToken cancellationToken) =>
+        {
+            var tagList = string.IsNullOrWhiteSpace(tags)
+                ? null
+                : tags.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            var results = await service.SearchAsync(tagList, latitude, longitude, radiusKm, cancellationToken);
+            return TypedResults.Ok(results.Select(result => ToResponse(result.Scene, result.DistanceKm)));
+        })
+        .WithName("GetScenes");
 
         group.MapGet("/{id:long}", async Task<Results<Ok<SceneResponse>, NotFound>>
             (long id, ISceneService service, CancellationToken cancellationToken) =>
@@ -158,7 +164,7 @@ public static class GeoSceneryEndpoints
                 Latitude = request.Latitude,
                 Longitude = request.Longitude,
                 OwnerUserId = GetUserId(principal)
-            }, cancellationToken);
+            }, request.Tags, cancellationToken);
             return TypedResults.Created($"/api/scenes/{scene.Id}", ToResponse(scene));
         })
         .WithName("CreateScene")
@@ -176,7 +182,7 @@ public static class GeoSceneryEndpoints
                 Latitude = request.Latitude,
                 Longitude = request.Longitude,
                 OwnerUserId = GetUserId(principal)
-            }, GetUserId(principal), cancellationToken);
+            }, GetUserId(principal), request.Tags, cancellationToken);
             return scene is null ? TypedResults.NotFound() : TypedResults.Ok(ToResponse(scene));
         })
         .RequireAuthorization();
@@ -250,8 +256,10 @@ public static class GeoSceneryEndpoints
     private static UserSummaryResponse ToSummaryResponse(User user) =>
         new(user.Id, user.DisplayName, user.ProfileImageUrl);
 
-    private static SceneResponse ToResponse(Scene scene) =>
-        new(scene.Id, scene.Title, scene.Description, scene.ImageUrl, scene.Rating, scene.Latitude, scene.Longitude, scene.OwnerUserId, scene.CreatedAt, scene.UpdatedAt);
+    private static SceneResponse ToResponse(Scene scene, double? distanceKm = null) =>
+        new(scene.Id, scene.Title, scene.Description, scene.ImageUrl, scene.Rating, scene.Latitude, scene.Longitude,
+            scene.Tags.Select(tag => tag.Tag).OrderBy(tag => tag).ToList(), distanceKm,
+            scene.OwnerUserId, scene.CreatedAt, scene.UpdatedAt);
 
     private static VisitResponse ToResponse(Visit visit) =>
         new(visit.Id, visit.SceneId, visit.UserId, visit.Scene?.Title, visit.VisitedAt);

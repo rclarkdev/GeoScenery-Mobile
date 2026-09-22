@@ -33,4 +33,6 @@ public class Scene
     public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
 
     public ICollection<Visit> Visits { get; set; } = new List<Visit>();
+
+    public ICollection<SceneTag> Tags { get; set; } = new List<SceneTag>();
 }

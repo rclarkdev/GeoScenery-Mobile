@@ -6,6 +6,8 @@ namespace GeoScenery.Data.Services;
 
 public sealed class SceneService : ISceneService
 {
+    private const double EarthRadiusKm = 6371.0;
+
     private readonly MyProjectDbContext _dbContext;
 
     public SceneService(MyProjectDbContext dbContext)
@@ -13,33 +15,72 @@ public sealed class SceneService : ISceneService
         _dbContext = dbContext;
     }
 
-    public async Task<IReadOnlyList<Scene>> GetAllAsync(CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<SceneSearchResult>> SearchAsync(
+        IReadOnlyList<string>? tags,
+        double? latitude,
+        double? longitude,
+        double? radiusKm,
+        CancellationToken cancellationToken = default)
     {
-        return await _dbContext.Scenes
+        var normalizedTags = NormalizeTags(tags);
+
+        var query = _dbContext.Scenes
             .AsNoTracking()
-            .OrderBy(scene => scene.Title)
-            .ToListAsync(cancellationToken);
+            .Include(scene => scene.Tags)
+            .AsQueryable();
+
+        if (normalizedTags.Count > 0)
+        {
+            query = query.Where(scene => scene.Tags.Any(tag => normalizedTags.Contains(tag.Tag)));
+        }
+
+        var scenes = await query.OrderBy(scene => scene.Title).ToListAsync(cancellationToken);
+
+        var hasLocationFilter = latitude.HasValue && longitude.HasValue;
+        if (!hasLocationFilter)
+        {
+            return scenes.Select(scene => new SceneSearchResult(scene, null)).ToList();
+        }
+
+        var results = scenes
+            .Select(scene => new SceneSearchResult(
+                scene,
+                scene.Latitude.HasValue && scene.Longitude.HasValue
+                    ? GetDistanceKm(latitude!.Value, longitude!.Value, scene.Latitude.Value, scene.Longitude.Value)
+                    : null))
+            .Where(result => result.DistanceKm.HasValue && (!radiusKm.HasValue || result.DistanceKm <= radiusKm.Value))
+            .OrderBy(result => result.DistanceKm)
+            .ToList();
+
+        return results;
     }
 
     public Task<Scene?> GetByIdAsync(long id, CancellationToken cancellationToken = default)
     {
         return _dbContext.Scenes
             .AsNoTracking()
+            .Include(scene => scene.Tags)
             .FirstOrDefaultAsync(scene => scene.Id == id, cancellationToken);
     }
 
-    public async Task<Scene> CreateAsync(Scene scene, CancellationToken cancellationToken = default)
+    public async Task<Scene> CreateAsync(Scene scene, IReadOnlyList<string>? tags, CancellationToken cancellationToken = default)
     {
         scene.CreatedAt = DateTimeOffset.UtcNow;
         scene.UpdatedAt = scene.CreatedAt;
+        foreach (var tag in NormalizeTags(tags))
+        {
+            scene.Tags.Add(new SceneTag { Tag = tag });
+        }
+
         _dbContext.Scenes.Add(scene);
         await _dbContext.SaveChangesAsync(cancellationToken);
         return scene;
     }
 
-    public async Task<Scene?> UpdateAsync(long id, Scene scene, long ownerUserId, CancellationToken cancellationToken = default)
+    public async Task<Scene?> UpdateAsync(long id, Scene scene, long ownerUserId, IReadOnlyList<string>? tags, CancellationToken cancellationToken = default)
     {
         var existingScene = await _dbContext.Scenes
+            .Include(existing => existing.Tags)
             .FirstOrDefaultAsync(existing => existing.Id == id && existing.OwnerUserId == ownerUserId, cancellationToken);
         if (existingScene is null)
         {
@@ -53,9 +94,48 @@ public sealed class SceneService : ISceneService
         existingScene.Latitude = scene.Latitude;
         existingScene.Longitude = scene.Longitude;
         existingScene.UpdatedAt = DateTimeOffset.UtcNow;
+
+        if (tags is not null)
+        {
+            var normalizedTags = NormalizeTags(tags);
+            existingScene.Tags.Clear();
+            foreach (var tag in normalizedTags)
+            {
+                existingScene.Tags.Add(new SceneTag { Tag = tag });
+            }
+        }
+
         await _dbContext.SaveChangesAsync(cancellationToken);
         return existingScene;
     }
+
+    private static IReadOnlyList<string> NormalizeTags(IReadOnlyList<string>? tags)
+    {
+        if (tags is null)
+        {
+            return [];
+        }
+
+        return tags
+            .Select(tag => tag.Trim().ToLowerInvariant())
+            .Where(tag => tag.Length > 0)
+            .Distinct()
+            .ToList();
+    }
+
+    private static double GetDistanceKm(double latitude1, double longitude1, double latitude2, double longitude2)
+    {
+        var deltaLatitude = DegreesToRadians(latitude2 - latitude1);
+        var deltaLongitude = DegreesToRadians(longitude2 - longitude1);
+
+        var a = Math.Sin(deltaLatitude / 2) * Math.Sin(deltaLatitude / 2) +
+                Math.Cos(DegreesToRadians(latitude1)) * Math.Cos(DegreesToRadians(latitude2)) *
+                Math.Sin(deltaLongitude / 2) * Math.Sin(deltaLongitude / 2);
+        var c = 2 * Math.Atan2(Math.Sqrt(a), Math.Sqrt(1 - a));
+        return EarthRadiusKm * c;
+    }
+
+    private static double DegreesToRadians(double degrees) => degrees * Math.PI / 180;
 
     public async Task<bool> DeleteAsync(long id, long ownerUserId, CancellationToken cancellationToken = default)
     {

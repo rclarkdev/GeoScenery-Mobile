@@ -31,9 +31,9 @@ public sealed class SceneServiceTests
             new Scene { Title = "Alpine", Description = "A", ImageUrl = "https://example.com/a.jpg", Rating = 9 });
         await _database.Context.SaveChangesAsync();
 
-        var scenes = await _service.GetAllAsync();
+        var scenes = await _service.SearchAsync(null, null, null, null);
 
-        Assert.That(scenes.Select(scene => scene.Title), Is.EqualTo(new[] { "Alpine", "Zion" }));
+        Assert.That(scenes.Select(result => result.Scene.Title), Is.EqualTo(new[] { "Alpine", "Zion" }));
     }
 
     [Test]
@@ -45,7 +45,7 @@ public sealed class SceneServiceTests
             Description = "A scenic view.",
             ImageUrl = "https://example.com/view.jpg",
             Rating = 9
-        });
+        }, null);
 
         var result = await _service.GetByIdAsync(scene.Id);
 
@@ -63,7 +63,7 @@ public sealed class SceneServiceTests
             Description = "Description",
             ImageUrl = "https://example.com/new.jpg",
             Rating = 7
-        });
+        }, null);
 
         Assert.That(scene.Id, Is.GreaterThan(0));
         Assert.That(scene.CreatedAt, Is.GreaterThanOrEqualTo(before));
@@ -80,7 +80,7 @@ public sealed class SceneServiceTests
             ImageUrl = "https://example.com/old.jpg",
             Rating = 5,
             OwnerUserId = _owner.Id
-        });
+        }, null);
 
         var updated = await _service.UpdateAsync(scene.Id, new Scene
         {
@@ -88,7 +88,7 @@ public sealed class SceneServiceTests
             Description = "New description",
             ImageUrl = "https://example.com/new.jpg",
             Rating = 10
-        }, _owner.Id);
+        }, _owner.Id, null);
 
         Assert.That(updated, Is.Not.Null);
         Assert.That(updated!.Title, Is.EqualTo("New title"));
@@ -98,7 +98,7 @@ public sealed class SceneServiceTests
     [Test]
     public async Task GivenAMissingSceneId_WhenUpdatingOrDeletingTheScene_ThenNoChangeIsMade()
     {
-        var updated = await _service.UpdateAsync(404, new Scene { Title = "Missing" }, _owner.Id);
+        var updated = await _service.UpdateAsync(404, new Scene { Title = "Missing" }, _owner.Id, null);
         var deleted = await _service.DeleteAsync(404, _owner.Id);
 
         Assert.That(updated, Is.Null);
@@ -108,7 +108,7 @@ public sealed class SceneServiceTests
     [Test]
     public async Task GivenAnExistingScene_WhenDeletingTheScene_ThenTheSceneNoLongerExists()
     {
-        var scene = await _service.CreateAsync(new Scene { Title = "Temporary", OwnerUserId = _owner.Id });
+        var scene = await _service.CreateAsync(new Scene { Title = "Temporary", OwnerUserId = _owner.Id }, null);
 
         var deleted = await _service.DeleteAsync(scene.Id, _owner.Id);
 
@@ -119,9 +119,9 @@ public sealed class SceneServiceTests
     [Test]
     public async Task GivenARecordOwnedByAnotherUser_WhenUpdatingOrDeletingTheScene_ThenNoChangeIsMade()
     {
-        var scene = await _service.CreateAsync(new Scene { Title = "Protected", OwnerUserId = _owner.Id });
+        var scene = await _service.CreateAsync(new Scene { Title = "Protected", OwnerUserId = _owner.Id }, null);
 
-        var updated = await _service.UpdateAsync(scene.Id, new Scene { Title = "Hijacked" }, 999);
+        var updated = await _service.UpdateAsync(scene.Id, new Scene { Title = "Hijacked" }, 999, null);
         var deleted = await _service.DeleteAsync(scene.Id, 999);
 
         Assert.That(updated, Is.Null);

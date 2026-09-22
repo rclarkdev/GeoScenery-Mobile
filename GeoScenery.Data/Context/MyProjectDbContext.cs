@@ -14,6 +14,7 @@ public class MyProjectDbContext : DbContext
     public DbSet<Scene> Scenes => Set<Scene>();
     public DbSet<Visit> Visits => Set<Visit>();
     public DbSet<Follow> Follows => Set<Follow>();
+    public DbSet<SceneTag> SceneTags => Set<SceneTag>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -35,6 +36,16 @@ public class MyProjectDbContext : DbContext
             .WithMany(user => user.Scenes)
             .HasForeignKey(scene => scene.OwnerUserId)
             .OnDelete(DeleteBehavior.SetNull);
+
+        modelBuilder.Entity<SceneTag>()
+            .HasIndex(sceneTag => new { sceneTag.SceneId, sceneTag.Tag })
+            .IsUnique();
+
+        modelBuilder.Entity<SceneTag>()
+            .HasOne(sceneTag => sceneTag.Scene)
+            .WithMany(scene => scene.Tags)
+            .HasForeignKey(sceneTag => sceneTag.SceneId)
+            .OnDelete(DeleteBehavior.Cascade);
 
         modelBuilder.Entity<Visit>()
             .HasIndex(visit => new { visit.UserId, visit.SceneId })

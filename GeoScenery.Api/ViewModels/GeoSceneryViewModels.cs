@@ -11,6 +11,8 @@ public sealed record SceneResponse(
     decimal Rating,
     double? Latitude,
     double? Longitude,
+    IReadOnlyList<string> Tags,
+    double? DistanceKm,
     long? OwnerUserId,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt);
@@ -36,6 +38,8 @@ public sealed record CreateSceneRequest
     [Range(-180, 180)]
     public double? Longitude { get; init; }
 
+    public IReadOnlyList<string>? Tags { get; init; }
+
 }
 
 /// <summary>Payload for updating a scene.</summary>
@@ -58,6 +62,8 @@ public sealed record UpdateSceneRequest
 
     [Range(-180, 180)]
     public double? Longitude { get; init; }
+
+    public IReadOnlyList<string>? Tags { get; init; }
 
 }
 
