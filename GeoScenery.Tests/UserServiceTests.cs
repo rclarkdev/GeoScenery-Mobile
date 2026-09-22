@@ -63,6 +63,35 @@ public sealed class UserServiceTests
     }
 
     [Test]
+    public async Task GivenAnExistingUser_WhenUpdatingProfileDetailFields_ThenAllFieldsArePersisted()
+    {
+        var user = await _service.CreateAsync(new User { DisplayName = "Ava", Email = "ava@example.com" });
+
+        var updated = await _service.UpdateAsync(user.Id, new User
+        {
+            DisplayName = "Ava",
+            Email = "ava@example.com",
+            ProfileImageUrl = "data:image/png;base64,abc",
+            Latitude = 12.5,
+            Longitude = -45.5,
+            BirthDate = new DateOnly(1990, 1, 1),
+            Education = "State University",
+            Hobbies = "Hiking, photography",
+            Employment = "Photographer",
+            Bio = "Loves scenic views."
+        });
+
+        Assert.That(updated?.ProfileImageUrl, Is.EqualTo("data:image/png;base64,abc"));
+        Assert.That(updated?.Latitude, Is.EqualTo(12.5));
+        Assert.That(updated?.Longitude, Is.EqualTo(-45.5));
+        Assert.That(updated?.BirthDate, Is.EqualTo(new DateOnly(1990, 1, 1)));
+        Assert.That(updated?.Education, Is.EqualTo("State University"));
+        Assert.That(updated?.Hobbies, Is.EqualTo("Hiking, photography"));
+        Assert.That(updated?.Employment, Is.EqualTo("Photographer"));
+        Assert.That(updated?.Bio, Is.EqualTo("Loves scenic views."));
+    }
+
+    [Test]
     public async Task GivenAnExistingUser_WhenDeletingTheUser_ThenTheUserNoLongerExists()
     {
         var user = await _service.CreateAsync(new User { DisplayName = "Temporary", Email = "temporary@example.com" });

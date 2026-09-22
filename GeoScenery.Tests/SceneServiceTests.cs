@@ -9,6 +9,7 @@ public sealed class SceneServiceTests
     private TestDatabase _database = null!;
     private SceneService _service = null!;
     private User _owner = null!;
+    private User _otherUser = null!;
 
     [SetUp]
     public void SetUp()
@@ -16,7 +17,8 @@ public sealed class SceneServiceTests
         _database = new TestDatabase();
         _service = new SceneService(_database.Context);
         _owner = new User { DisplayName = "Owner", Email = "owner@example.com", PasswordHash = "test" };
-        _database.Context.Users.Add(_owner);
+        _otherUser = new User { DisplayName = "Other", Email = "other@example.com", PasswordHash = "test" };
+        _database.Context.Users.AddRange(_owner, _otherUser);
         _database.Context.SaveChanges();
     }
 
@@ -127,5 +129,121 @@ public sealed class SceneServiceTests
         Assert.That(updated, Is.Null);
         Assert.That(deleted, Is.False);
         Assert.That((await _service.GetByIdAsync(scene.Id))?.Title, Is.EqualTo("Protected"));
+    }
+
+    [Test]
+    public async Task GivenTagsWithMixedCaseAndDuplicates_WhenCreatingAScene_ThenTagsAreNormalizedAndDeduplicated()
+    {
+        var scene = await _service.CreateAsync(new Scene { Title = "Tagged", OwnerUserId = _owner.Id },
+            ["Sunset", " sunset ", "Hiking"]);
+
+        Assert.That(scene.Tags.Select(tag => tag.Tag).OrderBy(tag => tag), Is.EqualTo(new[] { "hiking", "sunset" }));
+    }
+
+    [Test]
+    public async Task GivenAnExistingSceneWithTags_WhenUpdatingWithNewTags_ThenOldTagsAreReplaced()
+    {
+        var scene = await _service.CreateAsync(new Scene { Title = "Tagged", OwnerUserId = _owner.Id }, ["old-tag"]);
+
+        var updated = await _service.UpdateAsync(scene.Id, new Scene { Title = "Tagged" }, _owner.Id, ["new-tag"]);
+
+        Assert.That(updated!.Tags.Select(tag => tag.Tag), Is.EqualTo(new[] { "new-tag" }));
+    }
+
+    [Test]
+    public async Task GivenAnExistingSceneWithTags_WhenUpdatingWithNullTags_ThenExistingTagsAreUnchanged()
+    {
+        var scene = await _service.CreateAsync(new Scene { Title = "Tagged", OwnerUserId = _owner.Id }, ["keep-me"]);
+
+        var updated = await _service.UpdateAsync(scene.Id, new Scene { Title = "Tagged" }, _owner.Id, null);
+
+        Assert.That(updated!.Tags.Select(tag => tag.Tag), Is.EqualTo(new[] { "keep-me" }));
+    }
+
+    [Test]
+    public async Task GivenScenesWithDifferentTags_WhenSearchingByTag_ThenOnlyMatchingScenesAreReturned()
+    {
+        await _service.CreateAsync(new Scene { Title = "Beach", OwnerUserId = _owner.Id }, ["beach", "sunset"]);
+        await _service.CreateAsync(new Scene { Title = "Mountain", OwnerUserId = _owner.Id }, ["hiking"]);
+
+        var results = await _service.SearchAsync(["sunset"], null, null, null);
+
+        Assert.That(results.Select(result => result.Scene.Title), Is.EqualTo(new[] { "Beach" }));
+    }
+
+    [Test]
+    public async Task GivenScenesAtKnownLocations_WhenSearchingByLocationAndRadius_ThenOnlyScenesWithinRadiusAreReturnedOrderedByDistance()
+    {
+        // Roughly 1.1km and 111km north of the search origin, respectively
+        await _service.CreateAsync(new Scene { Title = "Near", OwnerUserId = _owner.Id, Latitude = 0.01, Longitude = 0 }, null);
+        await _service.CreateAsync(new Scene { Title = "Far", OwnerUserId = _owner.Id, Latitude = 1, Longitude = 0 }, null);
+        await _service.CreateAsync(new Scene { Title = "NoLocation", OwnerUserId = _owner.Id }, null);
+
+        var results = await _service.SearchAsync(null, 0, 0, 10);
+
+        Assert.That(results.Select(result => result.Scene.Title), Is.EqualTo(new[] { "Near" }));
+        Assert.That(results[0].DistanceKm, Is.Not.Null.And.LessThan(10));
+    }
+
+    [Test]
+    public async Task GivenNoRatingsYet_WhenRatingAScene_ThenARatingIsAdded()
+    {
+        var scene = await _service.CreateAsync(new Scene { Title = "Rated", OwnerUserId = _owner.Id }, null);
+
+        var rated = await _service.RateAsync(scene.Id, _otherUser.Id, 8);
+
+        Assert.That(rated, Is.Not.Null);
+        Assert.That(rated!.Ratings.Single().Rating, Is.EqualTo(8));
+        Assert.That(rated.Ratings.Single().UserId, Is.EqualTo(_otherUser.Id));
+    }
+
+    [Test]
+    public async Task GivenAnExistingRatingFromTheSameUser_WhenRatingAgain_ThenTheRatingIsUpdatedNotDuplicated()
+    {
+        var scene = await _service.CreateAsync(new Scene { Title = "Rated", OwnerUserId = _owner.Id }, null);
+        await _service.RateAsync(scene.Id, _otherUser.Id, 5);
+
+        var rated = await _service.RateAsync(scene.Id, _otherUser.Id, 9);
+
+        Assert.That(rated!.Ratings.Count, Is.EqualTo(1));
+        Assert.That(rated.Ratings.Single().Rating, Is.EqualTo(9));
+    }
+
+    [Test]
+    public async Task GivenAMissingScene_WhenRating_ThenNullIsReturned()
+    {
+        var rated = await _service.RateAsync(404, _otherUser.Id, 5);
+
+        Assert.That(rated, Is.Null);
+    }
+
+    [Test]
+    public async Task GivenAnExistingRating_WhenRemovingIt_ThenItIsGone()
+    {
+        var scene = await _service.CreateAsync(new Scene { Title = "Rated", OwnerUserId = _owner.Id }, null);
+        await _service.RateAsync(scene.Id, _otherUser.Id, 5);
+
+        var removed = await _service.RemoveRatingAsync(scene.Id, _otherUser.Id);
+
+        Assert.That(removed, Is.True);
+        Assert.That((await _service.GetByIdAsync(scene.Id))!.Ratings, Is.Empty);
+    }
+
+    [Test]
+    public async Task GivenNoExistingRating_WhenRemovingIt_ThenItIsIdempotentAndReturnsTrueForAnExistingScene()
+    {
+        var scene = await _service.CreateAsync(new Scene { Title = "Rated", OwnerUserId = _owner.Id }, null);
+
+        var removed = await _service.RemoveRatingAsync(scene.Id, _otherUser.Id);
+
+        Assert.That(removed, Is.True);
+    }
+
+    [Test]
+    public async Task GivenAMissingScene_WhenRemovingARating_ThenFalseIsReturned()
+    {
+        var removed = await _service.RemoveRatingAsync(404, _otherUser.Id);
+
+        Assert.That(removed, Is.False);
     }
 }
