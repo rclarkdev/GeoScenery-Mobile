@@ -66,4 +66,12 @@ export class SceneryService {
   deleteScene(id: number): Observable<void> {
     return this.http.delete<void>(`${this.scenesUrl}/${id}`);
   }
+
+  rateScene(id: number, rating: number): Observable<Scene> {
+    return this.http.post<Scene>(`${this.scenesUrl}/${id}/rating`, { rating });
+  }
+
+  removeRating(id: number): Observable<void> {
+    return this.http.delete<void>(`${this.scenesUrl}/${id}/rating`);
+  }
 }

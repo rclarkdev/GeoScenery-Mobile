@@ -63,4 +63,19 @@ describe('SceneryService', () => {
     expect(httpRequest.request.method).toBe('DELETE');
     httpRequest.flush(null);
   });
+
+  it('rates a scene', () => {
+    service.rateScene(scene.id, 7).subscribe(result => expect(result).toEqual(scene));
+    const httpRequest = http.expectOne(`${scenesUrl}/${scene.id}/rating`);
+    expect(httpRequest.request.method).toBe('POST');
+    expect(httpRequest.request.body).toEqual({ rating: 7 });
+    httpRequest.flush(scene);
+  });
+
+  it('removes a rating', () => {
+    service.removeRating(scene.id).subscribe();
+    const httpRequest = http.expectOne(`${scenesUrl}/${scene.id}/rating`);
+    expect(httpRequest.request.method).toBe('DELETE');
+    httpRequest.flush(null);
+  });
 });

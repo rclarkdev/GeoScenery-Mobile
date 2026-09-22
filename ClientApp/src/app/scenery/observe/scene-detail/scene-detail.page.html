@@ -7,7 +7,35 @@
   </ion-toolbar>
 </ion-header>
 
-<ion-content>
+<ion-content class="ion-padding" *ngIf="scene">
+  <ion-img *ngIf="scene.imageUrl" [src]="scene.imageUrl"></ion-img>
+  <h1>{{ scene.title }}</h1>
+  <p>{{ scene.description }}</p>
+  <p *ngIf="scene.tags.length > 0">
+    <ion-chip *ngFor="let tag of scene.tags">{{ tag }}</ion-chip>
+  </p>
+
+  <ion-item lines="none">
+    <ion-label>
+      <h3>Community rating</h3>
+      <p *ngIf="scene.ratingCount > 0">{{ scene.averageRating | number:'1.1-1' }} / 10 ({{ scene.ratingCount }} rating{{ scene.ratingCount === 1 ? '' : 's' }})</p>
+      <p *ngIf="scene.ratingCount === 0">No ratings yet.</p>
+    </ion-label>
+  </ion-item>
+
+  <ng-container *ngIf="!isOwnScene">
+    <ion-item>
+      <ion-input label="Your rating (0-10)" labelPlacement="stacked" type="number" min="0" max="10" [(ngModel)]="pendingRating"></ion-input>
+    </ion-item>
+    <ion-button expand="block" [disabled]="isRating || pendingRating == null" (click)="onSubmitRating()">
+      {{ isRating ? 'Saving...' : (scene.currentUserRating != null ? 'Update rating' : 'Submit rating') }}
+    </ion-button>
+    <ion-button expand="block" fill="clear" *ngIf="scene.currentUserRating != null" [disabled]="isRating" (click)="onRemoveRating()">
+      Remove my rating
+    </ion-button>
+    <ion-note color="danger" *ngIf="ratingError">Unable to save your rating.</ion-note>
+  </ng-container>
+
   <ion-button color="primary" margin (click)="onVisitScene()" [disabled]="isVisiting">
     {{ isVisiting ? 'Recording...' : 'Visit' }}
   </ion-button>

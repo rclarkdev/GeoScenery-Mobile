@@ -1,6 +1,7 @@
 import { CUSTOM_ELEMENTS_SCHEMA } from '@angular/core';
 import { ComponentFixture, TestBed, waitForAsync } from '@angular/core/testing';
 import { ActivatedRoute } from '@angular/router';
+import { HttpClientTestingModule } from '@angular/common/http/testing';
 import { NavController } from '@ionic/angular';
 import { of } from 'rxjs';
 
@@ -16,6 +17,7 @@ describe('SceneDetailPage', () => {
   beforeEach(waitForAsync(() => {
     TestBed.configureTestingModule({
       declarations: [ SceneDetailPage ],
+      imports: [HttpClientTestingModule],
       providers: [
         { provide: ActivatedRoute, useValue: { paramMap: of(new Map([['sceneId', '1']])) } },
         { provide: SceneryService, useValue: { getScene: () => of(new Scene(1, 'Test scene', 'Description', 'https://example.com/image.jpg', 8)) } },

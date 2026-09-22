@@ -9,6 +9,9 @@ export class Scene {
         public longitude?: number,
         public tags: string[] = [],
         public distanceKm?: number,
+        public averageRating?: number,
+        public ratingCount = 0,
+        public currentUserRating?: number,
         public ownerUserId?: number,
         public createdAt?: string,
         public updatedAt?: string
