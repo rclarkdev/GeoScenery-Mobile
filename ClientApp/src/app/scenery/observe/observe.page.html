@@ -29,6 +29,8 @@
           <ion-button expand="block" type="submit">Search</ion-button>
           <ion-button expand="block" fill="clear" type="button" *ngIf="isFiltered" (click)="clearSearch()">Clear filters</ion-button>
         </form>
+
+        <div #mapContainer class="scene-map"></div>
       </ion-col>
     </ion-row>
     <ion-row>
