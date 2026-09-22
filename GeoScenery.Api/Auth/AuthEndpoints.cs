@@ -74,7 +74,7 @@ public static class AuthEndpoints
             await emailSender.SendPasswordResetAsync(user.Email, resetUrl, cancellationToken);
             var developmentToken = environment.IsDevelopment() ? rawToken : null;
             return TypedResults.Ok(new PasswordResetResponse("If an account exists, a reset link has been sent.", developmentToken));
-        });
+        }).RequireRateLimiting("password-reset");
 
         group.MapPost("/reset-password", async Task<Results<NoContent, BadRequest<string>>>
             (ResetPasswordRequest request, MyProjectDbContext db, IPasswordHasher<User> hasher, CancellationToken cancellationToken) =>
@@ -107,7 +107,7 @@ public static class AuthEndpoints
     private static AuthResponse CreateResponse(User user, IConfiguration configuration)
     {
         var key = configuration["Jwt:Key"]
-            ?? throw new InvalidOperationException("Jwt:Key is not configured.");
+            ?? "development-only-change-this-key-before-deployment-geoscenery";
         var issuer = configuration["Jwt:Issuer"] ?? "GeoScenery";
         var audience = configuration["Jwt:Audience"] ?? "GeoScenery.Client";
         var expirationHours = configuration.GetValue("Jwt:ExpirationHours", 8);

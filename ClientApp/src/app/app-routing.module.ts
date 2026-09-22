@@ -5,6 +5,7 @@ import { AuthGuard } from './auth/auth.guard';
 const routes: Routes = [
   { path: '', redirectTo: 'scenery', pathMatch: 'full' },
   { path: 'auth', loadChildren: () => import('./auth/auth.module').then(m => m.AuthPageModule) },
+  { path: 'legal', loadChildren: () => import('./legal/legal.module').then(m => m.LegalPageModule) },
   { path: 'scenery', canActivate: [AuthGuard], loadChildren: () => import('./scenery/scenery.module').then(m => m.SceneryPageModule) },
   { path: 'visits', canActivate: [AuthGuard], loadChildren: () => import('./visits/visits.module').then(m => m.VisitsPageModule) }
 ];

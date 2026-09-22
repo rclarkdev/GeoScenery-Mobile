@@ -33,4 +33,12 @@
   <ion-button expand="block" fill="clear" (click)="toggleMode()">
     {{ isRegistering ? 'Already have an account? Sign in' : 'Need an account? Register' }}
   </ion-button>
+  <ion-text color="medium">
+    <p class="ion-text-center">
+      By using GeoScenery, you agree to our
+      <a routerLink="/legal/terms">Terms</a> and
+      <a routerLink="/legal/privacy">Privacy Policy</a>.
+      <a routerLink="/legal/community">Community Guidelines</a>.
+    </p>
+  </ion-text>
 </ion-content>

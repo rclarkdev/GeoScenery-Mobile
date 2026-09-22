@@ -61,6 +61,10 @@ public sealed class UserService : IUserService
             return false;
         }
 
+        _dbContext.Follows.RemoveRange(
+            _dbContext.Follows.Where(follow => follow.FollowerId == id || follow.FollowingId == id));
+        _dbContext.SceneRatings.RemoveRange(
+            _dbContext.SceneRatings.Where(rating => rating.UserId == id));
         _dbContext.Users.Remove(user);
         await _dbContext.SaveChangesAsync(cancellationToken);
         return true;

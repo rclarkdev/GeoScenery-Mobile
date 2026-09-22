@@ -1,5 +1,6 @@
 using GeoScenery.Data.Models;
 using GeoScenery.Data.Services;
+using Microsoft.EntityFrameworkCore;
 
 namespace GeoScenery.Tests;
 
@@ -100,5 +101,24 @@ public sealed class UserServiceTests
 
         Assert.That(deleted, Is.True);
         Assert.That(await _service.GetByIdAsync(user.Id), Is.Null);
+    }
+
+    [Test]
+    public async Task GivenAUserWithFollowsAndRatings_WhenDeletingTheUser_ThenRelatedRowsAreRemoved()
+    {
+        var user = await _service.CreateAsync(new User { DisplayName = "Ava", Email = "ava-related@example.com" });
+        var other = await _service.CreateAsync(new User { DisplayName = "Other", Email = "other-related@example.com" });
+        var scene = new Scene { Title = "View", Description = "View", ImageUrl = "image", OwnerUserId = other.Id };
+        _database.Context.Scenes.Add(scene);
+        await _database.Context.SaveChangesAsync();
+        _database.Context.Follows.Add(new Follow { FollowerId = user.Id, FollowingId = other.Id });
+        _database.Context.SceneRatings.Add(new SceneRating { SceneId = scene.Id, UserId = user.Id, Rating = 8 });
+        await _database.Context.SaveChangesAsync();
+
+        var deleted = await _service.DeleteAsync(user.Id);
+
+        Assert.That(deleted, Is.True);
+        Assert.That(await _database.Context.Follows.AnyAsync(follow => follow.FollowerId == user.Id || follow.FollowingId == user.Id), Is.False);
+        Assert.That(await _database.Context.SceneRatings.AnyAsync(rating => rating.UserId == user.Id), Is.False);
     }
 }

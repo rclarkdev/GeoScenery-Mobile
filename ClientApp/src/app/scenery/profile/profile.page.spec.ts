@@ -1,6 +1,7 @@
 import { CUSTOM_ELEMENTS_SCHEMA } from '@angular/core';
 import { ComponentFixture, TestBed, waitForAsync } from '@angular/core/testing';
-import { ActivatedRoute } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
+import { AlertController } from '@ionic/angular';
 import { Geolocation } from '@capacitor/geolocation';
 import { of, throwError } from 'rxjs';
 
@@ -27,9 +28,12 @@ describe('ProfilePage', () => {
             followUser: jasmine.createSpy('followUser').and.returnValue(of(undefined)),
             unfollowUser: jasmine.createSpy('unfollowUser').and.returnValue(of(undefined)),
             updateUser: jasmine.createSpy('updateUser').and.returnValue(of(user))
+            ,deleteUser: jasmine.createSpy('deleteUser').and.returnValue(of(undefined))
           }
         },
         { provide: AuthService, useValue: { currentUserId } },
+        { provide: Router, useValue: { navigateByUrl: jasmine.createSpy('navigateByUrl') } },
+        { provide: AlertController, useValue: { create: jasmine.createSpy('create') } },
         { provide: ActivatedRoute, useValue: { paramMap: of(paramMap) } }
       ],
       schemas: [CUSTOM_ELEMENTS_SCHEMA],
@@ -101,6 +105,8 @@ describe('ProfilePage', () => {
       providers: [
         { provide: UserService, useValue: userService },
         { provide: AuthService, useValue: { currentUserId: 1 } },
+        { provide: Router, useValue: { navigateByUrl: jasmine.createSpy('navigateByUrl') } },
+        { provide: AlertController, useValue: { create: jasmine.createSpy('create') } },
         { provide: ActivatedRoute, useValue: { paramMap: of(new Map([['userId', '2']])) } }
       ],
       schemas: [CUSTOM_ELEMENTS_SCHEMA],

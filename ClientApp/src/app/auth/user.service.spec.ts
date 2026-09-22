@@ -48,6 +48,13 @@ describe('UserService', () => {
     httpRequest.flush(user);
   });
 
+  it('deletes a user', () => {
+    service.deleteUser(user.id).subscribe();
+    const httpRequest = http.expectOne(`${usersUrl}/${user.id}`);
+    expect(httpRequest.request.method).toBe('DELETE');
+    httpRequest.flush(null);
+  });
+
   it('follows a user', () => {
     service.followUser(user.id).subscribe();
     const httpRequest = http.expectOne(`${usersUrl}/${user.id}/follow`);

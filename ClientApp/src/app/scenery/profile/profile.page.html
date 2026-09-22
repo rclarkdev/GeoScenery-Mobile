@@ -102,4 +102,17 @@
 
   <ion-note color="medium" *ngIf="isSaving">Saving...</ion-note>
   <ion-note color="danger" *ngIf="saveError">Unable to save your profile.</ion-note>
+
+  <ion-item *ngIf="isOwnProfile" lines="none">
+    <ion-label>
+      <h3>Account</h3>
+      <p>Manage your account and data.</p>
+    </ion-label>
+  </ion-item>
+  <ion-button *ngIf="isOwnProfile" expand="block" fill="outline" color="danger" (click)="confirmDeleteAccount()">
+    Delete account
+  </ion-button>
+  <ion-button *ngIf="isOwnProfile" expand="block" fill="clear" routerLink="/legal/support">
+    Contact support
+  </ion-button>
 </ion-content>

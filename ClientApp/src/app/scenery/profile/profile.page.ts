@@ -1,5 +1,6 @@
 import { Component, OnInit } from '@angular/core';
-import { ActivatedRoute } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
+import { AlertController } from '@ionic/angular';
 import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
 import { Geolocation } from '@capacitor/geolocation';
 import { AuthService } from '../../auth/auth.service';
@@ -22,6 +23,8 @@ export class ProfilePage implements OnInit {
 
   constructor(
     private route: ActivatedRoute,
+    private router: Router,
+    private alertController: AlertController,
     private authService: AuthService,
     private userService: UserService
   ) { }
@@ -119,6 +122,40 @@ export class ProfilePage implements OnInit {
       next: user => {
         this.user = user;
         this.isSaving = false;
+      },
+      error: () => {
+        this.isSaving = false;
+        this.saveError = true;
+      }
+    });
+  }
+
+  async confirmDeleteAccount(): Promise<void> {
+    const alert = await this.alertController.create({
+      header: 'Delete account?',
+      message: 'This permanently removes your profile, scenes, ratings, and follows.',
+      buttons: [
+        { text: 'Cancel', role: 'cancel' },
+        {
+          text: 'Delete',
+          role: 'destructive',
+          handler: () => this.deleteAccount()
+        }
+      ]
+    });
+    await alert.present();
+  }
+
+  private deleteAccount(): void {
+    if (!this.user) {
+      return;
+    }
+
+    this.isSaving = true;
+    this.userService.deleteUser(this.user.id).subscribe({
+      next: () => {
+        this.authService.logout();
+        void this.router.navigateByUrl('/auth');
       },
       error: () => {
         this.isSaving = false;

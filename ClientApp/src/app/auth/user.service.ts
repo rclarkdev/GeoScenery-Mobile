@@ -38,6 +38,10 @@ export class UserService {
     return this.http.put<User>(`${this.usersUrl}/${id}`, user);
   }
 
+  deleteUser(id: number): Observable<void> {
+    return this.http.delete<void>(`${this.usersUrl}/${id}`);
+  }
+
   followUser(id: number): Observable<void> {
     return this.http.post<void>(`${this.usersUrl}/${id}/follow`, {});
   }
