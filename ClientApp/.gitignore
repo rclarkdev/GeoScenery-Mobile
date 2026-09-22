@@ -33,3 +33,14 @@ npm-debug.log*
 /.vs/slnx.sqlite
 /.vs/GeoScenery-Mobile/FileContentIndex/a00e050e-333d-42c4-a59f-8c60024ecd2d.vsidx
 /.vs/GeoScenery-Mobile/FileContentIndex
+
+# Native Capacitor build output (android/ and ios/ project files are committed)
+/android/app/build
+/android/.gradle
+/android/local.properties
+/android/capacitor-cordova-android-plugins
+/ios/App/Pods
+/ios/App/output
+/ios/App/build
+/ios/App/App/public
+
