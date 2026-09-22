@@ -19,34 +19,37 @@ public static class GeoSceneryEndpoints
 
     private static void MapUserEndpoints(RouteGroupBuilder group)
     {
-        group.MapGet("", async (IUserService service, CancellationToken cancellationToken) =>
-            TypedResults.Ok((await service.GetAllAsync(cancellationToken)).Select(ToResponse)))
-            .WithName("GetUsers");
+        group.RequireAuthorization();
+
+        group.MapGet("/me", async Task<Results<Ok<UserResponse>, NotFound>>
+            (ClaimsPrincipal principal, IUserService service, CancellationToken cancellationToken) =>
+        {
+            var user = await service.GetByIdAsync(GetUserId(principal), cancellationToken);
+            return user is null ? TypedResults.NotFound() : TypedResults.Ok(ToResponse(user));
+        })
+        .WithName("GetCurrentUser");
 
         group.MapGet("/{id:long}", async Task<Results<Ok<UserResponse>, NotFound>>
-            (long id, IUserService service, CancellationToken cancellationToken) =>
+            (long id, ClaimsPrincipal principal, IUserService service, CancellationToken cancellationToken) =>
         {
+            if (id != GetUserId(principal))
+            {
+                return TypedResults.NotFound();
+            }
+
             var user = await service.GetByIdAsync(id, cancellationToken);
             return user is null ? TypedResults.NotFound() : TypedResults.Ok(ToResponse(user));
         })
         .WithName("GetUser");
 
-        group.MapPost("", async Task<Created<UserResponse>>
-            (CreateUserRequest request, IUserService service, CancellationToken cancellationToken) =>
-        {
-            var user = await service.CreateAsync(new User
-            {
-                DisplayName = request.DisplayName,
-                Email = request.Email,
-                PasswordHash = "!"
-            }, cancellationToken);
-            return TypedResults.Created($"/api/users/{user.Id}", ToResponse(user));
-        })
-        .WithName("CreateUser");
-
         group.MapPut("/{id:long}", async Task<Results<Ok<UserResponse>, NotFound>>
-            (long id, UpdateUserRequest request, IUserService service, CancellationToken cancellationToken) =>
+            (long id, UpdateUserRequest request, ClaimsPrincipal principal, IUserService service, CancellationToken cancellationToken) =>
         {
+            if (id != GetUserId(principal))
+            {
+                return TypedResults.NotFound();
+            }
+
             var user = await service.UpdateAsync(id, new User
             {
                 DisplayName = request.DisplayName,
@@ -56,10 +59,17 @@ public static class GeoSceneryEndpoints
         });
 
         group.MapDelete("/{id:long}", async Task<Results<NoContent, NotFound>>
-            (long id, IUserService service, CancellationToken cancellationToken) =>
-            await service.DeleteAsync(id, cancellationToken)
+            (long id, ClaimsPrincipal principal, IUserService service, CancellationToken cancellationToken) =>
+        {
+            if (id != GetUserId(principal))
+            {
+                return TypedResults.NotFound();
+            }
+
+            return await service.DeleteAsync(id, cancellationToken)
                 ? TypedResults.NoContent()
-                : TypedResults.NotFound());
+                : TypedResults.NotFound();
+        });
     }
 
     private static void MapSceneEndpoints(RouteGroupBuilder group)
@@ -102,14 +112,14 @@ public static class GeoSceneryEndpoints
                 ImageUrl = request.ImageUrl,
                 Rating = request.Rating,
                 OwnerUserId = GetUserId(principal)
-            }, cancellationToken);
+            }, GetUserId(principal), cancellationToken);
             return scene is null ? TypedResults.NotFound() : TypedResults.Ok(ToResponse(scene));
         })
         .RequireAuthorization();
 
         group.MapDelete("/{id:long}", async Task<Results<NoContent, NotFound>>
             (long id, ClaimsPrincipal principal, ISceneService service, CancellationToken cancellationToken) =>
-            await service.DeleteAsync(id, cancellationToken)
+            await service.DeleteAsync(id, GetUserId(principal), cancellationToken)
                 ? TypedResults.NoContent()
                 : TypedResults.NotFound())
             .RequireAuthorization();
@@ -117,18 +127,14 @@ public static class GeoSceneryEndpoints
 
     private static void MapVisitEndpoints(RouteGroupBuilder group)
     {
-        group.MapGet("", async (IVisitService service, CancellationToken cancellationToken) =>
-            TypedResults.Ok((await service.GetAllAsync(cancellationToken)).Select(ToResponse)))
-            .WithName("GetVisits");
-
         group.MapGet("/me", async (ClaimsPrincipal principal, IVisitService service, CancellationToken cancellationToken) =>
             TypedResults.Ok((await service.GetByUserIdAsync(GetUserId(principal), cancellationToken)).Select(ToResponse)))
             .WithName("GetUserVisits");
 
         group.MapGet("/{id:long}", async Task<Results<Ok<VisitResponse>, NotFound>>
-            (long id, IVisitService service, CancellationToken cancellationToken) =>
+            (long id, ClaimsPrincipal principal, IVisitService service, CancellationToken cancellationToken) =>
         {
-            var visit = await service.GetByIdAsync(id, cancellationToken);
+            var visit = await service.GetByIdAsync(id, GetUserId(principal), cancellationToken);
             return visit is null ? TypedResults.NotFound() : TypedResults.Ok(ToResponse(visit));
         })
         .WithName("GetVisit");
@@ -154,15 +160,16 @@ public static class GeoSceneryEndpoints
                 SceneId = request.SceneId,
                 UserId = GetUserId(principal),
                 VisitedAt = request.VisitedAt
-            }, cancellationToken);
+            }, GetUserId(principal), cancellationToken);
             return visit is null ? TypedResults.NotFound() : TypedResults.Ok(ToResponse(visit));
         });
 
         group.MapDelete("/{id:long}", async Task<Results<NoContent, NotFound>>
-            (long id, IVisitService service, CancellationToken cancellationToken) =>
-            await service.DeleteAsync(id, cancellationToken)
+            (long id, ClaimsPrincipal principal, IVisitService service, CancellationToken cancellationToken) =>
+            await service.DeleteAsync(id, GetUserId(principal), cancellationToken)
                 ? TypedResults.NoContent()
-                : TypedResults.NotFound());
+                : TypedResults.NotFound())
+            .RequireAuthorization();
     }
 
     private static UserResponse ToResponse(User user) =>

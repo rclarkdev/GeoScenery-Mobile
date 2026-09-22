@@ -37,9 +37,10 @@ public sealed class SceneService : ISceneService
         return scene;
     }
 
-    public async Task<Scene?> UpdateAsync(long id, Scene scene, CancellationToken cancellationToken = default)
+    public async Task<Scene?> UpdateAsync(long id, Scene scene, long ownerUserId, CancellationToken cancellationToken = default)
     {
-        var existingScene = await _dbContext.Scenes.FindAsync([id], cancellationToken);
+        var existingScene = await _dbContext.Scenes
+            .FirstOrDefaultAsync(existing => existing.Id == id && existing.OwnerUserId == ownerUserId, cancellationToken);
         if (existingScene is null)
         {
             return null;
@@ -49,15 +50,15 @@ public sealed class SceneService : ISceneService
         existingScene.Description = scene.Description;
         existingScene.ImageUrl = scene.ImageUrl;
         existingScene.Rating = scene.Rating;
-        existingScene.OwnerUserId = scene.OwnerUserId;
         existingScene.UpdatedAt = DateTimeOffset.UtcNow;
         await _dbContext.SaveChangesAsync(cancellationToken);
         return existingScene;
     }
 
-    public async Task<bool> DeleteAsync(long id, CancellationToken cancellationToken = default)
+    public async Task<bool> DeleteAsync(long id, long ownerUserId, CancellationToken cancellationToken = default)
     {
-        var scene = await _dbContext.Scenes.FindAsync([id], cancellationToken);
+        var scene = await _dbContext.Scenes
+            .FirstOrDefaultAsync(existing => existing.Id == id && existing.OwnerUserId == ownerUserId, cancellationToken);
         if (scene is null)
         {
             return false;

@@ -16,6 +16,15 @@ public class MyProjectDbContext : DbContext
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        modelBuilder.Entity<User>().HasData(new User
+        {
+            Id = 1,
+            DisplayName = "Master",
+            Email = "vjryanaye@gmail.com",
+            PasswordHash = "!",
+            CreatedAt = new DateTimeOffset(2026, 9, 22, 0, 0, 0, TimeSpan.Zero)
+        });
+
         modelBuilder.Entity<User>()
             .HasIndex(user => user.Email)
             .IsUnique();

@@ -51,7 +51,7 @@ public sealed class VisitServiceTests
     {
         var visit = await _service.CreateAsync(new Visit { UserId = _user.Id, SceneId = _scene.Id });
 
-        var result = await _service.GetByIdAsync(visit.Id);
+        var result = await _service.GetByIdAsync(visit.Id, _user.Id);
 
         Assert.That(result?.Scene.Title, Is.EqualTo("Scenic point"));
     }
@@ -70,7 +70,7 @@ public sealed class VisitServiceTests
             UserId = _user.Id,
             SceneId = secondScene.Id,
             VisitedAt = visitedAt
-        });
+        }, _user.Id);
 
         Assert.That(updated?.SceneId, Is.EqualTo(secondScene.Id));
         Assert.That(updated?.VisitedAt, Is.EqualTo(visitedAt));
@@ -81,9 +81,23 @@ public sealed class VisitServiceTests
     {
         var visit = await _service.CreateAsync(new Visit { UserId = _user.Id, SceneId = _scene.Id });
 
-        var deleted = await _service.DeleteAsync(visit.Id);
+        var deleted = await _service.DeleteAsync(visit.Id, _user.Id);
 
         Assert.That(deleted, Is.True);
-        Assert.That(await _service.GetByIdAsync(visit.Id), Is.Null);
+        Assert.That(await _service.GetByIdAsync(visit.Id, _user.Id), Is.Null);
+    }
+
+    [Test]
+    public async Task GivenAVisitOwnedByAnotherUser_WhenReadingUpdatingOrDeletingTheVisit_ThenNoAccessIsGranted()
+    {
+        var visit = await _service.CreateAsync(new Visit { UserId = _user.Id, SceneId = _scene.Id });
+
+        var result = await _service.GetByIdAsync(visit.Id, 999);
+        var updated = await _service.UpdateAsync(visit.Id, new Visit { SceneId = _scene.Id, VisitedAt = DateTimeOffset.UtcNow }, 999);
+        var deleted = await _service.DeleteAsync(visit.Id, 999);
+
+        Assert.That(result, Is.Null);
+        Assert.That(updated, Is.Null);
+        Assert.That(deleted, Is.False);
     }
 }

@@ -34,12 +34,12 @@ public sealed class VisitService : IVisitService
         return visits.OrderByDescending(visit => visit.VisitedAt).ToList();
     }
 
-    public Task<Visit?> GetByIdAsync(long id, CancellationToken cancellationToken = default)
+    public Task<Visit?> GetByIdAsync(long id, long userId, CancellationToken cancellationToken = default)
     {
         return _dbContext.Visits
             .AsNoTracking()
             .Include(visit => visit.Scene)
-            .FirstOrDefaultAsync(visit => visit.Id == id, cancellationToken);
+            .FirstOrDefaultAsync(visit => visit.Id == id && visit.UserId == userId, cancellationToken);
     }
 
     public async Task<Visit> CreateAsync(Visit visit, CancellationToken cancellationToken = default)
@@ -54,24 +54,25 @@ public sealed class VisitService : IVisitService
         return visit;
     }
 
-    public async Task<Visit?> UpdateAsync(long id, Visit visit, CancellationToken cancellationToken = default)
+    public async Task<Visit?> UpdateAsync(long id, Visit visit, long userId, CancellationToken cancellationToken = default)
     {
-        var existingVisit = await _dbContext.Visits.FindAsync([id], cancellationToken);
+        var existingVisit = await _dbContext.Visits
+            .FirstOrDefaultAsync(existing => existing.Id == id && existing.UserId == userId, cancellationToken);
         if (existingVisit is null)
         {
             return null;
         }
 
         existingVisit.SceneId = visit.SceneId;
-        existingVisit.UserId = visit.UserId;
         existingVisit.VisitedAt = visit.VisitedAt;
         await _dbContext.SaveChangesAsync(cancellationToken);
         return existingVisit;
     }
 
-    public async Task<bool> DeleteAsync(long id, CancellationToken cancellationToken = default)
+    public async Task<bool> DeleteAsync(long id, long userId, CancellationToken cancellationToken = default)
     {
-        var visit = await _dbContext.Visits.FindAsync([id], cancellationToken);
+        var visit = await _dbContext.Visits
+            .FirstOrDefaultAsync(existing => existing.Id == id && existing.UserId == userId, cancellationToken);
         if (visit is null)
         {
             return false;

@@ -24,9 +24,9 @@ describe('AuthService', () => {
   it('stores the token after a successful login', () => {
     service.login({ email: 'ava@example.com', password: 'Password123!' }).subscribe();
     const request = http.expectOne(`${authUrl}/login`);
-    request.flush({ userId: 1, displayName: 'Ava', email: 'ava@example.com', token: 'token' });
+    request.flush({ userId: 1, displayName: 'Ava', email: 'ava@example.com', token: createToken(Date.now() + 60000) });
 
-    expect(service.token).toBe('token');
+    expect(service.isAuthenticated).toBeTrue();
   });
 
   it('posts registration details to the registration endpoint', () => {
@@ -35,7 +35,19 @@ describe('AuthService', () => {
 
     expect(request.request.method).toBe('POST');
     expect(request.request.body.email).toBe('ava@example.com');
-    request.flush({ userId: 1, displayName: 'Ava', email: 'ava@example.com', token: 'token' });
+    request.flush({ userId: 1, displayName: 'Ava', email: 'ava@example.com', token: createToken(Date.now() + 60000) });
+  });
+
+  it('rejects an expired token', () => {
+    localStorage.setItem('geoscenery.auth.token', createToken(Date.now() - 60000));
+
+    expect(service.isAuthenticated).toBeFalse();
+  });
+
+  it('rejects a malformed token', () => {
+    localStorage.setItem('geoscenery.auth.token', 'not-a-jwt');
+
+    expect(service.isAuthenticated).toBeFalse();
   });
 
   it('removes stored authentication data when logging out', () => {
@@ -47,4 +59,10 @@ describe('AuthService', () => {
     expect(service.token).toBeNull();
     expect(localStorage.getItem('geoscenery.auth.user')).toBeNull();
   });
+
+  function createToken(expiresAt: number): string {
+    const payload = btoa(JSON.stringify({ exp: Math.floor(expiresAt / 1000) }))
+      .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    return `header.${payload}.signature`;
+  }
 });

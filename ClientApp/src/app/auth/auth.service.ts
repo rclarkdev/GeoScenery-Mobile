@@ -33,7 +33,19 @@ export class AuthService {
 
   get token(): string | null { return localStorage.getItem(this.tokenKey); }
 
-  get isAuthenticated(): boolean { return this.token !== null; }
+  get isAuthenticated(): boolean {
+    const token = this.token;
+    if (!token) {
+      return false;
+    }
+
+    try {
+      const payload = JSON.parse(this.decodeBase64Url(token.split('.')[1])) as { exp?: number };
+      return typeof payload.exp === 'number' && payload.exp * 1000 > Date.now();
+    } catch {
+      return false;
+    }
+  }
 
   logout(): void {
     localStorage.removeItem(this.tokenKey);
@@ -43,5 +55,10 @@ export class AuthService {
   private store(response: AuthResponse): void {
     localStorage.setItem(this.tokenKey, response.token);
     localStorage.setItem('geoscenery.auth.user', JSON.stringify(response));
+  }
+
+  private decodeBase64Url(value: string): string {
+    const normalized = value.replace(/-/g, '+').replace(/_/g, '/');
+    return atob(normalized.padEnd(normalized.length + (4 - normalized.length % 4) % 4, '='));
   }
 }

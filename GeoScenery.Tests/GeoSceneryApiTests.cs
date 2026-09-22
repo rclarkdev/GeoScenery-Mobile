@@ -68,15 +68,16 @@ public sealed class GeoSceneryApiTests
     }
 
     [Test]
-    public async Task GivenValidUserData_WhenPostingAUser_ThenTheApiReturnsCreatedUserData()
+    public async Task GivenValidRegistrationData_WhenRegistering_ThenTheApiReturnsCreatedUserData()
     {
-        var response = await _client.PostAsJsonAsync("/api/users", new
+        var response = await _client.PostAsJsonAsync("/api/auth/register", new
         {
             displayName = "Ava",
-            email = "ava@example.com"
+            email = "ava@example.com",
+            password = "Password123!"
         });
 
-        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.Created));
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK));
         var user = await response.Content.ReadFromJsonAsync<UserResponse>();
         Assert.That(user?.Email, Is.EqualTo("ava@example.com"));
     }
@@ -84,10 +85,11 @@ public sealed class GeoSceneryApiTests
     [Test]
     public async Task GivenValidVisitData_WhenPostingAVisit_ThenTheApiReturnsCreatedVisitData()
     {
-        var userResponse = await _client.PostAsJsonAsync("/api/users", new
+        var userResponse = await _client.PostAsJsonAsync("/api/auth/register", new
         {
             displayName = "Visitor",
-            email = "visitor@example.com"
+            email = "visitor@example.com",
+            password = "Password123!"
         });
         var user = await userResponse.Content.ReadFromJsonAsync<UserResponse>();
 
@@ -109,7 +111,7 @@ public sealed class GeoSceneryApiTests
         Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.Created));
         var visit = await response.Content.ReadFromJsonAsync<VisitResponse>();
         Assert.That(visit?.SceneId, Is.EqualTo(scene.Id));
-        Assert.That(visit?.UserId, Is.EqualTo(user.Id));
+        Assert.That(visit?.UserId, Is.EqualTo(1));
     }
 
     private sealed record SceneResponse(long Id, string Title, string Description, string ImageUrl, decimal Rating, long? OwnerUserId, DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt);

@@ -21,6 +21,7 @@ getTestBed().initTestEnvironment(
 import './app/app.component.spec';
 import './app/auth/auth.service.spec';
 import './app/auth/auth.guard.spec';
+import './app/auth/auth.interceptor.spec';
 import './app/auth/auth.page.spec';
 import './app/scenery/scenery.page.spec';
 import './app/scenery/scenery.service.spec';

@@ -29,7 +29,7 @@ public sealed class UserServiceTests
 
         var users = await _service.GetAllAsync();
 
-        Assert.That(users.Select(user => user.DisplayName), Is.EqualTo(new[] { "Ava", "Zoe" }));
+        Assert.That(users.Select(user => user.DisplayName), Is.EqualTo(new[] { "Ava", "Master", "Zoe" }));
     }
 
     [Test]
