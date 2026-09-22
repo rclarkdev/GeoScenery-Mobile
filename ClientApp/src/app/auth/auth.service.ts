@@ -33,6 +33,19 @@ export class AuthService {
 
   get token(): string | null { return localStorage.getItem(this.tokenKey); }
 
+  get currentUserId(): number | null {
+    const stored = localStorage.getItem('geoscenery.auth.user');
+    if (!stored) {
+      return null;
+    }
+
+    try {
+      return (JSON.parse(stored) as AuthResponse).userId;
+    } catch {
+      return null;
+    }
+  }
+
   get isAuthenticated(): boolean {
     const token = this.token;
     if (!token) {

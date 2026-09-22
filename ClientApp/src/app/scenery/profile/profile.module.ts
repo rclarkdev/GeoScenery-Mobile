@@ -6,11 +6,26 @@ import { Routes, RouterModule } from '@angular/router';
 import { IonicModule } from '@ionic/angular';
 
 import { ProfilePage } from './profile.page';
+import { FollowListPage } from './follow-list/follow-list.page';
 
 const routes: Routes = [
   {
     path: '',
     component: ProfilePage
+  },
+  {
+    path: ':userId',
+    component: ProfilePage
+  },
+  {
+    path: ':userId/followers',
+    component: FollowListPage,
+    data: { mode: 'followers' }
+  },
+  {
+    path: ':userId/following',
+    component: FollowListPage,
+    data: { mode: 'following' }
   }
 ];
 
@@ -22,6 +37,7 @@ const routes: Routes = [
     IonicModule,
     RouterModule.forChild(routes)
   ],
-  declarations: [ProfilePage]
+  declarations: [ProfilePage, FollowListPage]
 })
 export class ProfilePageModule {}
+

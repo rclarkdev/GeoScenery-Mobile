@@ -1,0 +1,25 @@
+<ion-header>
+  <ion-toolbar>
+    <ion-buttons slot="start">
+      <ion-back-button defaultHref="/scenery/tabs/profile"></ion-back-button>
+    </ion-buttons>
+    <ion-title>{{ title }}</ion-title>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content>
+  <ion-list>
+    <ion-item *ngFor="let user of users" button [routerLink]="['/scenery/tabs/profile', user.id]">
+      <ion-avatar slot="start">
+        <ion-img *ngIf="user.profileImageUrl; else placeholder" [src]="user.profileImageUrl"></ion-img>
+        <ng-template #placeholder>
+          <ion-icon name="person-circle-outline"></ion-icon>
+        </ng-template>
+      </ion-avatar>
+      <ion-label>{{ user.displayName }}</ion-label>
+    </ion-item>
+  </ion-list>
+  <ion-note class="ion-padding" color="medium" *ngIf="users.length === 0">
+    No users to show yet.
+  </ion-note>
+</ion-content>

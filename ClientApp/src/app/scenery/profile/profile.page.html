@@ -12,17 +12,30 @@
         <ion-icon name="person-circle-outline"></ion-icon>
       </ng-template>
     </ion-avatar>
-    <ion-button fill="outline" (click)="onPickPhoto()">
+    <ion-button *ngIf="isOwnProfile" fill="outline" (click)="onPickPhoto()">
       <ion-icon slot="start" name="camera-outline"></ion-icon>
       {{ user.profileImageUrl ? 'Change photo' : 'Add photo' }}
+    </ion-button>
+    <ion-button *ngIf="!isOwnProfile" [color]="user.isFollowedByCurrentUser ? 'medium' : 'primary'" [disabled]="isFollowChanging" (click)="toggleFollow()">
+      <ion-icon slot="start" [name]="user.isFollowedByCurrentUser ? 'person-remove-outline' : 'person-add-outline'"></ion-icon>
+      {{ user.isFollowedByCurrentUser ? 'Unfollow' : 'Follow' }}
     </ion-button>
   </div>
 
   <ion-item lines="none">
     <ion-label>
       <h1>{{ user.displayName }}</h1>
-      <p>{{ user.email }}</p>
+      <p *ngIf="user.email">{{ user.email }}</p>
     </ion-label>
+  </ion-item>
+
+  <ion-item lines="none" button [routerLink]="['/scenery/tabs/profile', user.id, 'followers']">
+    <ion-label>Followers</ion-label>
+    <ion-note slot="end">{{ user.followerCount }}</ion-note>
+  </ion-item>
+  <ion-item lines="none" button [routerLink]="['/scenery/tabs/profile', user.id, 'following']">
+    <ion-label>Following</ion-label>
+    <ion-note slot="end">{{ user.followingCount }}</ion-note>
   </ion-item>
 
   <ion-item lines="none">
@@ -34,7 +47,7 @@
       <p *ngIf="user.latitude == null || user.longitude == null">Not set</p>
     </ion-label>
   </ion-item>
-  <ion-button expand="block" fill="outline" [disabled]="isLocating" (click)="useCurrentLocation()">
+  <ion-button *ngIf="isOwnProfile" expand="block" fill="outline" [disabled]="isLocating" (click)="useCurrentLocation()">
     <ion-icon slot="start" name="locate-outline"></ion-icon>
     {{ isLocating ? 'Locating...' : 'Use current location' }}
   </ion-button>
@@ -42,7 +55,7 @@
     Couldn't get your current location.
   </ion-note>
 
-  <ion-button expand="block" routerLink="/scenery/tabs/my-scenes">
+  <ion-button *ngIf="isOwnProfile" expand="block" routerLink="/scenery/tabs/my-scenes">
     <ion-icon slot="start" name="globe"></ion-icon>
     View my scenes
   </ion-button>
