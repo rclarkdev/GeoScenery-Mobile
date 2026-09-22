@@ -1,0 +1,36 @@
+<ion-header>
+  <ion-toolbar>
+    <ion-buttons slot="start">
+      <ion-back-button defaultHref="/auth"></ion-back-button>
+    </ion-buttons>
+    <ion-title>About GeoScenery</ion-title>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content class="ion-padding">
+  <section class="about-intro ion-text-center">
+    <ion-icon name="earth-outline" aria-hidden="true"></ion-icon>
+    <h1>Notice more of the world around you.</h1>
+    <p>GeoScenery is a place to collect, explore, and share the scenes that make a place memorable.</p>
+  </section>
+
+  <ion-list lines="full">
+    <ion-item *ngFor="let feature of features">
+      <ion-icon slot="start" [name]="feature.icon" aria-hidden="true"></ion-icon>
+      <ion-label class="ion-text-wrap">
+        <h2>{{ feature.title }}</h2>
+        <p>{{ feature.description }}</p>
+      </ion-label>
+    </ion-item>
+  </ion-list>
+
+  <ion-item lines="none">
+    <ion-label class="ion-text-wrap">
+      <h2>Built around responsible sharing</h2>
+      <p>Photos and locations are yours to choose. Read our <a routerLink="/legal/community">Community Guidelines</a> and <a routerLink="/legal/privacy">Privacy Policy</a> before you begin.</p>
+    </ion-label>
+  </ion-item>
+
+  <ion-button expand="block" fill="outline" routerLink="/legal/support">Contact support</ion-button>
+  <p class="ion-text-center" aria-label="Application version">Version 1.0.0</p>
+</ion-content>
