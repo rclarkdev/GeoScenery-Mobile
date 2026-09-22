@@ -52,7 +52,12 @@ public static class GeoSceneryEndpoints
                 Email = request.Email,
                 ProfileImageUrl = request.ProfileImageUrl,
                 Latitude = request.Latitude,
-                Longitude = request.Longitude
+                Longitude = request.Longitude,
+                BirthDate = request.BirthDate,
+                Education = request.Education,
+                Hobbies = request.Hobbies,
+                Employment = request.Employment,
+                Bio = request.Bio
             }, cancellationToken);
             return user is null ? TypedResults.NotFound() : TypedResults.Ok(await ToResponseAsync(user, id, followService, cancellationToken));
         });
@@ -237,7 +242,9 @@ public static class GeoSceneryEndpoints
         var followingCount = await followService.GetFollowingCountAsync(user.Id, cancellationToken);
         var isFollowedByCurrentUser = viewerId != user.Id && await followService.IsFollowingAsync(viewerId, user.Id, cancellationToken);
         var email = user.Id == viewerId ? user.Email : null;
-        return new(user.Id, user.DisplayName, email, user.ProfileImageUrl, user.Latitude, user.Longitude, followerCount, followingCount, isFollowedByCurrentUser, user.CreatedAt);
+        return new(user.Id, user.DisplayName, email, user.ProfileImageUrl, user.Latitude, user.Longitude,
+            user.BirthDate, user.Education, user.Hobbies, user.Employment, user.Bio,
+            followerCount, followingCount, isFollowedByCurrentUser, user.CreatedAt);
     }
 
     private static UserSummaryResponse ToSummaryResponse(User user) =>

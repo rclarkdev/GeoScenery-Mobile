@@ -23,6 +23,20 @@ public class User
     [Range(-180, 180)]
     public double? Longitude { get; set; }
 
+    public DateOnly? BirthDate { get; set; }
+
+    [MaxLength(200)]
+    public string? Education { get; set; }
+
+    [MaxLength(500)]
+    public string? Hobbies { get; set; }
+
+    [MaxLength(200)]
+    public string? Employment { get; set; }
+
+    [MaxLength(2000)]
+    public string? Bio { get; set; }
+
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
 
     public ICollection<Scene> Scenes { get; set; } = new List<Scene>();

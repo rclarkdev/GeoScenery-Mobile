@@ -44,6 +44,11 @@ public sealed class UserService : IUserService
         existingUser.ProfileImageUrl = user.ProfileImageUrl;
         existingUser.Latitude = user.Latitude;
         existingUser.Longitude = user.Longitude;
+        existingUser.BirthDate = user.BirthDate;
+        existingUser.Education = user.Education;
+        existingUser.Hobbies = user.Hobbies;
+        existingUser.Employment = user.Employment;
+        existingUser.Bio = user.Bio;
         await _dbContext.SaveChangesAsync(cancellationToken);
         return existingUser;
     }

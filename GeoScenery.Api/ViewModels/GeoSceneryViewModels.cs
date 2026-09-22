@@ -61,7 +61,6 @@ public sealed record UpdateSceneRequest
 
 }
 
-/// <summary>Represents a user returned by the API.</summary>
 /// <summary>Represents a user returned by the API. Email is only populated when viewing your own profile.</summary>
 public sealed record UserResponse(
     long Id,
@@ -70,6 +69,11 @@ public sealed record UserResponse(
     string? ProfileImageUrl,
     double? Latitude,
     double? Longitude,
+    DateOnly? BirthDate,
+    string? Education,
+    string? Hobbies,
+    string? Employment,
+    string? Bio,
     int FollowerCount,
     int FollowingCount,
     bool IsFollowedByCurrentUser,
@@ -104,6 +108,20 @@ public sealed record UpdateUserRequest
 
     [Range(-180, 180)]
     public double? Longitude { get; init; }
+
+    public DateOnly? BirthDate { get; init; }
+
+    [MaxLength(200)]
+    public string? Education { get; init; }
+
+    [MaxLength(500)]
+    public string? Hobbies { get; init; }
+
+    [MaxLength(200)]
+    public string? Employment { get; init; }
+
+    [MaxLength(2000)]
+    public string? Bio { get; init; }
 }
 
 /// <summary>Represents a recorded scene visit.</summary>
