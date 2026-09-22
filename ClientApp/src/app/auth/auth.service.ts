@@ -33,6 +33,8 @@ export class AuthService {
 
   get token(): string | null { return localStorage.getItem(this.tokenKey); }
 
+  get isAuthenticated(): boolean { return this.token !== null; }
+
   logout(): void {
     localStorage.removeItem(this.tokenKey);
     localStorage.removeItem('geoscenery.auth.user');
