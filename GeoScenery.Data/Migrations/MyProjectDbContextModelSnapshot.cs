@@ -17,7 +17,7 @@ namespace GeoScenery.Data.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "10.0.0")
+                .HasAnnotation("ProductVersion", "10.0.11")
                 .HasAnnotation("Relational:MaxIdentifierLength", 128);
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
@@ -61,7 +61,7 @@ namespace GeoScenery.Data.Migrations
 
                     b.HasIndex("OwnerUserId");
 
-                    b.ToTable("Scenes");
+                    b.ToTable("Scenes", (string)null);
                 });
 
             modelBuilder.Entity("GeoScenery.Data.Models.User", b =>
@@ -94,7 +94,7 @@ namespace GeoScenery.Data.Migrations
                     b.HasIndex("Email")
                         .IsUnique();
 
-                    b.ToTable("Users");
+                    b.ToTable("Users", (string)null);
 
                     b.HasData(
                         new
@@ -131,7 +131,7 @@ namespace GeoScenery.Data.Migrations
                     b.HasIndex("UserId", "SceneId")
                         .IsUnique();
 
-                    b.ToTable("Visits");
+                    b.ToTable("Visits", (string)null);
                 });
 
             modelBuilder.Entity("GeoScenery.Data.Models.Scene", b =>

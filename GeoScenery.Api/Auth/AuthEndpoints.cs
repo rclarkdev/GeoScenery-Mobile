@@ -57,6 +57,8 @@ public static class AuthEndpoints
         var key = configuration["Jwt:Key"]
             ?? throw new InvalidOperationException("Jwt:Key is not configured.");
         var issuer = configuration["Jwt:Issuer"] ?? "GeoScenery";
+        var audience = configuration["Jwt:Audience"] ?? "GeoScenery.Client";
+        var expirationHours = configuration.GetValue("Jwt:ExpirationHours", 8);
         var claims = new[]
         {
             new Claim(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
@@ -65,7 +67,7 @@ public static class AuthEndpoints
             new Claim(ClaimTypes.Name, user.DisplayName)
         };
         var credentials = new SigningCredentials(new SymmetricSecurityKey(Encoding.UTF8.GetBytes(key)), SecurityAlgorithms.HmacSha256);
-        var token = new JwtSecurityToken(issuer, issuer, claims, expires: DateTime.UtcNow.AddHours(8), signingCredentials: credentials);
+        var token = new JwtSecurityToken(issuer, audience, claims, expires: DateTime.UtcNow.AddHours(expirationHours), signingCredentials: credentials);
         return new AuthResponse(user.Id, user.DisplayName, user.Email, new JwtSecurityTokenHandler().WriteToken(token));
     }
 }

@@ -28,7 +28,14 @@ export class AuthPage {
   toggleMode(): void {
     this.isRegistering = !this.isRegistering;
     this.authError = false;
-    this.authForm.controls.displayName.reset();
+    const displayName = this.authForm.controls.displayName;
+    displayName.reset();
+    if (this.isRegistering) {
+      displayName.addValidators(Validators.required);
+    } else {
+      displayName.removeValidators(Validators.required);
+    }
+    displayName.updateValueAndValidity();
   }
 
   onSubmit(): void {

@@ -21,7 +21,7 @@ public sealed class GeoSceneryApiTests
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes("development-only-change-this-key-before-deployment-geoscenery"));
         var token = new JwtSecurityTokenHandler().WriteToken(new JwtSecurityToken(
             issuer: "GeoScenery",
-            audience: "GeoScenery",
+            audience: "GeoScenery.Client",
             claims: [new Claim(ClaimTypes.NameIdentifier, "1")],
             expires: DateTime.UtcNow.AddMinutes(30),
             signingCredentials: new SigningCredentials(key, SecurityAlgorithms.HmacSha256)));

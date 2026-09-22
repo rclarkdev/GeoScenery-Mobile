@@ -17,6 +17,7 @@ builder.Services.AddDbContext<MyProjectDbContext>(options => options.UseSqlServe
 var jwtKey = builder.Configuration["Jwt:Key"]
     ?? throw new InvalidOperationException("Jwt:Key is not configured.");
 var jwtIssuer = builder.Configuration["Jwt:Issuer"] ?? "GeoScenery";
+var jwtAudience = builder.Configuration["Jwt:Audience"] ?? "GeoScenery.Client";
 builder.Services.AddSingleton<IPasswordHasher<GeoScenery.Data.Models.User>, PasswordHasher<GeoScenery.Data.Models.User>>();
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
@@ -26,7 +27,7 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             ValidateIssuer = true,
             ValidateAudience = true,
             ValidIssuer = jwtIssuer,
-            ValidAudience = jwtIssuer,
+            ValidAudience = jwtAudience,
             IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey)),
             ValidateLifetime = true,
             ValidateIssuerSigningKey = true

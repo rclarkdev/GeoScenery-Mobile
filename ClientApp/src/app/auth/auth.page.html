@@ -9,6 +9,9 @@
     <ion-item *ngIf="isRegistering">
       <ion-input label="Display name" labelPlacement="stacked" formControlName="displayName"></ion-input>
     </ion-item>
+    <ion-note color="danger" *ngIf="isRegistering && authForm.controls.displayName.touched && authForm.controls.displayName.invalid">
+      Enter a display name.
+    </ion-note>
     <ion-item>
       <ion-input label="Email" labelPlacement="stacked" type="email" formControlName="email"></ion-input>
     </ion-item>
