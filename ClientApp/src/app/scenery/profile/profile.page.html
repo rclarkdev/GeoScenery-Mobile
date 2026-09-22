@@ -1,0 +1,52 @@
+<ion-header>
+  <ion-toolbar>
+    <ion-title>Profile</ion-title>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content class="ion-padding" *ngIf="user">
+  <div class="ion-text-center">
+    <ion-avatar>
+      <ion-img *ngIf="user.profileImageUrl; else placeholder" [src]="user.profileImageUrl"></ion-img>
+      <ng-template #placeholder>
+        <ion-icon name="person-circle-outline"></ion-icon>
+      </ng-template>
+    </ion-avatar>
+    <ion-button fill="outline" (click)="onPickPhoto()">
+      <ion-icon slot="start" name="camera-outline"></ion-icon>
+      {{ user.profileImageUrl ? 'Change photo' : 'Add photo' }}
+    </ion-button>
+  </div>
+
+  <ion-item lines="none">
+    <ion-label>
+      <h1>{{ user.displayName }}</h1>
+      <p>{{ user.email }}</p>
+    </ion-label>
+  </ion-item>
+
+  <ion-item lines="none">
+    <ion-label>
+      <h3>Current location</h3>
+      <p *ngIf="user.latitude != null && user.longitude != null">
+        {{ user.latitude | number:'1.4-4' }}, {{ user.longitude | number:'1.4-4' }}
+      </p>
+      <p *ngIf="user.latitude == null || user.longitude == null">Not set</p>
+    </ion-label>
+  </ion-item>
+  <ion-button expand="block" fill="outline" [disabled]="isLocating" (click)="useCurrentLocation()">
+    <ion-icon slot="start" name="locate-outline"></ion-icon>
+    {{ isLocating ? 'Locating...' : 'Use current location' }}
+  </ion-button>
+  <ion-note color="danger" *ngIf="locationError">
+    Couldn't get your current location.
+  </ion-note>
+
+  <ion-button expand="block" routerLink="/scenery/tabs/my-scenes">
+    <ion-icon slot="start" name="globe"></ion-icon>
+    View my scenes
+  </ion-button>
+
+  <ion-note color="medium" *ngIf="isSaving">Saving...</ion-note>
+  <ion-note color="danger" *ngIf="saveError">Unable to save your profile.</ion-note>
+</ion-content>
