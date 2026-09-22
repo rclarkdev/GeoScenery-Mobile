@@ -24,6 +24,7 @@ export class EditScenePage implements OnInit {
     description: ['', [Validators.required, Validators.maxLength(4000)]],
     imageUrl: ['', [Validators.required]],
     rating: [0, [Validators.min(0), Validators.max(10)]],
+    tags: [''],
     latitude: this.formBuilder.control<number | null>(null, [Validators.min(-90), Validators.max(90)]),
     longitude: this.formBuilder.control<number | null>(null, [Validators.min(-180), Validators.max(180)])
   });
@@ -53,6 +54,7 @@ export class EditScenePage implements OnInit {
           description: scene.description,
           imageUrl: scene.imageUrl,
           rating: scene.rating,
+          tags: scene.tags.join(', '),
           latitude: scene.latitude ?? null,
           longitude: scene.longitude ?? null
         });
@@ -102,7 +104,11 @@ export class EditScenePage implements OnInit {
 
     this.isSaving = true;
     this.saveError = false;
-    this.sceneryService.updateScene(this.scene.id, this.sceneForm.getRawValue()).subscribe({
+    const { tags, ...rest } = this.sceneForm.getRawValue();
+    this.sceneryService.updateScene(this.scene.id, {
+      ...rest,
+      tags: tags.split(',').map(tag => tag.trim()).filter(tag => tag.length > 0)
+    }).subscribe({
       next: () => this.navCtrl.navigateBack(`/scenery/tabs/my-scenes/${this.scene?.id}`),
       error: () => {
         this.isSaving = false;

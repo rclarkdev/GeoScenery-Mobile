@@ -48,7 +48,15 @@ describe('EditScenePage', () => {
     component.sceneForm.patchValue({ title: 'Updated scene', rating: 9 });
     component.onSave();
 
-    expect(service.updateScene).toHaveBeenCalledWith(1, component.sceneForm.getRawValue());
+    expect(service.updateScene).toHaveBeenCalledWith(1, {
+      title: 'Updated scene',
+      description: 'Description',
+      imageUrl: 'https://example.com/image.jpg',
+      rating: 9,
+      latitude: null,
+      longitude: null,
+      tags: []
+    });
     expect(navController.navigateBack).toHaveBeenCalledWith('/scenery/tabs/my-scenes/1');
   });
 });

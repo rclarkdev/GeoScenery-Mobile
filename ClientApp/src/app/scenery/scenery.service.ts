@@ -1,5 +1,5 @@
 import { Injectable } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { Scene } from './scene.model';
 import { environment } from '../../environments/environment';
@@ -11,7 +11,15 @@ export interface SceneRequest {
   rating: number;
   latitude?: number | null;
   longitude?: number | null;
+  tags?: string[] | null;
   ownerUserId?: number;
+}
+
+export interface SceneSearchParams {
+  tags?: string[];
+  latitude?: number;
+  longitude?: number;
+  radiusKm?: number;
 }
 
 @Injectable({
@@ -24,6 +32,23 @@ export class SceneryService {
 
   getScenery(): Observable<Scene[]> {
     return this.http.get<Scene[]>(this.scenesUrl);
+  }
+
+  searchScenery(searchParams: SceneSearchParams): Observable<Scene[]> {
+    let params = new HttpParams();
+    if (searchParams.tags?.length) {
+      params = params.set('tags', searchParams.tags.join(','));
+    }
+    if (searchParams.latitude != null) {
+      params = params.set('latitude', searchParams.latitude);
+    }
+    if (searchParams.longitude != null) {
+      params = params.set('longitude', searchParams.longitude);
+    }
+    if (searchParams.radiusKm != null) {
+      params = params.set('radiusKm', searchParams.radiusKm);
+    }
+    return this.http.get<Scene[]>(this.scenesUrl, { params });
   }
 
   getScene(id: number): Observable<Scene> {

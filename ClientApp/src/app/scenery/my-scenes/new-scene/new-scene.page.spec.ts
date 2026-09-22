@@ -48,13 +48,22 @@ describe('NewScenePage', () => {
       description: 'A description',
       imageUrl: 'https://example.com/image.jpg',
       rating: 8,
+      tags: 'sunset, beach',
       latitude: null,
       longitude: null
     });
 
     component.onSave();
 
-    expect(service.createScene).toHaveBeenCalledWith(component.sceneForm.getRawValue());
+    expect(service.createScene).toHaveBeenCalledWith({
+      title: 'New scene',
+      description: 'A description',
+      imageUrl: 'https://example.com/image.jpg',
+      rating: 8,
+      latitude: null,
+      longitude: null,
+      tags: ['sunset', 'beach']
+    });
     expect(navController.navigateBack).toHaveBeenCalledWith('/scenery/tabs/my-scenes');
   });
 });
