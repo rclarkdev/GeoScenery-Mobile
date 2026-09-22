@@ -12,6 +12,8 @@ export class AuthPage {
   isRegistering = false;
   isSubmitting = false;
   authError = false;
+  recoverySent = false;
+  developmentResetToken: string | null = null;
 
   readonly authForm = this.formBuilder.nonNullable.group({
     displayName: [''],
@@ -28,6 +30,8 @@ export class AuthPage {
   toggleMode(): void {
     this.isRegistering = !this.isRegistering;
     this.authError = false;
+    this.recoverySent = false;
+    this.developmentResetToken = null;
     const displayName = this.authForm.controls.displayName;
     displayName.reset();
     if (this.isRegistering) {
@@ -50,6 +54,25 @@ export class AuthPage {
       : this.authService.login(this.authForm.getRawValue());
     operation.subscribe({
       next: () => this.navController.navigateRoot('/scenery/tabs/observe'),
+      error: () => { this.isSubmitting = false; this.authError = true; }
+    });
+  }
+
+  onForgotPassword(): void {
+    const email = this.authForm.controls.email;
+    if (email.invalid || this.isSubmitting) {
+      email.markAsTouched();
+      return;
+    }
+
+    this.isSubmitting = true;
+    this.authError = false;
+    this.authService.requestPasswordReset(email.value).subscribe({
+      next: response => {
+        this.isSubmitting = false;
+        this.recoverySent = true;
+        this.developmentResetToken = response.developmentToken ?? null;
+      },
       error: () => { this.isSubmitting = false; this.authError = true; }
     });
   }

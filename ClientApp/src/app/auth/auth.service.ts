@@ -1,3 +1,8 @@
+export interface PasswordResetResponse {
+  message: string;
+  developmentToken?: string;
+}
+
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable, tap } from 'rxjs';
@@ -29,6 +34,14 @@ export class AuthService {
 
   register(request: AuthRequest): Observable<AuthResponse> {
     return this.http.post<AuthResponse>(`${this.authUrl}/register`, request).pipe(tap(response => this.store(response)));
+  }
+
+  requestPasswordReset(email: string): Observable<PasswordResetResponse> {
+    return this.http.post<PasswordResetResponse>(`${this.authUrl}/forgot-password`, { email });
+  }
+
+  resetPassword(token: string, password: string): Observable<void> {
+    return this.http.post<void>(`${this.authUrl}/reset-password`, { token, password });
   }
 
   get token(): string | null { return localStorage.getItem(this.tokenKey); }

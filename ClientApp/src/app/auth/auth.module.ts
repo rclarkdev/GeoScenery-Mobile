@@ -6,11 +6,16 @@ import { Routes, RouterModule } from '@angular/router';
 import { IonicModule } from '@ionic/angular';
 
 import { AuthPage } from './auth.page';
+import { ResetPasswordPage } from './reset-password.page';
 
 const routes: Routes = [
   {
     path: '',
     component: AuthPage
+  },
+  {
+    path: 'reset-password',
+    component: ResetPasswordPage
   }
 ];
 
@@ -21,6 +26,6 @@ const routes: Routes = [
     IonicModule,
     RouterModule.forChild(routes)
   ],
-  declarations: [AuthPage]
+  declarations: [AuthPage, ResetPasswordPage]
 })
 export class AuthPageModule {}

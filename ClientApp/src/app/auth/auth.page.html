@@ -19,10 +19,17 @@
       <ion-input label="Password" labelPlacement="stacked" type="password" formControlName="password"></ion-input>
     </ion-item>
     <ion-note color="danger" *ngIf="authError">Unable to authenticate with those details.</ion-note>
+      <ion-note color="success" *ngIf="recoverySent">If an account exists, a reset link has been sent.</ion-note>
+    <ion-note color="medium" *ngIf="developmentResetToken">
+      Development reset token: {{ developmentResetToken }}
+    </ion-note>
     <ion-button expand="block" type="submit" [disabled]="isSubmitting">
       {{ isSubmitting ? 'Please wait...' : (isRegistering ? 'Create account' : 'Sign in') }}
     </ion-button>
   </form>
+  <ion-button *ngIf="!isRegistering" expand="block" fill="clear" (click)="onForgotPassword()">
+    Forgot password?
+  </ion-button>
   <ion-button expand="block" fill="clear" (click)="toggleMode()">
     {{ isRegistering ? 'Already have an account? Sign in' : 'Need an account? Register' }}
   </ion-button>

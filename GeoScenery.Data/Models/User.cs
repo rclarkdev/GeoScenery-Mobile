@@ -43,6 +43,8 @@ public class User
 
     public ICollection<Visit> Visits { get; set; } = new List<Visit>();
 
+    public ICollection<PasswordResetToken> PasswordResetTokens { get; set; } = new List<PasswordResetToken>();
+
     /// <summary>Follow rows where this user is the follower (who they follow).</summary>
     public ICollection<Follow> Following { get; set; } = new List<Follow>();
 

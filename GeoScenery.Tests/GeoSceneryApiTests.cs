@@ -4,6 +4,7 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
 using GeoScenery.Api.ViewModels;
+using GeoScenery.Api.Auth;
 using Microsoft.IdentityModel.Tokens;
 
 namespace GeoScenery.Tests;
@@ -343,6 +344,46 @@ public sealed class GeoSceneryApiTests
     }
 
     // ----- Auth -----
+
+    [Test]
+    public async Task GivenAnExistingEmail_WhenRequestingPasswordReset_ThenTheApiReturnsAcceptedMessageAndSendsAResetLink()
+    {
+        await RegisterUserAsync("Reset User", "reset@example.com");
+
+        var response = await _client.PostAsJsonAsync("/api/auth/forgot-password", new { email = "reset@example.com" });
+        var result = await response.Content.ReadFromJsonAsync<PasswordResetResponse>();
+
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK));
+        Assert.That(result?.Message, Does.Contain("If an account exists"));
+        Assert.That(_factory.LastResetUrl, Does.Contain("token="));
+    }
+
+    [Test]
+    public async Task GivenAnUnknownEmail_WhenRequestingPasswordReset_ThenTheApiReturnsTheSameGenericMessage()
+    {
+        var response = await _client.PostAsJsonAsync("/api/auth/forgot-password", new { email = "unknown@example.com" });
+        var result = await response.Content.ReadFromJsonAsync<PasswordResetResponse>();
+
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK));
+        Assert.That(result?.Message, Does.Contain("If an account exists"));
+        Assert.That(_factory.LastResetUrl, Is.Null);
+    }
+
+    [Test]
+    public async Task GivenAValidResetLink_WhenResettingThePassword_ThenTheNewPasswordCanBeUsedOnce()
+    {
+        await RegisterUserAsync("Reset User", "reset-once@example.com");
+        await _client.PostAsJsonAsync("/api/auth/forgot-password", new { email = "reset-once@example.com" });
+        var token = _factory.LastResetUrl!.Split("token=", StringSplitOptions.None)[1];
+
+        var resetResponse = await _client.PostAsJsonAsync("/api/auth/reset-password", new { token, password = "NewPassword123!" });
+        var loginResponse = await _client.PostAsJsonAsync("/api/auth/login", new { email = "reset-once@example.com", password = "NewPassword123!" });
+        var reusedResponse = await _client.PostAsJsonAsync("/api/auth/reset-password", new { token, password = "AnotherPassword123!" });
+
+        Assert.That(resetResponse.StatusCode, Is.EqualTo(HttpStatusCode.NoContent));
+        Assert.That(loginResponse.StatusCode, Is.EqualTo(HttpStatusCode.OK));
+        Assert.That(reusedResponse.StatusCode, Is.EqualTo(HttpStatusCode.BadRequest));
+    }
 
     [Test]
     public async Task GivenValidRegistrationData_WhenRegistering_ThenTheApiReturnsCreatedUserData()

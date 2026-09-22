@@ -6,12 +6,14 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
 using GeoScenery.Data.Models;
+using GeoScenery.Api.Auth;
 
 namespace GeoScenery.Tests;
 
 public sealed class GeoSceneryApiFactory : WebApplicationFactory<Program>
 {
     private readonly SqliteConnection _connection = new("Data Source=:memory:");
+    public string? LastResetUrl { get; private set; }
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
@@ -30,6 +32,7 @@ public sealed class GeoSceneryApiFactory : WebApplicationFactory<Program>
             }
 
             services.AddDbContext<MyProjectDbContext>(options => options.UseSqlite(_connection));
+            services.AddSingleton<IEmailSender>(new CapturingEmailSender(this));
 
             using var serviceProvider = services.BuildServiceProvider();
             using var scope = serviceProvider.CreateScope();
@@ -47,6 +50,15 @@ public sealed class GeoSceneryApiFactory : WebApplicationFactory<Program>
                 context.SaveChanges();
             }
         });
+    }
+
+    private sealed class CapturingEmailSender(GeoSceneryApiFactory factory) : IEmailSender
+    {
+        public Task SendPasswordResetAsync(string recipient, string resetUrl, CancellationToken cancellationToken = default)
+        {
+            factory.LastResetUrl = resetUrl;
+            return Task.CompletedTask;
+        }
     }
 
     protected override void Dispose(bool disposing)

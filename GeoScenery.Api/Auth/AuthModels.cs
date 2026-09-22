@@ -24,3 +24,20 @@ public sealed record LoginRequest
 }
 
 public sealed record AuthResponse(long UserId, string DisplayName, string Email, string Token);
+
+public sealed record ForgotPasswordRequest
+{
+    [Required, EmailAddress, MaxLength(320)]
+    public required string Email { get; init; }
+}
+
+public sealed record ResetPasswordRequest
+{
+    [Required]
+    public required string Token { get; init; }
+
+    [Required, MinLength(8), MaxLength(128)]
+    public required string Password { get; init; }
+}
+
+public sealed record PasswordResetResponse(string Message, string? DevelopmentToken = null);

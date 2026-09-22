@@ -19,6 +19,7 @@ var jwtKey = builder.Configuration["Jwt:Key"]
 var jwtIssuer = builder.Configuration["Jwt:Issuer"] ?? "GeoScenery";
 var jwtAudience = builder.Configuration["Jwt:Audience"] ?? "GeoScenery.Client";
 builder.Services.AddSingleton<IPasswordHasher<GeoScenery.Data.Models.User>, PasswordHasher<GeoScenery.Data.Models.User>>();
+builder.Services.AddScoped<IEmailSender, SmtpEmailSender>();
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {

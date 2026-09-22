@@ -16,6 +16,7 @@ public class MyProjectDbContext : DbContext
     public DbSet<Follow> Follows => Set<Follow>();
     public DbSet<SceneTag> SceneTags => Set<SceneTag>();
     public DbSet<SceneRating> SceneRatings => Set<SceneRating>();
+    public DbSet<PasswordResetToken> PasswordResetTokens => Set<PasswordResetToken>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -31,6 +32,16 @@ public class MyProjectDbContext : DbContext
         modelBuilder.Entity<User>()
             .HasIndex(user => user.Email)
             .IsUnique();
+
+        modelBuilder.Entity<PasswordResetToken>()
+            .HasIndex(token => token.TokenHash)
+            .IsUnique();
+
+        modelBuilder.Entity<PasswordResetToken>()
+            .HasOne(token => token.User)
+            .WithMany(user => user.PasswordResetTokens)
+            .HasForeignKey(token => token.UserId)
+            .OnDelete(DeleteBehavior.Cascade);
 
         modelBuilder.Entity<Scene>()
             .HasOne(scene => scene.OwnerUser)
