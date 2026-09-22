@@ -62,14 +62,21 @@ public sealed record UpdateSceneRequest
 }
 
 /// <summary>Represents a user returned by the API.</summary>
+/// <summary>Represents a user returned by the API. Email is only populated when viewing your own profile.</summary>
 public sealed record UserResponse(
     long Id,
     string DisplayName,
-    string Email,
+    string? Email,
     string? ProfileImageUrl,
     double? Latitude,
     double? Longitude,
+    int FollowerCount,
+    int FollowingCount,
+    bool IsFollowedByCurrentUser,
     DateTimeOffset CreatedAt);
+
+/// <summary>Represents a user in a follower/following list.</summary>
+public sealed record UserSummaryResponse(long Id, string DisplayName, string? ProfileImageUrl);
 
 /// <summary>Payload for creating a user.</summary>
 public sealed record CreateUserRequest

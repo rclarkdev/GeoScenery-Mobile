@@ -22,28 +22,24 @@ public static class GeoSceneryEndpoints
         group.RequireAuthorization();
 
         group.MapGet("/me", async Task<Results<Ok<UserResponse>, NotFound>>
-            (ClaimsPrincipal principal, IUserService service, CancellationToken cancellationToken) =>
+            (ClaimsPrincipal principal, IUserService service, IFollowService followService, CancellationToken cancellationToken) =>
         {
-            var user = await service.GetByIdAsync(GetUserId(principal), cancellationToken);
-            return user is null ? TypedResults.NotFound() : TypedResults.Ok(ToResponse(user));
+            var viewerId = GetUserId(principal);
+            var user = await service.GetByIdAsync(viewerId, cancellationToken);
+            return user is null ? TypedResults.NotFound() : TypedResults.Ok(await ToResponseAsync(user, viewerId, followService, cancellationToken));
         })
         .WithName("GetCurrentUser");
 
         group.MapGet("/{id:long}", async Task<Results<Ok<UserResponse>, NotFound>>
-            (long id, ClaimsPrincipal principal, IUserService service, CancellationToken cancellationToken) =>
+            (long id, ClaimsPrincipal principal, IUserService service, IFollowService followService, CancellationToken cancellationToken) =>
         {
-            if (id != GetUserId(principal))
-            {
-                return TypedResults.NotFound();
-            }
-
             var user = await service.GetByIdAsync(id, cancellationToken);
-            return user is null ? TypedResults.NotFound() : TypedResults.Ok(ToResponse(user));
+            return user is null ? TypedResults.NotFound() : TypedResults.Ok(await ToResponseAsync(user, GetUserId(principal), followService, cancellationToken));
         })
         .WithName("GetUser");
 
         group.MapPut("/{id:long}", async Task<Results<Ok<UserResponse>, NotFound>>
-            (long id, UpdateUserRequest request, ClaimsPrincipal principal, IUserService service, CancellationToken cancellationToken) =>
+            (long id, UpdateUserRequest request, ClaimsPrincipal principal, IUserService service, IFollowService followService, CancellationToken cancellationToken) =>
         {
             if (id != GetUserId(principal))
             {
@@ -58,7 +54,7 @@ public static class GeoSceneryEndpoints
                 Latitude = request.Latitude,
                 Longitude = request.Longitude
             }, cancellationToken);
-            return user is null ? TypedResults.NotFound() : TypedResults.Ok(ToResponse(user));
+            return user is null ? TypedResults.NotFound() : TypedResults.Ok(await ToResponseAsync(user, id, followService, cancellationToken));
         });
 
         group.MapDelete("/{id:long}", async Task<Results<NoContent, NotFound>>
@@ -73,6 +69,62 @@ public static class GeoSceneryEndpoints
                 ? TypedResults.NoContent()
                 : TypedResults.NotFound();
         });
+
+        group.MapPost("/{id:long}/follow", async Task<Results<NoContent, NotFound, BadRequest>>
+            (long id, ClaimsPrincipal principal, IUserService userService, IFollowService followService, CancellationToken cancellationToken) =>
+        {
+            var followerId = GetUserId(principal);
+            if (followerId == id)
+            {
+                return TypedResults.BadRequest();
+            }
+
+            var target = await userService.GetByIdAsync(id, cancellationToken);
+            if (target is null)
+            {
+                return TypedResults.NotFound();
+            }
+
+            await followService.FollowAsync(followerId, id, cancellationToken);
+            return TypedResults.NoContent();
+        })
+        .WithName("FollowUser");
+
+        group.MapDelete("/{id:long}/follow", async Task<NoContent>
+            (long id, ClaimsPrincipal principal, IFollowService followService, CancellationToken cancellationToken) =>
+        {
+            await followService.UnfollowAsync(GetUserId(principal), id, cancellationToken);
+            return TypedResults.NoContent();
+        })
+        .WithName("UnfollowUser");
+
+        group.MapGet("/{id:long}/followers", async Task<Results<Ok<IEnumerable<UserSummaryResponse>>, NotFound>>
+            (long id, IUserService userService, IFollowService followService, CancellationToken cancellationToken) =>
+        {
+            var target = await userService.GetByIdAsync(id, cancellationToken);
+            if (target is null)
+            {
+                return TypedResults.NotFound();
+            }
+
+            var followers = await followService.GetFollowersAsync(id, cancellationToken);
+            return TypedResults.Ok(followers.Select(ToSummaryResponse));
+        })
+        .WithName("GetUserFollowers");
+
+        group.MapGet("/{id:long}/following", async Task<Results<Ok<IEnumerable<UserSummaryResponse>>, NotFound>>
+            (long id, IUserService userService, IFollowService followService, CancellationToken cancellationToken) =>
+        {
+            var target = await userService.GetByIdAsync(id, cancellationToken);
+            if (target is null)
+            {
+                return TypedResults.NotFound();
+            }
+
+            var following = await followService.GetFollowingAsync(id, cancellationToken);
+            return TypedResults.Ok(following.Select(ToSummaryResponse));
+        })
+        .WithName("GetUserFollowing");
     }
 
     private static void MapSceneEndpoints(RouteGroupBuilder group)
@@ -179,8 +231,17 @@ public static class GeoSceneryEndpoints
             .RequireAuthorization();
     }
 
-    private static UserResponse ToResponse(User user) =>
-        new(user.Id, user.DisplayName, user.Email, user.ProfileImageUrl, user.Latitude, user.Longitude, user.CreatedAt);
+    private static async Task<UserResponse> ToResponseAsync(User user, long viewerId, IFollowService followService, CancellationToken cancellationToken)
+    {
+        var followerCount = await followService.GetFollowerCountAsync(user.Id, cancellationToken);
+        var followingCount = await followService.GetFollowingCountAsync(user.Id, cancellationToken);
+        var isFollowedByCurrentUser = viewerId != user.Id && await followService.IsFollowingAsync(viewerId, user.Id, cancellationToken);
+        var email = user.Id == viewerId ? user.Email : null;
+        return new(user.Id, user.DisplayName, email, user.ProfileImageUrl, user.Latitude, user.Longitude, followerCount, followingCount, isFollowedByCurrentUser, user.CreatedAt);
+    }
+
+    private static UserSummaryResponse ToSummaryResponse(User user) =>
+        new(user.Id, user.DisplayName, user.ProfileImageUrl);
 
     private static SceneResponse ToResponse(Scene scene) =>
         new(scene.Id, scene.Title, scene.Description, scene.ImageUrl, scene.Rating, scene.Latitude, scene.Longitude, scene.OwnerUserId, scene.CreatedAt, scene.UpdatedAt);

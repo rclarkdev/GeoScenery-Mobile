@@ -28,4 +28,10 @@ public class User
     public ICollection<Scene> Scenes { get; set; } = new List<Scene>();
 
     public ICollection<Visit> Visits { get; set; } = new List<Visit>();
+
+    /// <summary>Follow rows where this user is the follower (who they follow).</summary>
+    public ICollection<Follow> Following { get; set; } = new List<Follow>();
+
+    /// <summary>Follow rows where this user is being followed (their followers).</summary>
+    public ICollection<Follow> Followers { get; set; } = new List<Follow>();
 }

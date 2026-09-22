@@ -37,6 +37,7 @@ builder.Services.AddAuthorization();
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<ISceneService, SceneService>();
 builder.Services.AddScoped<IVisitService, VisitService>();
+builder.Services.AddScoped<IFollowService, FollowService>();
 builder.Services.AddValidation();
 builder.Services.AddOpenApi();
 builder.Services.AddCors(options =>

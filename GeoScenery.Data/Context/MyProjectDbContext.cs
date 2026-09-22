@@ -13,6 +13,7 @@ public class MyProjectDbContext : DbContext
     public DbSet<User> Users => Set<User>();
     public DbSet<Scene> Scenes => Set<Scene>();
     public DbSet<Visit> Visits => Set<Visit>();
+    public DbSet<Follow> Follows => Set<Follow>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -50,5 +51,21 @@ public class MyProjectDbContext : DbContext
             .WithMany(user => user.Visits)
             .HasForeignKey(visit => visit.UserId)
             .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<Follow>()
+            .HasIndex(follow => new { follow.FollowerId, follow.FollowingId })
+            .IsUnique();
+
+        modelBuilder.Entity<Follow>()
+            .HasOne(follow => follow.Follower)
+            .WithMany(user => user.Following)
+            .HasForeignKey(follow => follow.FollowerId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<Follow>()
+            .HasOne(follow => follow.Following)
+            .WithMany(user => user.Followers)
+            .HasForeignKey(follow => follow.FollowingId)
+            .OnDelete(DeleteBehavior.Restrict);
     }
 }
