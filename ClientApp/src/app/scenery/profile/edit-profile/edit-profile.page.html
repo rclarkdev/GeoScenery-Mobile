@@ -1,0 +1,51 @@
+<ion-header>
+  <ion-toolbar>
+    <ion-buttons slot="start">
+      <ion-back-button defaultHref="/scenery/tabs/profile"></ion-back-button>
+    </ion-buttons>
+    <ion-title>Edit Profile</ion-title>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content class="ion-padding">
+  <form [formGroup]="profileForm" (ngSubmit)="onSave()">
+    <ion-item>
+      <ion-input label="Name" labelPlacement="stacked" formControlName="displayName"></ion-input>
+    </ion-item>
+    <ion-note color="danger" *ngIf="profileForm.controls.displayName.touched && profileForm.controls.displayName.invalid">
+      Enter a name.
+    </ion-note>
+
+    <ion-item>
+      <ion-input label="Email" labelPlacement="stacked" type="email" formControlName="email"></ion-input>
+    </ion-item>
+    <ion-note color="danger" *ngIf="profileForm.controls.email.touched && profileForm.controls.email.invalid">
+      Enter a valid email.
+    </ion-note>
+
+    <ion-item>
+      <ion-input label="Birth date" labelPlacement="stacked" type="date" formControlName="birthDate"></ion-input>
+    </ion-item>
+
+    <ion-item>
+      <ion-input label="Employment" labelPlacement="stacked" formControlName="employment"></ion-input>
+    </ion-item>
+
+    <ion-item>
+      <ion-input label="Education" labelPlacement="stacked" formControlName="education"></ion-input>
+    </ion-item>
+
+    <ion-item>
+      <ion-input label="Hobbies" labelPlacement="stacked" formControlName="hobbies"></ion-input>
+    </ion-item>
+
+    <ion-item>
+      <ion-textarea label="Bio" labelPlacement="stacked" formControlName="bio" [autoGrow]="true"></ion-textarea>
+    </ion-item>
+
+    <ion-button expand="block" type="submit" [disabled]="isSaving">
+      {{ isSaving ? 'Saving...' : 'Save profile' }}
+    </ion-button>
+    <ion-note color="danger" *ngIf="saveError">Unable to save your profile.</ion-note>
+  </form>
+</ion-content>

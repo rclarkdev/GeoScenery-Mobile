@@ -109,7 +109,12 @@ export class ProfilePage implements OnInit {
       email: this.user.email ?? '',
       profileImageUrl: this.user.profileImageUrl,
       latitude: this.user.latitude,
-      longitude: this.user.longitude
+      longitude: this.user.longitude,
+      birthDate: this.user.birthDate,
+      education: this.user.education,
+      hobbies: this.user.hobbies,
+      employment: this.user.employment,
+      bio: this.user.bio
     }).subscribe({
       next: user => {
         this.user = user;

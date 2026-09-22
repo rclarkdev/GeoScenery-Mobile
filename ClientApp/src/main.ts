@@ -1,7 +1,7 @@
 import { enableProdMode } from '@angular/core';
 import { platformBrowserDynamic } from '@angular/platform-browser-dynamic';
 import { addIcons } from 'ionicons';
-import { add, cameraOutline, globe, locateOutline, personAddOutline, personCircleOutline, personRemoveOutline, search } from 'ionicons/icons';
+import { add, cameraOutline, createOutline, globe, locateOutline, personAddOutline, personCircleOutline, personRemoveOutline, search } from 'ionicons/icons';
 
 import { AppModule } from './app/app.module';
 import { environment } from './environments/environment';
@@ -14,6 +14,7 @@ if (environment.production) {
 addIcons({
   add,
   'camera-outline': cameraOutline,
+  'create-outline': createOutline,
   globe,
   'locate-outline': locateOutline,
   'person-add-outline': personAddOutline,

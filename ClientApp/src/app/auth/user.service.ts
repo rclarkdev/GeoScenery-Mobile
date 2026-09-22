@@ -11,6 +11,11 @@ export interface UpdateUserRequest {
   profileImageUrl?: string | null;
   latitude?: number | null;
   longitude?: number | null;
+  birthDate?: string | null;
+  education?: string | null;
+  hobbies?: string | null;
+  employment?: string | null;
+  bio?: string | null;
 }
 
 @Injectable({

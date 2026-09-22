@@ -7,11 +7,16 @@ import { IonicModule } from '@ionic/angular';
 
 import { ProfilePage } from './profile.page';
 import { FollowListPage } from './follow-list/follow-list.page';
+import { EditProfilePage } from './edit-profile/edit-profile.page';
 
 const routes: Routes = [
   {
     path: '',
     component: ProfilePage
+  },
+  {
+    path: 'edit',
+    component: EditProfilePage
   },
   {
     path: ':userId',
@@ -37,7 +42,7 @@ const routes: Routes = [
     IonicModule,
     RouterModule.forChild(routes)
   ],
-  declarations: [ProfilePage, FollowListPage]
+  declarations: [ProfilePage, FollowListPage, EditProfilePage]
 })
 export class ProfilePageModule {}
 
