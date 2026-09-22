@@ -5,6 +5,7 @@ using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
+using GeoScenery.Data.Models;
 
 namespace GeoScenery.Tests;
 
@@ -32,7 +33,19 @@ public sealed class GeoSceneryApiFactory : WebApplicationFactory<Program>
 
             using var serviceProvider = services.BuildServiceProvider();
             using var scope = serviceProvider.CreateScope();
-            scope.ServiceProvider.GetRequiredService<MyProjectDbContext>().Database.EnsureCreated();
+            var context = scope.ServiceProvider.GetRequiredService<MyProjectDbContext>();
+            context.Database.EnsureCreated();
+            if (!context.Users.Any())
+            {
+                context.Users.Add(new User
+                {
+                    Id = 1,
+                    DisplayName = "Test User",
+                    Email = "test@example.com",
+                    PasswordHash = "test-password-hash"
+                });
+                context.SaveChanges();
+            }
         });
     }
 

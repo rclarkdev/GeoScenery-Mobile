@@ -12,6 +12,9 @@ public class User
     [Required, MaxLength(320)]
     public string Email { get; set; } = string.Empty;
 
+    [Required]
+    public string PasswordHash { get; set; } = string.Empty;
+
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
 
     public ICollection<Scene> Scenes { get; set; } = new List<Scene>();

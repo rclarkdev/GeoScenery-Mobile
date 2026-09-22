@@ -1,9 +1,26 @@
 <ion-header>
   <ion-toolbar>
-    <ion-title>auth</ion-title>
+    <ion-title>{{ isRegistering ? 'Create account' : 'Sign in' }}</ion-title>
   </ion-toolbar>
 </ion-header>
 
-<ion-content>
-
+<ion-content class="ion-padding">
+  <form [formGroup]="authForm" (ngSubmit)="onSubmit()">
+    <ion-item *ngIf="isRegistering">
+      <ion-input label="Display name" labelPlacement="stacked" formControlName="displayName"></ion-input>
+    </ion-item>
+    <ion-item>
+      <ion-input label="Email" labelPlacement="stacked" type="email" formControlName="email"></ion-input>
+    </ion-item>
+    <ion-item>
+      <ion-input label="Password" labelPlacement="stacked" type="password" formControlName="password"></ion-input>
+    </ion-item>
+    <ion-note color="danger" *ngIf="authError">Unable to authenticate with those details.</ion-note>
+    <ion-button expand="block" type="submit" [disabled]="isSubmitting">
+      {{ isSubmitting ? 'Please wait...' : (isRegistering ? 'Create account' : 'Sign in') }}
+    </ion-button>
+  </form>
+  <ion-button expand="block" fill="clear" (click)="toggleMode()">
+    {{ isRegistering ? 'Already have an account? Sign in' : 'Need an account? Register' }}
+  </ion-button>
 </ion-content>

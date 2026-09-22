@@ -18,17 +18,17 @@ describe('VisitsService', () => {
   afterEach(() => http.verify());
 
   it('gets visits for the current user', () => {
-    service.getUserVisits(4).subscribe();
-    const request = http.expectOne(`${visitsUrl}/user/4`);
+    service.getUserVisits().subscribe();
+    const request = http.expectOne(`${visitsUrl}/me`);
     expect(request.request.method).toBe('GET');
     request.flush([]);
   });
 
   it('records a visit for the current user', () => {
-    service.recordVisit(8, 4).subscribe();
+    service.recordVisit(8).subscribe();
     const request = http.expectOne(visitsUrl);
     expect(request.request.method).toBe('POST');
-    expect(request.request.body).toEqual({ sceneId: 8, userId: 4 });
+    expect(request.request.body).toEqual({ sceneId: 8 });
     request.flush({ id: 1, sceneId: 8, userId: 4, visitedAt: '2026-09-21T12:00:00Z' });
   });
 });

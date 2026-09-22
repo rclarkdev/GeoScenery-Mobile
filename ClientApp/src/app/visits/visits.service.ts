@@ -6,7 +6,6 @@ import { Visit } from './visit.model';
 
 export interface CreateVisitRequest {
   sceneId: number;
-  userId: number;
   visitedAt?: string;
 }
 
@@ -16,12 +15,12 @@ export class VisitsService {
 
   constructor(private http: HttpClient) { }
 
-  getUserVisits(userId: number = environment.currentUserId): Observable<Visit[]> {
-    return this.http.get<Visit[]>(`${this.visitsUrl}/user/${userId}`);
+  getUserVisits(): Observable<Visit[]> {
+    return this.http.get<Visit[]>(`${this.visitsUrl}/me`);
   }
 
-  recordVisit(sceneId: number, userId: number = environment.currentUserId): Observable<Visit> {
-    const request: CreateVisitRequest = { sceneId, userId };
+  recordVisit(sceneId: number): Observable<Visit> {
+    const request: CreateVisitRequest = { sceneId };
     return this.http.post<Visit>(this.visitsUrl, request);
   }
 }

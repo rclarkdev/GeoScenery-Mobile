@@ -2,6 +2,7 @@ using GeoScenery.Api.ViewModels;
 using GeoScenery.Data.Models;
 using GeoScenery.Data.Services;
 using Microsoft.AspNetCore.Http.HttpResults;
+using System.Security.Claims;
 
 namespace GeoScenery.Api.Endpoints;
 
@@ -12,7 +13,7 @@ public static class GeoSceneryEndpoints
         var api = endpoints.MapGroup("/api");
         MapUserEndpoints(api.MapGroup("/users"));
         MapSceneEndpoints(api.MapGroup("/scenes"));
-        MapVisitEndpoints(api.MapGroup("/visits"));
+        MapVisitEndpoints(api.MapGroup("/visits").RequireAuthorization());
         return endpoints;
     }
 
@@ -36,7 +37,8 @@ public static class GeoSceneryEndpoints
             var user = await service.CreateAsync(new User
             {
                 DisplayName = request.DisplayName,
-                Email = request.Email
+                Email = request.Email,
+                PasswordHash = "!"
             }, cancellationToken);
             return TypedResults.Created($"/api/users/{user.Id}", ToResponse(user));
         })
@@ -75,7 +77,7 @@ public static class GeoSceneryEndpoints
         .WithName("GetScene");
 
         group.MapPost("", async Task<Created<SceneResponse>>
-            (CreateSceneRequest request, ISceneService service, CancellationToken cancellationToken) =>
+            (CreateSceneRequest request, ClaimsPrincipal principal, ISceneService service, CancellationToken cancellationToken) =>
         {
             var scene = await service.CreateAsync(new Scene
             {
@@ -83,14 +85,15 @@ public static class GeoSceneryEndpoints
                 Description = request.Description,
                 ImageUrl = request.ImageUrl,
                 Rating = request.Rating,
-                OwnerUserId = request.OwnerUserId
+                OwnerUserId = GetUserId(principal)
             }, cancellationToken);
             return TypedResults.Created($"/api/scenes/{scene.Id}", ToResponse(scene));
         })
-        .WithName("CreateScene");
+        .WithName("CreateScene")
+        .RequireAuthorization();
 
         group.MapPut("/{id:long}", async Task<Results<Ok<SceneResponse>, NotFound>>
-            (long id, UpdateSceneRequest request, ISceneService service, CancellationToken cancellationToken) =>
+            (long id, UpdateSceneRequest request, ClaimsPrincipal principal, ISceneService service, CancellationToken cancellationToken) =>
         {
             var scene = await service.UpdateAsync(id, new Scene
             {
@@ -98,16 +101,18 @@ public static class GeoSceneryEndpoints
                 Description = request.Description,
                 ImageUrl = request.ImageUrl,
                 Rating = request.Rating,
-                OwnerUserId = request.OwnerUserId
+                OwnerUserId = GetUserId(principal)
             }, cancellationToken);
             return scene is null ? TypedResults.NotFound() : TypedResults.Ok(ToResponse(scene));
-        });
+        })
+        .RequireAuthorization();
 
         group.MapDelete("/{id:long}", async Task<Results<NoContent, NotFound>>
-            (long id, ISceneService service, CancellationToken cancellationToken) =>
+            (long id, ClaimsPrincipal principal, ISceneService service, CancellationToken cancellationToken) =>
             await service.DeleteAsync(id, cancellationToken)
                 ? TypedResults.NoContent()
-                : TypedResults.NotFound());
+                : TypedResults.NotFound())
+            .RequireAuthorization();
     }
 
     private static void MapVisitEndpoints(RouteGroupBuilder group)
@@ -116,8 +121,8 @@ public static class GeoSceneryEndpoints
             TypedResults.Ok((await service.GetAllAsync(cancellationToken)).Select(ToResponse)))
             .WithName("GetVisits");
 
-        group.MapGet("/user/{userId:long}", async (long userId, IVisitService service, CancellationToken cancellationToken) =>
-            TypedResults.Ok((await service.GetByUserIdAsync(userId, cancellationToken)).Select(ToResponse)))
+        group.MapGet("/me", async (ClaimsPrincipal principal, IVisitService service, CancellationToken cancellationToken) =>
+            TypedResults.Ok((await service.GetByUserIdAsync(GetUserId(principal), cancellationToken)).Select(ToResponse)))
             .WithName("GetUserVisits");
 
         group.MapGet("/{id:long}", async Task<Results<Ok<VisitResponse>, NotFound>>
@@ -129,12 +134,12 @@ public static class GeoSceneryEndpoints
         .WithName("GetVisit");
 
         group.MapPost("", async Task<Created<VisitResponse>>
-            (CreateVisitRequest request, IVisitService service, CancellationToken cancellationToken) =>
+            (CreateVisitRequest request, ClaimsPrincipal principal, IVisitService service, CancellationToken cancellationToken) =>
         {
             var visit = await service.CreateAsync(new Visit
             {
                 SceneId = request.SceneId,
-                UserId = request.UserId,
+                UserId = GetUserId(principal),
                 VisitedAt = request.VisitedAt ?? DateTimeOffset.UtcNow
             }, cancellationToken);
             return TypedResults.Created($"/api/visits/{visit.Id}", ToResponse(visit));
@@ -142,12 +147,12 @@ public static class GeoSceneryEndpoints
         .WithName("CreateVisit");
 
         group.MapPut("/{id:long}", async Task<Results<Ok<VisitResponse>, NotFound>>
-            (long id, UpdateVisitRequest request, IVisitService service, CancellationToken cancellationToken) =>
+            (long id, UpdateVisitRequest request, ClaimsPrincipal principal, IVisitService service, CancellationToken cancellationToken) =>
         {
             var visit = await service.UpdateAsync(id, new Visit
             {
                 SceneId = request.SceneId,
-                UserId = request.UserId,
+                UserId = GetUserId(principal),
                 VisitedAt = request.VisitedAt
             }, cancellationToken);
             return visit is null ? TypedResults.NotFound() : TypedResults.Ok(ToResponse(visit));
@@ -168,4 +173,8 @@ public static class GeoSceneryEndpoints
 
     private static VisitResponse ToResponse(Visit visit) =>
         new(visit.Id, visit.SceneId, visit.UserId, visit.Scene?.Title, visit.VisitedAt);
+
+    private static long GetUserId(ClaimsPrincipal principal) =>
+        long.Parse(principal.FindFirstValue(ClaimTypes.NameIdentifier)
+            ?? throw new InvalidOperationException("Authenticated user id is missing."));
 }

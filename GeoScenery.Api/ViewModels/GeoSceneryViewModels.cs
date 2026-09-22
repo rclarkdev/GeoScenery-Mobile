@@ -28,7 +28,6 @@ public sealed record CreateSceneRequest
     [Range(0, 10)]
     public decimal Rating { get; init; }
 
-    public long? OwnerUserId { get; init; }
 }
 
 /// <summary>Payload for updating a scene.</summary>
@@ -46,7 +45,6 @@ public sealed record UpdateSceneRequest
     [Range(0, 10)]
     public decimal Rating { get; init; }
 
-    public long? OwnerUserId { get; init; }
 }
 
 /// <summary>Represents a user returned by the API.</summary>
@@ -81,9 +79,6 @@ public sealed record CreateVisitRequest
     [Range(1, long.MaxValue)]
     public long SceneId { get; init; }
 
-    [Range(1, long.MaxValue)]
-    public long UserId { get; init; }
-
     public DateTimeOffset? VisitedAt { get; init; }
 }
 
@@ -92,9 +87,6 @@ public sealed record UpdateVisitRequest
 {
     [Range(1, long.MaxValue)]
     public long SceneId { get; init; }
-
-    [Range(1, long.MaxValue)]
-    public long UserId { get; init; }
 
     public DateTimeOffset VisitedAt { get; init; }
 }

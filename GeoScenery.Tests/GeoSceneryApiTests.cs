@@ -1,5 +1,9 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
+using System.Text;
+using Microsoft.IdentityModel.Tokens;
 
 namespace GeoScenery.Tests;
 
@@ -14,6 +18,14 @@ public sealed class GeoSceneryApiTests
     {
         _factory = new GeoSceneryApiFactory();
         _client = _factory.CreateClient();
+        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes("development-only-change-this-key-before-deployment-geoscenery"));
+        var token = new JwtSecurityTokenHandler().WriteToken(new JwtSecurityToken(
+            issuer: "GeoScenery",
+            audience: "GeoScenery",
+            claims: [new Claim(ClaimTypes.NameIdentifier, "1")],
+            expires: DateTime.UtcNow.AddMinutes(30),
+            signingCredentials: new SigningCredentials(key, SecurityAlgorithms.HmacSha256)));
+        _client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
     }
 
     [TearDown]
