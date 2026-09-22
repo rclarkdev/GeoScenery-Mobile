@@ -2,6 +2,8 @@ using System.Text;
 using System.Threading.RateLimiting;
 using GeoScenery.Api.Auth;
 using GeoScenery.Api.Endpoints;
+using GeoScenery.Api.Logging;
+using GeoScenery.Api.Middleware;
 using GeoScenery.Data.Context;
 using GeoScenery.Data.Services;
 using Microsoft.EntityFrameworkCore;
@@ -58,6 +60,7 @@ builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<ISceneService, SceneService>();
 builder.Services.AddScoped<IVisitService, VisitService>();
 builder.Services.AddScoped<IFollowService, FollowService>();
+builder.Services.AddScoped<ISqlAuditLog, SqlAuditLog>();
 builder.Services.AddValidation();
 builder.Services.AddOpenApi();
 builder.Services.AddCors(options =>
@@ -91,6 +94,8 @@ app.UseCors("ClientApp");
 app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseMiddleware<SqlRequestLoggingMiddleware>();
+app.MapHealthEndpoints();
 app.MapAuthEndpoints(builder.Configuration);
 app.MapGeoSceneryEndpoints();
 

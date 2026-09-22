@@ -17,6 +17,7 @@ public class MyProjectDbContext : DbContext
     public DbSet<SceneTag> SceneTags => Set<SceneTag>();
     public DbSet<SceneRating> SceneRatings => Set<SceneRating>();
     public DbSet<PasswordResetToken> PasswordResetTokens => Set<PasswordResetToken>();
+    public DbSet<AppLogEntry> AppLogEntries => Set<AppLogEntry>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -42,6 +43,15 @@ public class MyProjectDbContext : DbContext
             .WithMany(user => user.PasswordResetTokens)
             .HasForeignKey(token => token.UserId)
             .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<AppLogEntry>()
+            .HasIndex(log => log.CreatedAt);
+
+        modelBuilder.Entity<AppLogEntry>()
+            .HasIndex(log => log.CorrelationId);
+
+        modelBuilder.Entity<AppLogEntry>()
+            .HasIndex(log => log.UserId);
 
         modelBuilder.Entity<Scene>()
             .HasOne(scene => scene.OwnerUser)

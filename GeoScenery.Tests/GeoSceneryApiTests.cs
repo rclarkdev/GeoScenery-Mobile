@@ -5,7 +5,10 @@ using System.Security.Claims;
 using System.Text;
 using GeoScenery.Api.ViewModels;
 using GeoScenery.Api.Auth;
+using GeoScenery.Data.Context;
 using Microsoft.IdentityModel.Tokens;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.EntityFrameworkCore;
 
 namespace GeoScenery.Tests;
 
@@ -68,6 +71,34 @@ public sealed class GeoSceneryApiTests
     }
 
     // ----- Scenes: basic CRUD -----
+
+    [Test]
+    public async Task GivenAHealthyApi_WhenCheckingLiveness_ThenTheApiReturnsOk()
+    {
+        var response = await _client.GetAsync("/health/live");
+
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK));
+    }
+
+    [Test]
+    public async Task GivenAnApiRequest_WhenItCompletes_ThenACorrelationIdAndSqlLogEntryAreCreated()
+    {
+        var response = await _client.GetAsync("/api/scenes");
+
+        Assert.That(response.Headers.TryGetValues("X-Correlation-ID", out var values), Is.True);
+        Assert.That(values!.Single(), Is.Not.Empty);
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<MyProjectDbContext>();
+        Assert.That(await db.AppLogEntries.AnyAsync(log => log.EventName == "HttpRequest" && log.RequestPath == "/api/scenes"), Is.True);
+    }
+
+    [Test]
+    public async Task GivenAReachableDatabase_WhenCheckingReadiness_ThenTheApiReturnsOk()
+    {
+        var response = await _client.GetAsync("/health/ready");
+
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK));
+    }
 
     [Test]
     public async Task GivenAnEmptyDatabase_WhenGettingScenes_ThenTheApiReturnsAnEmptyOkList()

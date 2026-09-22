@@ -1,0 +1,26 @@
+name: Apply production database migrations
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Install EF Core CLI
+        run: dotnet tool install --global dotnet-ef --version 10.0.11
+      - name: Apply migrations
+        env:
+          ASPNETCORE_ENVIRONMENT: Production
+          ConnectionStrings__DefaultConnection: ${{ secrets.PRODUCTION_CONNECTION_STRING }}
+          Jwt__Key: ${{ secrets.PRODUCTION_JWT_KEY }}
+          Cors__AllowedOrigins__0: ${{ vars.CLIENT_ORIGIN }}
+        run: dotnet ef database update --project GeoScenery.Data --startup-project GeoScenery.Api
