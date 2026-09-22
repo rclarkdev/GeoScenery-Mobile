@@ -27,6 +27,7 @@ public sealed class SceneService : ISceneService
         var query = _dbContext.Scenes
             .AsNoTracking()
             .Include(scene => scene.Tags)
+            .Include(scene => scene.Ratings)
             .AsQueryable();
 
         if (normalizedTags.Count > 0)
@@ -60,6 +61,7 @@ public sealed class SceneService : ISceneService
         return _dbContext.Scenes
             .AsNoTracking()
             .Include(scene => scene.Tags)
+            .Include(scene => scene.Ratings)
             .FirstOrDefaultAsync(scene => scene.Id == id, cancellationToken);
     }
 
@@ -81,6 +83,7 @@ public sealed class SceneService : ISceneService
     {
         var existingScene = await _dbContext.Scenes
             .Include(existing => existing.Tags)
+            .Include(existing => existing.Ratings)
             .FirstOrDefaultAsync(existing => existing.Id == id && existing.OwnerUserId == ownerUserId, cancellationToken);
         if (existingScene is null)
         {
@@ -148,6 +151,51 @@ public sealed class SceneService : ISceneService
 
         _dbContext.Scenes.Remove(scene);
         await _dbContext.SaveChangesAsync(cancellationToken);
+        return true;
+    }
+
+    public async Task<Scene?> RateAsync(long sceneId, long userId, decimal rating, CancellationToken cancellationToken = default)
+    {
+        var scene = await _dbContext.Scenes
+            .Include(existing => existing.Ratings)
+            .FirstOrDefaultAsync(existing => existing.Id == sceneId, cancellationToken);
+        if (scene is null)
+        {
+            return null;
+        }
+
+        var existingRating = scene.Ratings.FirstOrDefault(sceneRating => sceneRating.UserId == userId);
+        if (existingRating is not null)
+        {
+            existingRating.Rating = rating;
+            existingRating.UpdatedAt = DateTimeOffset.UtcNow;
+        }
+        else
+        {
+            scene.Ratings.Add(new SceneRating { UserId = userId, Rating = rating });
+        }
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        return scene;
+    }
+
+    public async Task<bool> RemoveRatingAsync(long sceneId, long userId, CancellationToken cancellationToken = default)
+    {
+        var scene = await _dbContext.Scenes
+            .Include(existing => existing.Ratings)
+            .FirstOrDefaultAsync(existing => existing.Id == sceneId, cancellationToken);
+        if (scene is null)
+        {
+            return false;
+        }
+
+        var existingRating = scene.Ratings.FirstOrDefault(sceneRating => sceneRating.UserId == userId);
+        if (existingRating is not null)
+        {
+            scene.Ratings.Remove(existingRating);
+            await _dbContext.SaveChangesAsync(cancellationToken);
+        }
+
         return true;
     }
 }

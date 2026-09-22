@@ -134,21 +134,22 @@ public static class GeoSceneryEndpoints
 
     private static void MapSceneEndpoints(RouteGroupBuilder group)
     {
-        group.MapGet("", async (string? tags, double? latitude, double? longitude, double? radiusKm, ISceneService service, CancellationToken cancellationToken) =>
+        group.MapGet("", async (string? tags, double? latitude, double? longitude, double? radiusKm, ClaimsPrincipal principal, ISceneService service, CancellationToken cancellationToken) =>
         {
             var tagList = string.IsNullOrWhiteSpace(tags)
                 ? null
                 : tags.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            var viewerId = TryGetUserId(principal);
             var results = await service.SearchAsync(tagList, latitude, longitude, radiusKm, cancellationToken);
-            return TypedResults.Ok(results.Select(result => ToResponse(result.Scene, result.DistanceKm)));
+            return TypedResults.Ok(results.Select(result => ToResponse(result.Scene, result.DistanceKm, viewerId)));
         })
         .WithName("GetScenes");
 
         group.MapGet("/{id:long}", async Task<Results<Ok<SceneResponse>, NotFound>>
-            (long id, ISceneService service, CancellationToken cancellationToken) =>
+            (long id, ClaimsPrincipal principal, ISceneService service, CancellationToken cancellationToken) =>
         {
             var scene = await service.GetByIdAsync(id, cancellationToken);
-            return scene is null ? TypedResults.NotFound() : TypedResults.Ok(ToResponse(scene));
+            return scene is null ? TypedResults.NotFound() : TypedResults.Ok(ToResponse(scene, viewerId: TryGetUserId(principal)));
         })
         .WithName("GetScene");
 
@@ -165,7 +166,7 @@ public static class GeoSceneryEndpoints
                 Longitude = request.Longitude,
                 OwnerUserId = GetUserId(principal)
             }, request.Tags, cancellationToken);
-            return TypedResults.Created($"/api/scenes/{scene.Id}", ToResponse(scene));
+            return TypedResults.Created($"/api/scenes/{scene.Id}", ToResponse(scene, viewerId: GetUserId(principal)));
         })
         .WithName("CreateScene")
         .RequireAuthorization();
@@ -183,7 +184,7 @@ public static class GeoSceneryEndpoints
                 Longitude = request.Longitude,
                 OwnerUserId = GetUserId(principal)
             }, GetUserId(principal), request.Tags, cancellationToken);
-            return scene is null ? TypedResults.NotFound() : TypedResults.Ok(ToResponse(scene));
+            return scene is null ? TypedResults.NotFound() : TypedResults.Ok(ToResponse(scene, viewerId: GetUserId(principal)));
         })
         .RequireAuthorization();
 
@@ -193,6 +194,35 @@ public static class GeoSceneryEndpoints
                 ? TypedResults.NoContent()
                 : TypedResults.NotFound())
             .RequireAuthorization();
+
+        group.MapPost("/{id:long}/rating", async Task<Results<Ok<SceneResponse>, NotFound, BadRequest>>
+            (long id, RateSceneRequest request, ClaimsPrincipal principal, ISceneService service, CancellationToken cancellationToken) =>
+        {
+            var userId = GetUserId(principal);
+            var scene = await service.GetByIdAsync(id, cancellationToken);
+            if (scene is null)
+            {
+                return TypedResults.NotFound();
+            }
+
+            if (scene.OwnerUserId == userId)
+            {
+                return TypedResults.BadRequest();
+            }
+
+            var rated = await service.RateAsync(id, userId, request.Rating, cancellationToken);
+            return TypedResults.Ok(ToResponse(rated!, viewerId: userId));
+        })
+        .WithName("RateScene")
+        .RequireAuthorization();
+
+        group.MapDelete("/{id:long}/rating", async Task<Results<NoContent, NotFound>>
+            (long id, ClaimsPrincipal principal, ISceneService service, CancellationToken cancellationToken) =>
+            await service.RemoveRatingAsync(id, GetUserId(principal), cancellationToken)
+                ? TypedResults.NoContent()
+                : TypedResults.NotFound())
+        .WithName("RemoveSceneRating")
+        .RequireAuthorization();
     }
 
     private static void MapVisitEndpoints(RouteGroupBuilder group)
@@ -256,10 +286,18 @@ public static class GeoSceneryEndpoints
     private static UserSummaryResponse ToSummaryResponse(User user) =>
         new(user.Id, user.DisplayName, user.ProfileImageUrl);
 
-    private static SceneResponse ToResponse(Scene scene, double? distanceKm = null) =>
-        new(scene.Id, scene.Title, scene.Description, scene.ImageUrl, scene.Rating, scene.Latitude, scene.Longitude,
+    private static SceneResponse ToResponse(Scene scene, double? distanceKm = null, long? viewerId = null)
+    {
+        var ratingCount = scene.Ratings.Count;
+        var averageRating = ratingCount > 0 ? (double?)scene.Ratings.Average(sceneRating => sceneRating.Rating) : null;
+        var currentUserRating = viewerId.HasValue
+            ? scene.Ratings.FirstOrDefault(sceneRating => sceneRating.UserId == viewerId.Value)?.Rating
+            : null;
+        return new(scene.Id, scene.Title, scene.Description, scene.ImageUrl, scene.Rating, scene.Latitude, scene.Longitude,
             scene.Tags.Select(tag => tag.Tag).OrderBy(tag => tag).ToList(), distanceKm,
+            averageRating, ratingCount, currentUserRating,
             scene.OwnerUserId, scene.CreatedAt, scene.UpdatedAt);
+    }
 
     private static VisitResponse ToResponse(Visit visit) =>
         new(visit.Id, visit.SceneId, visit.UserId, visit.Scene?.Title, visit.VisitedAt);
@@ -267,4 +305,10 @@ public static class GeoSceneryEndpoints
     private static long GetUserId(ClaimsPrincipal principal) =>
         long.Parse(principal.FindFirstValue(ClaimTypes.NameIdentifier)
             ?? throw new InvalidOperationException("Authenticated user id is missing."));
+
+    private static long? TryGetUserId(ClaimsPrincipal principal)
+    {
+        var value = principal.FindFirstValue(ClaimTypes.NameIdentifier);
+        return value is not null && long.TryParse(value, out var userId) ? userId : null;
+    }
 }

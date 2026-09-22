@@ -15,6 +15,7 @@ public class MyProjectDbContext : DbContext
     public DbSet<Visit> Visits => Set<Visit>();
     public DbSet<Follow> Follows => Set<Follow>();
     public DbSet<SceneTag> SceneTags => Set<SceneTag>();
+    public DbSet<SceneRating> SceneRatings => Set<SceneRating>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -46,6 +47,22 @@ public class MyProjectDbContext : DbContext
             .WithMany(scene => scene.Tags)
             .HasForeignKey(sceneTag => sceneTag.SceneId)
             .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<SceneRating>()
+            .HasIndex(sceneRating => new { sceneRating.SceneId, sceneRating.UserId })
+            .IsUnique();
+
+        modelBuilder.Entity<SceneRating>()
+            .HasOne(sceneRating => sceneRating.Scene)
+            .WithMany(scene => scene.Ratings)
+            .HasForeignKey(sceneRating => sceneRating.SceneId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<SceneRating>()
+            .HasOne(sceneRating => sceneRating.User)
+            .WithMany()
+            .HasForeignKey(sceneRating => sceneRating.UserId)
+            .OnDelete(DeleteBehavior.Restrict);
 
         modelBuilder.Entity<Visit>()
             .HasIndex(visit => new { visit.UserId, visit.SceneId })

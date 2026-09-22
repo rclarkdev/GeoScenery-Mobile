@@ -35,4 +35,6 @@ public class Scene
     public ICollection<Visit> Visits { get; set; } = new List<Visit>();
 
     public ICollection<SceneTag> Tags { get; set; } = new List<SceneTag>();
+
+    public ICollection<SceneRating> Ratings { get; set; } = new List<SceneRating>();
 }

@@ -17,4 +17,6 @@ public interface ISceneService
     Task<Scene> CreateAsync(Scene scene, IReadOnlyList<string>? tags, CancellationToken cancellationToken = default);
     Task<Scene?> UpdateAsync(long id, Scene scene, long ownerUserId, IReadOnlyList<string>? tags, CancellationToken cancellationToken = default);
     Task<bool> DeleteAsync(long id, long ownerUserId, CancellationToken cancellationToken = default);
+    Task<Scene?> RateAsync(long sceneId, long userId, decimal rating, CancellationToken cancellationToken = default);
+    Task<bool> RemoveRatingAsync(long sceneId, long userId, CancellationToken cancellationToken = default);
 }

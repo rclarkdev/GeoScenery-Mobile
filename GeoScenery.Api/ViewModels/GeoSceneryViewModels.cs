@@ -13,9 +13,19 @@ public sealed record SceneResponse(
     double? Longitude,
     IReadOnlyList<string> Tags,
     double? DistanceKm,
+    double? AverageRating,
+    int RatingCount,
+    decimal? CurrentUserRating,
     long? OwnerUserId,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt);
+
+/// <summary>Payload for rating another user's scene.</summary>
+public sealed record RateSceneRequest
+{
+    [Range(0, 10)]
+    public decimal Rating { get; init; }
+}
 
 /// <summary>Payload for creating a scene.</summary>
 public sealed record CreateSceneRequest
