@@ -3,6 +3,7 @@ import { ActivatedRoute } from '@angular/router';
 import { NavController } from '@ionic/angular';
 import { SceneryService } from '../../scenery.service';
 import { Scene } from '../../scene.model';
+import { VisitsService } from '../../../visits/visits.service';
 
 @Component({
   selector: 'app-scene-detail',
@@ -12,11 +13,14 @@ import { Scene } from '../../scene.model';
 export class SceneDetailPage implements OnInit {
 
   scene?: Scene;
+  isVisiting = false;
+  visitError = false;
 
   constructor(
     private navCtrl: NavController,
     private route: ActivatedRoute,
-    private sceneryService: SceneryService) { }
+    private sceneryService: SceneryService,
+    private visitsService: VisitsService) { }
 
   ngOnInit() {
     this.route.paramMap.subscribe(paramMap => {
@@ -33,7 +37,18 @@ export class SceneDetailPage implements OnInit {
   }
 
   onVisitScene() {
-    // this.router.navigateByUrl('/scenery/tabs/observe');
-    this.navCtrl.navigateBack('/scenery/tabs/observe');
+    if (!this.scene || this.isVisiting) {
+      return;
+    }
+
+    this.isVisiting = true;
+    this.visitError = false;
+    this.visitsService.recordVisit(this.scene.id).subscribe({
+      next: () => this.navCtrl.navigateBack('/visits'),
+      error: () => {
+        this.isVisiting = false;
+        this.visitError = true;
+      }
+    });
   }
 }

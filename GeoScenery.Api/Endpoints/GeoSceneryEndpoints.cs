@@ -167,5 +167,5 @@ public static class GeoSceneryEndpoints
         new(scene.Id, scene.Title, scene.Description, scene.ImageUrl, scene.Rating, scene.OwnerUserId, scene.CreatedAt, scene.UpdatedAt);
 
     private static VisitResponse ToResponse(Visit visit) =>
-        new(visit.Id, visit.SceneId, visit.UserId, visit.VisitedAt);
+        new(visit.Id, visit.SceneId, visit.UserId, visit.Scene?.Title, visit.VisitedAt);
 }

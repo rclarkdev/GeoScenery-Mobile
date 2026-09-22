@@ -29,3 +29,4 @@ import './app/scenery/my-scenes/new-scene/new-scene.page.spec';
 import './app/scenery/my-scenes/edit-scene/edit-scene.page.spec';
 import './app/scenery/my-scenes/share-scenery/share-scenery.page.spec';
 import './app/visits/visits.page.spec';
+import './app/visits/visits.service.spec';

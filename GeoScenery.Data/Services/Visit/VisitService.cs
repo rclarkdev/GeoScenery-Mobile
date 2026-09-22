@@ -15,21 +15,23 @@ public sealed class VisitService : IVisitService
 
     public async Task<IReadOnlyList<Visit>> GetAllAsync(CancellationToken cancellationToken = default)
     {
-        return await _dbContext.Visits
+        var visits = await _dbContext.Visits
             .AsNoTracking()
             .Include(visit => visit.Scene)
-            .OrderByDescending(visit => visit.VisitedAt)
             .ToListAsync(cancellationToken);
+
+        return visits.OrderByDescending(visit => visit.VisitedAt).ToList();
     }
 
     public async Task<IReadOnlyList<Visit>> GetByUserIdAsync(long userId, CancellationToken cancellationToken = default)
     {
-        return await _dbContext.Visits
+        var visits = await _dbContext.Visits
             .AsNoTracking()
             .Include(visit => visit.Scene)
             .Where(visit => visit.UserId == userId)
-            .OrderByDescending(visit => visit.VisitedAt)
             .ToListAsync(cancellationToken);
+
+        return visits.OrderByDescending(visit => visit.VisitedAt).ToList();
     }
 
     public Task<Visit?> GetByIdAsync(long id, CancellationToken cancellationToken = default)

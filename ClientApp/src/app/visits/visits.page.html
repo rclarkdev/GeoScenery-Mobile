@@ -1,9 +1,17 @@
 <ion-header>
   <ion-toolbar>
-    <ion-title>visits</ion-title>
+    <ion-title>My Visits</ion-title>
   </ion-toolbar>
 </ion-header>
 
-<ion-content>
-
+<ion-content class="ion-padding">
+  <ion-list *ngIf="visits.length > 0">
+    <ion-item *ngFor="let visit of visits">
+      <ion-label>
+        <h2>{{ visit.sceneTitle || ('Scene ' + visit.sceneId) }}</h2>
+        <p>{{ visit.visitedAt | date:'medium' }}</p>
+      </ion-label>
+    </ion-item>
+  </ion-list>
+  <ion-note *ngIf="visits.length === 0">No visits recorded yet.</ion-note>
 </ion-content>

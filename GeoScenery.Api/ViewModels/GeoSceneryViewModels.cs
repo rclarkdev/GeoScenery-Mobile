@@ -73,7 +73,7 @@ public sealed record UpdateUserRequest
 }
 
 /// <summary>Represents a recorded scene visit.</summary>
-public sealed record VisitResponse(long Id, long SceneId, long UserId, DateTimeOffset VisitedAt);
+public sealed record VisitResponse(long Id, long SceneId, long UserId, string? SceneTitle, DateTimeOffset VisitedAt);
 
 /// <summary>Payload for recording a scene visit.</summary>
 public sealed record CreateVisitRequest

@@ -8,5 +8,8 @@
 </ion-header>
 
 <ion-content>
-  <ion-button color="primary" margin (click)="onVisitScene()">Visit</ion-button>
+  <ion-button color="primary" margin (click)="onVisitScene()" [disabled]="isVisiting">
+    {{ isVisiting ? 'Recording...' : 'Visit' }}
+  </ion-button>
+  <ion-note color="danger" *ngIf="visitError">Unable to record this visit.</ion-note>
 </ion-content>

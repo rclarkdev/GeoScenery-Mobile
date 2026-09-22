@@ -31,3 +31,5 @@ app.UseCors("ClientApp");
 app.MapGeoSceneryEndpoints();
 
 app.Run();
+
+public partial class Program;

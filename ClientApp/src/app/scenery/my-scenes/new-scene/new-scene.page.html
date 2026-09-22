@@ -6,3 +6,37 @@
     <ion-title>New Scene</ion-title>
   </ion-toolbar>
 </ion-header>
+
+<ion-content class="ion-padding">
+  <form [formGroup]="sceneForm" (ngSubmit)="onSave()">
+    <ion-item>
+      <ion-input label="Title" labelPlacement="stacked" formControlName="title"></ion-input>
+    </ion-item>
+    <ion-note color="danger" *ngIf="sceneForm.controls.title.touched && sceneForm.controls.title.invalid">
+      Enter a title.
+    </ion-note>
+
+    <ion-item>
+      <ion-textarea label="Description" labelPlacement="stacked" formControlName="description" [autoGrow]="true"></ion-textarea>
+    </ion-item>
+    <ion-note color="danger" *ngIf="sceneForm.controls.description.touched && sceneForm.controls.description.invalid">
+      Enter a description.
+    </ion-note>
+
+    <ion-item>
+      <ion-input label="Image URL" labelPlacement="stacked" type="url" formControlName="imageUrl"></ion-input>
+    </ion-item>
+    <ion-note color="danger" *ngIf="sceneForm.controls.imageUrl.touched && sceneForm.controls.imageUrl.invalid">
+      Enter a valid image URL.
+    </ion-note>
+
+    <ion-item>
+      <ion-input label="Rating" labelPlacement="stacked" type="number" formControlName="rating"></ion-input>
+    </ion-item>
+
+    <ion-button expand="block" type="submit" [disabled]="isSaving">
+      {{ isSaving ? 'Saving...' : 'Save scene' }}
+    </ion-button>
+    <ion-note color="danger" *ngIf="saveError">Unable to save this scene.</ion-note>
+  </form>
+</ion-content>
