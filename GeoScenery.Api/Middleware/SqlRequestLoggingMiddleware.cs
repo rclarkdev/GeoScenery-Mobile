@@ -5,7 +5,8 @@ using GeoScenery.Api.Logging;
 namespace GeoScenery.Api.Middleware;
 
 public sealed class SqlRequestLoggingMiddleware(
-    RequestDelegate next)
+    RequestDelegate next,
+    ILogger<SqlRequestLoggingMiddleware> logger)
 {
     public async Task InvokeAsync(HttpContext context, ISqlAuditLog auditLog)
     {
@@ -39,17 +40,24 @@ public sealed class SqlRequestLoggingMiddleware(
                 var level = requestException is not null || context.Response.StatusCode >= 500
                     ? "Error"
                     : context.Response.StatusCode >= 400 ? "Warning" : "Information";
-                await auditLog.WriteAsync(
-                    context,
-                    level,
-                    "HttpRequest",
-                    requestException is null ? "HTTP request completed." : "HTTP request failed.",
-                    userId,
-                    new Dictionary<string, object?>
-                    {
-                        ["durationMilliseconds"] = stopwatch.ElapsedMilliseconds,
-                        ["exceptionType"] = requestException?.GetType().Name
-                    });
+                try
+                {
+                    await auditLog.WriteAsync(
+                        context,
+                        level,
+                        "HttpRequest",
+                        requestException is null ? "HTTP request completed." : "HTTP request failed.",
+                        userId,
+                        new Dictionary<string, object?>
+                        {
+                            ["durationMilliseconds"] = stopwatch.ElapsedMilliseconds,
+                            ["exceptionType"] = requestException?.GetType().Name
+                        });
+                }
+                catch (Exception loggingException)
+                {
+                    logger.LogError(loggingException, "Request logging failed for {RequestPath}.", context.Request.Path);
+                }
             }
         }
     }
