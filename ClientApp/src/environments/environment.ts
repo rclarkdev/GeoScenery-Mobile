@@ -2,9 +2,11 @@
 // `ng build --prod` replaces `environment.ts` with `environment.prod.ts`.
 // The list of file replacements can be found in `angular.json`.
 
+import { Capacitor } from '@capacitor/core';
+
 export const environment = {
   production: false,
-  apiUrl: 'http://localhost:5022',
+  apiUrl: Capacitor.isNativePlatform() ? 'http://10.0.2.2:5022' : 'http://localhost:5022',
   currentUserId: 1
 };
 

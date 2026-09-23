@@ -18,7 +18,7 @@
     <ion-item>
       <ion-input label="Password" labelPlacement="stacked" type="password" formControlName="password"></ion-input>
     </ion-item>
-    <ion-note color="danger" *ngIf="authError">Unable to authenticate with those details.</ion-note>
+    <ion-note color="danger" *ngIf="authError">{{ authError }}</ion-note>
       <ion-note color="success" *ngIf="recoverySent">If an account exists, a reset link has been sent.</ion-note>
     <ion-note color="medium" *ngIf="developmentResetToken">
       Development reset token: {{ developmentResetToken }}

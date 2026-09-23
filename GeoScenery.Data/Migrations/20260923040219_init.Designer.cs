@@ -12,8 +12,8 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace GeoScenery.Data.Migrations
 {
     [DbContext(typeof(MyProjectDbContext))]
-    [Migration("20260922053553_AddFollows")]
-    partial class AddFollows
+    [Migration("20260923040219_init")]
+    partial class init
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -24,6 +24,69 @@ namespace GeoScenery.Data.Migrations
                 .HasAnnotation("Relational:MaxIdentifierLength", 128);
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
+
+            modelBuilder.Entity("GeoScenery.Data.Models.AppLogEntry", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("CorrelationId")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<long?>("DurationMilliseconds")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("EventName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("HttpMethod")
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)");
+
+                    b.Property<string>("Level")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("nvarchar(16)");
+
+                    b.Property<string>("Message")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<string>("PropertiesJson")
+                        .HasMaxLength(4000)
+                        .HasColumnType("nvarchar(4000)");
+
+                    b.Property<string>("RequestPath")
+                        .HasMaxLength(512)
+                        .HasColumnType("nvarchar(512)");
+
+                    b.Property<int?>("StatusCode")
+                        .HasColumnType("int");
+
+                    b.Property<long?>("UserId")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CorrelationId");
+
+                    b.HasIndex("CreatedAt");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("AppLogEntries");
+                });
 
             modelBuilder.Entity("GeoScenery.Data.Models.Follow", b =>
                 {
@@ -50,6 +113,37 @@ namespace GeoScenery.Data.Migrations
                         .IsUnique();
 
                     b.ToTable("Follows");
+                });
+
+            modelBuilder.Entity("GeoScenery.Data.Models.PasswordResetToken", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTimeOffset>("ExpiresAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("TokenHash")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<DateTimeOffset?>("UsedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<long>("UserId")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TokenHash")
+                        .IsUnique();
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("PasswordResetTokens");
                 });
 
             modelBuilder.Entity("GeoScenery.Data.Models.Scene", b =>
@@ -99,7 +193,7 @@ namespace GeoScenery.Data.Migrations
                     b.ToTable("Scenes");
                 });
 
-            modelBuilder.Entity("GeoScenery.Data.Models.User", b =>
+            modelBuilder.Entity("GeoScenery.Data.Models.SceneRating", b =>
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
@@ -110,8 +204,76 @@ namespace GeoScenery.Data.Migrations
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("datetimeoffset");
 
+                    b.Property<decimal>("Rating")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<long>("SceneId")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<long>("UserId")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId");
+
+                    b.HasIndex("SceneId", "UserId")
+                        .IsUnique();
+
+                    b.ToTable("SceneRatings");
+                });
+
+            modelBuilder.Entity("GeoScenery.Data.Models.SceneTag", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("SceneId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("Tag")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SceneId", "Tag")
+                        .IsUnique();
+
+                    b.ToTable("SceneTags");
+                });
+
+            modelBuilder.Entity("GeoScenery.Data.Models.User", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("Bio")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<DateOnly?>("BirthDate")
+                        .HasColumnType("date");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
                     b.Property<string>("DisplayName")
                         .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("Education")
                         .HasMaxLength(200)
                         .HasColumnType("nvarchar(200)");
 
@@ -119,6 +281,14 @@ namespace GeoScenery.Data.Migrations
                         .IsRequired()
                         .HasMaxLength(320)
                         .HasColumnType("nvarchar(320)");
+
+                    b.Property<string>("Employment")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("Hobbies")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
 
                     b.Property<double?>("Latitude")
                         .HasColumnType("float");
@@ -197,6 +367,17 @@ namespace GeoScenery.Data.Migrations
                     b.Navigation("Following");
                 });
 
+            modelBuilder.Entity("GeoScenery.Data.Models.PasswordResetToken", b =>
+                {
+                    b.HasOne("GeoScenery.Data.Models.User", "User")
+                        .WithMany("PasswordResetTokens")
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
+                });
+
             modelBuilder.Entity("GeoScenery.Data.Models.Scene", b =>
                 {
                     b.HasOne("GeoScenery.Data.Models.User", "OwnerUser")
@@ -205,6 +386,36 @@ namespace GeoScenery.Data.Migrations
                         .OnDelete(DeleteBehavior.SetNull);
 
                     b.Navigation("OwnerUser");
+                });
+
+            modelBuilder.Entity("GeoScenery.Data.Models.SceneRating", b =>
+                {
+                    b.HasOne("GeoScenery.Data.Models.Scene", "Scene")
+                        .WithMany("Ratings")
+                        .HasForeignKey("SceneId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("GeoScenery.Data.Models.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Scene");
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("GeoScenery.Data.Models.SceneTag", b =>
+                {
+                    b.HasOne("GeoScenery.Data.Models.Scene", "Scene")
+                        .WithMany("Tags")
+                        .HasForeignKey("SceneId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Scene");
                 });
 
             modelBuilder.Entity("GeoScenery.Data.Models.Visit", b =>
@@ -228,6 +439,10 @@ namespace GeoScenery.Data.Migrations
 
             modelBuilder.Entity("GeoScenery.Data.Models.Scene", b =>
                 {
+                    b.Navigation("Ratings");
+
+                    b.Navigation("Tags");
+
                     b.Navigation("Visits");
                 });
 
@@ -236,6 +451,8 @@ namespace GeoScenery.Data.Migrations
                     b.Navigation("Followers");
 
                     b.Navigation("Following");
+
+                    b.Navigation("PasswordResetTokens");
 
                     b.Navigation("Scenes");
 
