@@ -6,6 +6,7 @@ import { of } from 'rxjs';
 import { ShareSceneryPage } from './share-scenery.page';
 import { SceneryService } from '../../scenery.service';
 import { Scene } from '../../scene.model';
+import { AuthService } from '../../../auth/auth.service';
 
 describe('ShareSceneryPage', () => {
   let component: ShareSceneryPage;
@@ -17,6 +18,7 @@ describe('ShareSceneryPage', () => {
       providers: [
         { provide: ActivatedRoute, useValue: { paramMap: of(new Map([['sceneId', '1']])) } },
         { provide: SceneryService, useValue: { getScene: () => of(new Scene(1, 'Test scene', 'Description', 'https://example.com/image.jpg', 8)) } }
+        ,{ provide: AuthService, useValue: { currentUserId: 1 } }
       ],
       schemas: [CUSTOM_ELEMENTS_SCHEMA],
     })

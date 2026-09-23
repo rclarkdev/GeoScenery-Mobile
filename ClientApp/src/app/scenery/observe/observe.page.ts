@@ -4,6 +4,7 @@ import { Router } from '@angular/router';
 import { Geolocation } from '@capacitor/geolocation';
 import { SceneryService } from '../scenery.service';
 import { Scene } from '../scene.model';
+import { createScenePopupContent } from './scene-popup';
 
 @Component({
   selector: 'app-observe',
@@ -119,7 +120,7 @@ export class ObservePage implements OnInit, AfterViewInit {
 
       const position: [number, number] = [scene.latitude, scene.longitude];
       const marker = L.marker(position)
-        .bindPopup(`<strong>${scene.title}</strong>`)
+        .bindPopup(() => createScenePopupContent(scene))
         .on('click', () => this.router.navigate(['/scenery/tabs/observe', scene.id]))
         .addTo(this.map);
       this.sceneMarkers.push(marker);

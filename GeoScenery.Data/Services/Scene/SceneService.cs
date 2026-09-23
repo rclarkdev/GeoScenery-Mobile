@@ -65,6 +65,17 @@ public sealed class SceneService : ISceneService
             .FirstOrDefaultAsync(scene => scene.Id == id, cancellationToken);
     }
 
+    public async Task<IReadOnlyList<Scene>> GetByOwnerAsync(long ownerUserId, CancellationToken cancellationToken = default)
+    {
+        return await _dbContext.Scenes
+            .AsNoTracking()
+            .Include(scene => scene.Tags)
+            .Include(scene => scene.Ratings)
+            .Where(scene => scene.OwnerUserId == ownerUserId)
+            .OrderBy(scene => scene.Title)
+            .ToListAsync(cancellationToken);
+    }
+
     public async Task<Scene> CreateAsync(Scene scene, IReadOnlyList<string>? tags, CancellationToken cancellationToken = default)
     {
         scene.CreatedAt = DateTimeOffset.UtcNow;
@@ -119,11 +130,19 @@ public sealed class SceneService : ISceneService
             return [];
         }
 
-        return tags
+        var normalized = tags
             .Select(tag => tag.Trim().ToLowerInvariant())
             .Where(tag => tag.Length > 0)
             .Distinct()
             .ToList();
+
+        if (normalized.Any(tag => tag.Length > SceneTag.MaxTagLength))
+        {
+            // Defensive backstop for the API-level validation in the endpoints.
+            throw new ArgumentException($"Each tag must be {SceneTag.MaxTagLength} characters or fewer.", nameof(tags));
+        }
+
+        return normalized;
     }
 
     private static double GetDistanceKm(double latitude1, double longitude1, double latitude2, double longitude2)

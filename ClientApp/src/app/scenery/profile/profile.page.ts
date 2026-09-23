@@ -3,9 +3,11 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { AlertController } from '@ionic/angular';
 import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
 import { Geolocation } from '@capacitor/geolocation';
+import { firstValueFrom } from 'rxjs';
 import { AuthService } from '../../auth/auth.service';
 import { User } from '../../auth/user.model';
 import { UserService } from '../../auth/user.service';
+import { ImageUploadService } from '../../shared/image-upload.service';
 
 @Component({
   selector: 'app-profile',
@@ -26,7 +28,8 @@ export class ProfilePage implements OnInit {
     private router: Router,
     private alertController: AlertController,
     private authService: AuthService,
-    private userService: UserService
+    private userService: UserService,
+    private imageUploadService: ImageUploadService
   ) { }
 
   ngOnInit() {
@@ -69,15 +72,20 @@ export class ProfilePage implements OnInit {
       // Prompt lets the user choose between the camera and their photo library
       const photo = await Camera.getPhoto({
         quality: 80,
-        resultType: CameraResultType.DataUrl,
+        resultType: CameraResultType.Uri,
         source: CameraSource.Prompt
       });
-      if (photo.dataUrl) {
-        this.user.profileImageUrl = photo.dataUrl;
+      if (photo.webPath) {
+        this.isSaving = true;
+        this.saveError = false;
+        const uploaded = await firstValueFrom(this.imageUploadService.uploadUri(photo.webPath, 'profile'));
+        this.user.profileImageUrl = uploaded.url;
         this.save();
       }
     } catch {
       // user cancelled the picker
+      this.isSaving = false;
+      this.saveError = true;
     }
   }
 

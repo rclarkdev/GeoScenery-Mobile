@@ -63,7 +63,15 @@ public sealed class FollowService : IFollowService
             FollowerId = followerId,
             FollowingId = followingId
         });
-        await _dbContext.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await _dbContext.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException exception) when (UniqueConstraintGuard.IsUniqueConstraintViolation(exception))
+        {
+            // A concurrent request created the same follow relationship first;
+            // the unique (FollowerId, FollowingId) index preserved the invariant.
+        }
     }
 
     public async Task UnfollowAsync(long followerId, long followingId, CancellationToken cancellationToken = default)

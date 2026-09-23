@@ -143,6 +143,9 @@ public sealed record UpdateUserRequest
 /// <summary>Represents a recorded scene visit.</summary>
 public sealed record VisitResponse(long Id, long SceneId, long UserId, string? SceneTitle, DateTimeOffset VisitedAt);
 
+/// <summary>Response with the server-hosted URL of a successfully uploaded image.</summary>
+public sealed record UploadedImageResponse(string Url);
+
 /// <summary>Payload for recording a scene visit.</summary>
 public sealed record CreateVisitRequest
 {

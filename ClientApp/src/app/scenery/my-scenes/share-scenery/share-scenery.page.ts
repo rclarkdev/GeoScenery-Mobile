@@ -3,6 +3,7 @@ import { Scene } from '../../scene.model';
 import { ActivatedRoute } from '@angular/router';
 import { NavController } from '@ionic/angular';
 import { SceneryService } from '../../scenery.service';
+import { AuthService } from '../../../auth/auth.service';
 
 @Component({
   selector: 'app-share-scenery',
@@ -13,7 +14,11 @@ export class ShareSceneryPage implements OnInit {
 
   scene?: Scene;
 
-  constructor(private route: ActivatedRoute, private navCtrl: NavController, private sceneryService: SceneryService) { }
+  constructor(private route: ActivatedRoute, private navCtrl: NavController, private sceneryService: SceneryService, private authService: AuthService) { }
+
+  get canEdit(): boolean {
+    return this.scene?.ownerUserId === this.authService.currentUserId;
+  }
 
   ngOnInit() {
     this.route.paramMap.subscribe(paramMap => {

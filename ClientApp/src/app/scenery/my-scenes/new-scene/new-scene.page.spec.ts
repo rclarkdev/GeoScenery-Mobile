@@ -6,6 +6,7 @@ import { of } from 'rxjs';
 
 import { NewScenePage } from './new-scene.page';
 import { SceneryService } from '../../scenery.service';
+import { ImageUploadService } from '../../../shared/image-upload.service';
 
 describe('NewScenePage', () => {
   let component: NewScenePage;
@@ -17,6 +18,7 @@ describe('NewScenePage', () => {
       imports: [ReactiveFormsModule, IonicModule.forRoot()],
       providers: [
         { provide: SceneryService, useValue: { createScene: jasmine.createSpy('createScene').and.returnValue(of({})) } },
+        { provide: ImageUploadService, useValue: {} },
         { provide: NavController, useValue: { navigateBack: jasmine.createSpy('navigateBack') } }
       ],
       schemas: [CUSTOM_ELEMENTS_SCHEMA],
@@ -40,25 +42,25 @@ describe('NewScenePage', () => {
     expect(TestBed.inject(SceneryService).createScene).not.toHaveBeenCalled();
   });
 
-  it('should create a scene and navigate back after a valid submission', () => {
+  it('should create a scene and navigate back after a valid submission', async () => {
     const service = TestBed.inject(SceneryService);
     const navController = TestBed.inject(NavController);
     component.sceneForm.setValue({
       title: 'New scene',
       description: 'A description',
-      imageUrl: 'https://example.com/image.jpg',
+      imageUrl: '/uploads/image.jpg',
       rating: 8,
       tags: 'sunset, beach',
       latitude: null,
       longitude: null
     });
 
-    component.onSave();
+    await component.onSave();
 
     expect(service.createScene).toHaveBeenCalledWith({
       title: 'New scene',
       description: 'A description',
-      imageUrl: 'https://example.com/image.jpg',
+      imageUrl: '/uploads/image.jpg',
       rating: 8,
       latitude: null,
       longitude: null,

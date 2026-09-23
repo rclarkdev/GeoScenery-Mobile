@@ -517,6 +517,149 @@ public sealed class GeoSceneryApiTests
         Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.BadRequest));
     }
 
+    // ----- Auth: rate limiting -----
+
+    [Test]
+    public async Task GivenAHandfulOfFailedLogins_ThenASubsequentCorrectLoginStillWorks()
+    {
+        await RegisterUserAsync("Retry", "retry@example.com");
+
+        for (var i = 0; i < 5; i++)
+        {
+            var failed = await _client.PostAsJsonAsync("/api/auth/login", new
+            {
+                email = "retry@example.com",
+                password = $"WrongPassword!{i}"
+            });
+            Assert.That(failed.StatusCode, Is.EqualTo(HttpStatusCode.Unauthorized));
+        }
+
+        var succeeded = await _client.PostAsJsonAsync("/api/auth/login", new
+        {
+            email = "retry@example.com",
+            password = "Password123!"
+        });
+        Assert.That(succeeded.StatusCode, Is.EqualTo(HttpStatusCode.OK));
+    }
+
+    [Test]
+    public async Task GivenRepeatedLoginAttempts_WhenExceedingThePerIpLimit_ThenTheApiReturnsTooManyRequests()
+    {
+        await RegisterUserAsync("Throttled", "throttled@example.com");
+
+        for (var i = 0; i < 20; i++)
+        {
+            var attempt = await _client.PostAsJsonAsync("/api/auth/login", new
+            {
+                email = "throttled@example.com",
+                password = $"WrongPassword!{i}"
+            });
+            Assert.That(attempt.StatusCode, Is.EqualTo(HttpStatusCode.Unauthorized));
+        }
+
+        var exceeded = await _client.PostAsJsonAsync("/api/auth/login", new
+        {
+            email = "throttled@example.com",
+            password = "Password123!"
+        });
+        Assert.That(exceeded.StatusCode, Is.EqualTo(HttpStatusCode.TooManyRequests));
+    }
+
+    [Test]
+    public async Task GivenAnAccountLockedByRepeatedFailures_WhenLoggingInWithTheCorrectPassword_ThenTheApiStillReturnsUnauthorized()
+    {
+        await RegisterUserAsync("Locked", "locked@example.com");
+
+        for (var i = 0; i < 10; i++)
+        {
+            var attempt = await _client.PostAsJsonAsync("/api/auth/login", new
+            {
+                email = "locked@example.com",
+                password = $"WrongPassword!{i}"
+            });
+            Assert.That(attempt.StatusCode, Is.EqualTo(HttpStatusCode.Unauthorized));
+        }
+
+        var correctPassword = await _client.PostAsJsonAsync("/api/auth/login", new
+        {
+            email = "locked@example.com",
+            password = "Password123!"
+        });
+        Assert.That(correctPassword.StatusCode, Is.EqualTo(HttpStatusCode.Unauthorized));
+    }
+
+    [Test]
+    public async Task GivenARegistrationBelowTheThreshold_WhenRegistering_ThenTheApiSucceeds()
+    {
+        var response = await _client.PostAsJsonAsync("/api/auth/register", new
+        {
+            displayName = "Below Limit",
+            email = "below@example.com",
+            password = "Password123!"
+        });
+
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK));
+    }
+
+    [Test]
+    public async Task GivenRepeatedRegistrationAttempts_WhenExceedingThePerIpLimit_ThenTheApiReturnsTooManyRequests()
+    {
+        for (var i = 0; i < 5; i++)
+        {
+            var attempt = await _client.PostAsJsonAsync("/api/auth/register", new
+            {
+                displayName = $"Spam {i}",
+                email = $"spam{i}@example.com",
+                password = "Password123!"
+            });
+            Assert.That(attempt.StatusCode, Is.EqualTo(HttpStatusCode.OK));
+        }
+
+        var exceeded = await _client.PostAsJsonAsync("/api/auth/register", new
+        {
+            displayName = "Spam",
+            email = "spam-over@example.com",
+            password = "Password123!"
+        });
+        Assert.That(exceeded.StatusCode, Is.EqualTo(HttpStatusCode.TooManyRequests));
+    }
+
+    [Test]
+    public async Task GivenAnExhaustedLoginBudget_WhenCallingAnUnrelatedEndpoint_ThenTheUnrelatedEndpointStillWorks()
+    {
+        for (var i = 0; i < 20; i++)
+        {
+            await _client.PostAsJsonAsync("/api/auth/login", new
+            {
+                email = "nobody@example.com",
+                password = "WrongPassword!"
+            });
+        }
+
+        var blockedLogin = await _client.PostAsJsonAsync("/api/auth/login", new
+        {
+            email = "nobody@example.com",
+            password = "WrongPassword!"
+        });
+        Assert.That(blockedLogin.StatusCode, Is.EqualTo(HttpStatusCode.TooManyRequests));
+
+        var scenes = await _client.GetAsync("/api/scenes");
+        Assert.That(scenes.StatusCode, Is.EqualTo(HttpStatusCode.OK));
+    }
+
+    [Test]
+    public async Task GivenRepeatedForgotPasswordRequests_WhenExceedingTheLimit_ThenTheApiReturnsTooManyRequests()
+    {
+        for (var i = 0; i < 5; i++)
+        {
+            var attempt = await _client.PostAsJsonAsync("/api/auth/forgot-password", new { email = $"missing{i}@example.com" });
+            Assert.That(attempt.StatusCode, Is.EqualTo(HttpStatusCode.OK));
+        }
+
+        var exceeded = await _client.PostAsJsonAsync("/api/auth/forgot-password", new { email = "missing-over@example.com" });
+        Assert.That(exceeded.StatusCode, Is.EqualTo(HttpStatusCode.TooManyRequests));
+    }
+
     // ----- Follow/unfollow -----
 
     [Test]

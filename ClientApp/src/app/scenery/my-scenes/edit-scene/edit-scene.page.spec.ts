@@ -8,6 +8,7 @@ import { of } from 'rxjs';
 import { EditScenePage } from './edit-scene.page';
 import { SceneryService } from '../../scenery.service';
 import { Scene } from '../../scene.model';
+import { ImageUploadService } from '../../../shared/image-upload.service';
 
 describe('EditScenePage', () => {
   let component: EditScenePage;
@@ -20,9 +21,10 @@ describe('EditScenePage', () => {
       providers: [
         { provide: ActivatedRoute, useValue: { paramMap: of(new Map([['sceneId', '1']])) } },
         { provide: SceneryService, useValue: {
-          getScene: jasmine.createSpy('getScene').and.returnValue(of(new Scene(1, 'Test scene', 'Description', 'https://example.com/image.jpg', 8))),
+          getScene: jasmine.createSpy('getScene').and.returnValue(of(new Scene(1, 'Test scene', 'Description', '/uploads/image.jpg', 8))),
           updateScene: jasmine.createSpy('updateScene').and.returnValue(of(new Scene(1, 'Updated scene', 'Updated description', 'https://example.com/updated.jpg', 9)))
         } },
+        { provide: ImageUploadService, useValue: {} },
         { provide: NavController, useValue: { navigateBack: jasmine.createSpy('navigateBack') } }
       ],
       schemas: [CUSTOM_ELEMENTS_SCHEMA],
@@ -41,17 +43,17 @@ describe('EditScenePage', () => {
     expect(component.scene?.id).toBe(1);
   });
 
-  it('should update the scene and navigate back after a valid submission', () => {
+  it('should update the scene and navigate back after a valid submission', async () => {
     const service = TestBed.inject(SceneryService);
     const navController = TestBed.inject(NavController);
 
     component.sceneForm.patchValue({ title: 'Updated scene', rating: 9 });
-    component.onSave();
+    await component.onSave();
 
     expect(service.updateScene).toHaveBeenCalledWith(1, {
       title: 'Updated scene',
       description: 'Description',
-      imageUrl: 'https://example.com/image.jpg',
+      imageUrl: '/uploads/image.jpg',
       rating: 9,
       latitude: null,
       longitude: null,

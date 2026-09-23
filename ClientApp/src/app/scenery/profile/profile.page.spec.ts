@@ -9,6 +9,7 @@ import { ProfilePage } from './profile.page';
 import { UserService } from '../../auth/user.service';
 import { AuthService } from '../../auth/auth.service';
 import { User } from '../../auth/user.model';
+import { ImageUploadService } from '../../shared/image-upload.service';
 
 describe('ProfilePage', () => {
   let component: ProfilePage;
@@ -35,6 +36,7 @@ describe('ProfilePage', () => {
         { provide: Router, useValue: { navigateByUrl: jasmine.createSpy('navigateByUrl') } },
         { provide: AlertController, useValue: { create: jasmine.createSpy('create') } },
         { provide: ActivatedRoute, useValue: { paramMap: of(paramMap) } }
+        ,{ provide: ImageUploadService, useValue: {} }
       ],
       schemas: [CUSTOM_ELEMENTS_SCHEMA],
     });
@@ -108,6 +110,7 @@ describe('ProfilePage', () => {
         { provide: Router, useValue: { navigateByUrl: jasmine.createSpy('navigateByUrl') } },
         { provide: AlertController, useValue: { create: jasmine.createSpy('create') } },
         { provide: ActivatedRoute, useValue: { paramMap: of(new Map([['userId', '2']])) } }
+        ,{ provide: ImageUploadService, useValue: {} }
       ],
       schemas: [CUSTOM_ELEMENTS_SCHEMA],
     });

@@ -19,6 +19,10 @@ public sealed class GeoSceneryApiFactory : WebApplicationFactory<Program>
     {
         _connection.Open();
         builder.UseEnvironment("Testing");
+        // Enable forwarded header handling in the test host so tests can simulate
+        // distinct client IPs via X-Forwarded-For when exercising partitioned
+        // rate limits. Requests that do not set the header behave as before.
+        builder.UseSetting("ForwardedHeaders:Enabled", "true");
         builder.ConfigureServices(services =>
         {
             var dbContextDescriptors = services

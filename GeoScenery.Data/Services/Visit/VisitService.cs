@@ -42,6 +42,19 @@ public sealed class VisitService : IVisitService
             .FirstOrDefaultAsync(visit => visit.Id == id && visit.UserId == userId, cancellationToken);
     }
 
+    public Task<Visit?> GetBySceneAsync(long userId, long sceneId, CancellationToken cancellationToken = default)
+    {
+        return _dbContext.Visits
+            .AsNoTracking()
+            .Include(visit => visit.Scene)
+            .FirstOrDefaultAsync(visit => visit.UserId == userId && visit.SceneId == sceneId, cancellationToken);
+    }
+
+    /// <summary>
+    /// Creates a visit for a user/scene pair, or returns the existing visit when
+    /// one is already recorded. The (UserId, SceneId) unique index is preserved;
+    /// a concurrent duplicate insert is swallowed and the winner is returned.
+    /// </summary>
     public async Task<Visit> CreateAsync(Visit visit, CancellationToken cancellationToken = default)
     {
         if (visit.VisitedAt == default)
@@ -49,8 +62,25 @@ public sealed class VisitService : IVisitService
             visit.VisitedAt = DateTimeOffset.UtcNow;
         }
 
+        var existing = await GetBySceneAsync(visit.UserId, visit.SceneId, cancellationToken);
+        if (existing is not null)
+        {
+            return existing;
+        }
+
         _dbContext.Visits.Add(visit);
-        await _dbContext.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await _dbContext.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException exception) when (UniqueConstraintGuard.IsUniqueConstraintViolation(exception))
+        {
+            // A concurrent request recorded the same visit first. Return the
+            // existing row so the operation is idempotent.
+            return await GetBySceneAsync(visit.UserId, visit.SceneId, cancellationToken)
+                ?? throw new InvalidOperationException("The existing visit could not be reloaded after a concurrent insert.");
+        }
+
         return visit;
     }
 

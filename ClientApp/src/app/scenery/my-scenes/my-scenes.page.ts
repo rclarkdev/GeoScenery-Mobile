@@ -14,7 +14,7 @@ export class MyScenesPage implements OnInit {
   constructor(private sceneryService: SceneryService) { }
 
   ngOnInit() {
-    this.sceneryService.getScenery().subscribe(scenes => this.myScenes = scenes);
+    this.sceneryService.getMyScenes().subscribe(scenes => this.myScenes = scenes);
  
   }
 }

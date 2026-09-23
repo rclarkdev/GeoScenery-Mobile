@@ -6,6 +6,8 @@ import { Geolocation } from '@capacitor/geolocation';
 import { SceneryService } from '../../scenery.service';
 import { NavController } from '@ionic/angular';
 import { Scene } from '../../scene.model';
+import { firstValueFrom } from 'rxjs';
+import { ImageUploadService } from '../../../shared/image-upload.service';
 
 @Component({
   selector: 'app-edit-scene',
@@ -32,6 +34,7 @@ export class EditScenePage implements OnInit {
   constructor(
     private route: ActivatedRoute,
     private sceneryService: SceneryService,
+    private imageUploadService: ImageUploadService,
     private navCtrl: NavController,
     private formBuilder: FormBuilder
   ) { }
@@ -84,11 +87,11 @@ export class EditScenePage implements OnInit {
       // Prompt lets the user choose between the camera and their photo library
       const photo = await Camera.getPhoto({
         quality: 80,
-        resultType: CameraResultType.DataUrl,
+        resultType: CameraResultType.Uri,
         source: CameraSource.Prompt
       });
-      if (photo.dataUrl) {
-        this.sceneForm.patchValue({ imageUrl: photo.dataUrl });
+      if (photo.webPath) {
+        this.sceneForm.patchValue({ imageUrl: photo.webPath });
         this.sceneForm.controls.imageUrl.markAsTouched();
       }
     } catch {
@@ -96,7 +99,7 @@ export class EditScenePage implements OnInit {
     }
   }
 
-  onSave() {
+  async onSave() {
     if (!this.scene || this.sceneForm.invalid || this.isSaving) {
       this.sceneForm.markAllAsTouched();
       return;
@@ -105,16 +108,22 @@ export class EditScenePage implements OnInit {
     this.isSaving = true;
     this.saveError = false;
     const { tags, ...rest } = this.sceneForm.getRawValue();
-    this.sceneryService.updateScene(this.scene.id, {
-      ...rest,
-      tags: tags.split(',').map(tag => tag.trim()).filter(tag => tag.length > 0)
-    }).subscribe({
-      next: () => this.navCtrl.navigateBack(`/scenery/tabs/my-scenes/${this.scene?.id}`),
-      error: () => {
-        this.isSaving = false;
-        this.saveError = true;
-      }
-    });
+    try {
+      const imageUrl = rest.imageUrl.startsWith('data:')
+        ? (await firstValueFrom(this.imageUploadService.uploadDataUrl(rest.imageUrl, 'scene'))).url
+        : rest.imageUrl.startsWith('http') && !rest.imageUrl.startsWith('/uploads/')
+          ? (await firstValueFrom(this.imageUploadService.uploadUri(rest.imageUrl, 'scene'))).url
+        : rest.imageUrl;
+      await firstValueFrom(this.sceneryService.updateScene(this.scene.id, {
+        ...rest,
+        imageUrl,
+        tags: tags.split(',').map(tag => tag.trim()).filter(tag => tag.length > 0)
+      }));
+      await this.navCtrl.navigateBack(`/scenery/tabs/my-scenes/${this.scene?.id}`);
+    } catch {
+      this.isSaving = false;
+      this.saveError = true;
+    }
   }
 
 }

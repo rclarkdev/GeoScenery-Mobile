@@ -34,6 +34,10 @@ export class SceneryService {
     return this.http.get<Scene[]>(this.scenesUrl);
   }
 
+  getMyScenes(): Observable<Scene[]> {
+    return this.http.get<Scene[]>(`${environment.apiUrl}/api/users/me/scenes`);
+  }
+
   searchScenery(searchParams: SceneSearchParams): Observable<Scene[]> {
     let params = new HttpParams();
     if (searchParams.tags?.length) {

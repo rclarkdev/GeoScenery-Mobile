@@ -5,6 +5,7 @@ import { of } from 'rxjs';
 import { MyScenesPage } from './my-scenes.page';
 import { SceneryService } from '../scenery.service';
 import { Scene } from '../scene.model';
+import { ImageUploadService } from '../../shared/image-upload.service';
 
 describe('MyScenesPage', () => {
   let component: MyScenesPage;
@@ -15,8 +16,8 @@ describe('MyScenesPage', () => {
       declarations: [ MyScenesPage ],
       providers: [{
         provide: SceneryService,
-        useValue: { getScenery: () => of([new Scene(1, 'My scene', 'Description', 'https://example.com/image.jpg', 8)]) }
-      }],
+        useValue: { getMyScenes: () => of([new Scene(1, 'My scene', 'Description', '/uploads/image.jpg', 8)]) }
+      }, { provide: ImageUploadService, useValue: {} }],
       schemas: [CUSTOM_ELEMENTS_SCHEMA],
     })
     .compileComponents();

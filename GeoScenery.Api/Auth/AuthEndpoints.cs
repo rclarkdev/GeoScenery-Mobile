@@ -4,6 +4,7 @@ using System.Security.Claims;
 using System.Text;
 using GeoScenery.Data.Context;
 using GeoScenery.Data.Models;
+using GeoScenery.Data.Services;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -33,22 +34,53 @@ public static class AuthEndpoints
             };
             user.PasswordHash = hasher.HashPassword(user, request.Password);
             db.Users.Add(user);
-            await db.SaveChangesAsync(cancellationToken);
+            try
+            {
+                await db.SaveChangesAsync(cancellationToken);
+            }
+            catch (DbUpdateException exception) when (UniqueConstraintGuard.IsUniqueConstraintViolation(exception))
+            {
+                // Two requests could pass the pre-check above concurrently; the
+                // unique email index stays authoritative. Keep the response the
+                // same as the pre-check so the outcome is consistent.
+                return TypedResults.Conflict("An account with this email already exists.");
+            }
             return TypedResults.Ok(CreateResponse(user, configuration));
-        });
+        })
+        .WithName("Register")
+        .RequireRateLimiting("auth-register");
 
         group.MapPost("/login", async Task<Results<Ok<AuthResponse>, UnauthorizedHttpResult>>
-            (LoginRequest request, MyProjectDbContext db, IPasswordHasher<User> hasher, CancellationToken cancellationToken) =>
+            (LoginRequest request, MyProjectDbContext db, IPasswordHasher<User> hasher, ILoginAttemptTracker attemptTracker, CancellationToken cancellationToken) =>
         {
             var normalizedEmail = request.Email.Trim().ToLowerInvariant();
-            var user = await db.Users.FirstOrDefaultAsync(candidate => candidate.Email == normalizedEmail, cancellationToken);
-            if (user is null || hasher.VerifyHashedPassword(user, user.PasswordHash, request.Password) == PasswordVerificationResult.Failed)
+            if (attemptTracker.IsLocked(normalizedEmail))
             {
+                // Respond exactly like a failed login so a throttled account is
+                // indistinguishable from one with the wrong password. No DB lookup
+                // or hashing is performed for locked accounts.
                 return TypedResults.Unauthorized();
             }
 
+            var user = await db.Users.FirstOrDefaultAsync(candidate => candidate.Email == normalizedEmail, cancellationToken);
+            if (user is null || hasher.VerifyHashedPassword(user, user.PasswordHash, request.Password) == PasswordVerificationResult.Failed)
+            {
+                // Only lock accounts that actually exist; arbitrary email addresses
+                // must not be tracked (otherwise they would fill memory and reveal
+                // account existence through the lockout state).
+                if (user is not null)
+                {
+                    attemptTracker.RecordFailure(normalizedEmail);
+                }
+
+                return TypedResults.Unauthorized();
+            }
+
+            attemptTracker.Reset(normalizedEmail);
             return TypedResults.Ok(CreateResponse(user, configuration));
-        });
+        })
+        .WithName("Login")
+        .RequireRateLimiting("auth-login");
 
         group.MapPost("/forgot-password", async Task<Ok<PasswordResetResponse>>
             (ForgotPasswordRequest request, MyProjectDbContext db, IEmailSender emailSender, IHostEnvironment environment, CancellationToken cancellationToken) =>

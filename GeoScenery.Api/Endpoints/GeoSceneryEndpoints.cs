@@ -1,4 +1,5 @@
 using GeoScenery.Api.ViewModels;
+using GeoScenery.Api.Storage;
 using GeoScenery.Data.Models;
 using GeoScenery.Data.Services;
 using Microsoft.AspNetCore.Http.HttpResults;
@@ -30,6 +31,18 @@ public static class GeoSceneryEndpoints
         })
         .WithName("GetCurrentUser");
 
+        // The authenticated user's own scenes. The owner id is always derived from
+        // the token; there is intentionally no {userId}/scenes route so another
+        // user's private scene list cannot be requested by parameter manipulation.
+        group.MapGet("/me/scenes", async Task<Ok<List<SceneResponse>>>
+            (ClaimsPrincipal principal, ISceneService service, CancellationToken cancellationToken) =>
+        {
+            var viewerId = GetUserId(principal);
+            var scenes = await service.GetByOwnerAsync(viewerId, cancellationToken);
+            return TypedResults.Ok(scenes.Select(scene => ToResponse(scene, viewerId: viewerId)).ToList());
+        })
+        .WithName("GetMyScenes");
+
         group.MapGet("/{id:long}", async Task<Results<Ok<UserResponse>, NotFound>>
             (long id, ClaimsPrincipal principal, IUserService service, IFollowService followService, CancellationToken cancellationToken) =>
         {
@@ -38,28 +51,44 @@ public static class GeoSceneryEndpoints
         })
         .WithName("GetUser");
 
-        group.MapPut("/{id:long}", async Task<Results<Ok<UserResponse>, NotFound>>
-            (long id, UpdateUserRequest request, ClaimsPrincipal principal, IUserService service, IFollowService followService, CancellationToken cancellationToken) =>
+        group.MapPut("/{id:long}", async Task<Results<Ok<UserResponse>, NotFound, Conflict<string>, BadRequest<string>>>
+            (long id, UpdateUserRequest request, ClaimsPrincipal principal, IUserService service, IFollowService followService, IFileStorageService storage, CancellationToken cancellationToken) =>
         {
             if (id != GetUserId(principal))
             {
                 return TypedResults.NotFound();
             }
 
-            var user = await service.UpdateAsync(id, new User
+            // A profile image must be a reference to an image uploaded through the
+            // authenticated upload endpoint; arbitrary client-supplied URLs or
+            // base64 data are rejected (unless cleared with a null/empty value).
+            if (!string.IsNullOrEmpty(request.ProfileImageUrl)
+                && !await storage.IsStoredImageAsync(request.ProfileImageUrl, cancellationToken))
             {
-                DisplayName = request.DisplayName,
-                Email = request.Email,
-                ProfileImageUrl = request.ProfileImageUrl,
-                Latitude = request.Latitude,
-                Longitude = request.Longitude,
-                BirthDate = request.BirthDate,
-                Education = request.Education,
-                Hobbies = request.Hobbies,
-                Employment = request.Employment,
-                Bio = request.Bio
-            }, cancellationToken);
-            return user is null ? TypedResults.NotFound() : TypedResults.Ok(await ToResponseAsync(user, id, followService, cancellationToken));
+                return TypedResults.BadRequest("profileImageUrl must reference a previously uploaded image.");
+            }
+
+            try
+            {
+                var user = await service.UpdateAsync(id, new User
+                {
+                    DisplayName = request.DisplayName,
+                    Email = request.Email,
+                    ProfileImageUrl = string.IsNullOrEmpty(request.ProfileImageUrl) ? null : request.ProfileImageUrl,
+                    Latitude = request.Latitude,
+                    Longitude = request.Longitude,
+                    BirthDate = request.BirthDate,
+                    Education = request.Education,
+                    Hobbies = request.Hobbies,
+                    Employment = request.Employment,
+                    Bio = request.Bio
+                }, cancellationToken);
+                return user is null ? TypedResults.NotFound() : TypedResults.Ok(await ToResponseAsync(user, id, followService, cancellationToken));
+            }
+            catch (DuplicateEmailException)
+            {
+                return TypedResults.Conflict("An account with this email already exists.");
+            }
         });
 
         group.MapDelete("/{id:long}", async Task<Results<NoContent, NotFound>>
@@ -153,9 +182,23 @@ public static class GeoSceneryEndpoints
         })
         .WithName("GetScene");
 
-        group.MapPost("", async Task<Created<SceneResponse>>
-            (CreateSceneRequest request, ClaimsPrincipal principal, ISceneService service, CancellationToken cancellationToken) =>
+        group.MapPost("", async Task<Results<Created<SceneResponse>, BadRequest<string>>>
+            (CreateSceneRequest request, ClaimsPrincipal principal, ISceneService service, IFileStorageService storage, CancellationToken cancellationToken) =>
         {
+            // Only references to images uploaded through the authenticated upload
+            // endpoint are accepted; arbitrary client-supplied URLs and encoded
+            // image data are rejected.
+            if (!await storage.IsStoredImageAsync(request.ImageUrl, cancellationToken))
+            {
+                return TypedResults.BadRequest("imageUrl must reference a previously uploaded image.");
+            }
+
+            var tagError = ValidateTags(request.Tags);
+            if (tagError is not null)
+            {
+                return TypedResults.BadRequest(tagError);
+            }
+
             var scene = await service.CreateAsync(new Scene
             {
                 Title = request.Title,
@@ -171,9 +214,23 @@ public static class GeoSceneryEndpoints
         .WithName("CreateScene")
         .RequireAuthorization();
 
-        group.MapPut("/{id:long}", async Task<Results<Ok<SceneResponse>, NotFound>>
-            (long id, UpdateSceneRequest request, ClaimsPrincipal principal, ISceneService service, CancellationToken cancellationToken) =>
+        group.MapPut("/{id:long}", async Task<Results<Ok<SceneResponse>, NotFound, BadRequest<string>>>
+            (long id, UpdateSceneRequest request, ClaimsPrincipal principal, ISceneService service, IFileStorageService storage, CancellationToken cancellationToken) =>
         {
+            var tagError = ValidateTags(request.Tags);
+            if (tagError is not null)
+            {
+                return TypedResults.BadRequest(tagError);
+            }
+
+            // Reject arbitrary image URLs/data; the submitted image must be a valid
+            // reference produced by the upload endpoint (e.g. the unchanged value
+            // loaded from the scene itself).
+            if (!await storage.IsStoredImageAsync(request.ImageUrl, cancellationToken))
+            {
+                return TypedResults.BadRequest("imageUrl must reference a previously uploaded image.");
+            }
+
             var scene = await service.UpdateAsync(id, new Scene
             {
                 Title = request.Title,
@@ -239,13 +296,24 @@ public static class GeoSceneryEndpoints
         })
         .WithName("GetVisit");
 
-        group.MapPost("", async Task<Created<VisitResponse>>
+        group.MapPost("", async Task<Results<Ok<VisitResponse>, Created<VisitResponse>>>
             (CreateVisitRequest request, ClaimsPrincipal principal, IVisitService service, CancellationToken cancellationToken) =>
         {
+            var userId = GetUserId(principal);
+
+            // A (user, scene) visit is unique: recording one again is idempotent
+            // and returns the existing row with 200 instead of failing on the
+            // database's unique index.
+            var existing = await service.GetBySceneAsync(userId, request.SceneId, cancellationToken);
+            if (existing is not null)
+            {
+                return TypedResults.Ok(ToResponse(existing));
+            }
+
             var visit = await service.CreateAsync(new Visit
             {
                 SceneId = request.SceneId,
-                UserId = GetUserId(principal),
+                UserId = userId,
                 VisitedAt = request.VisitedAt ?? DateTimeOffset.UtcNow
             }, cancellationToken);
             return TypedResults.Created($"/api/visits/{visit.Id}", ToResponse(visit));
@@ -310,5 +378,17 @@ public static class GeoSceneryEndpoints
     {
         var value = principal.FindFirstValue(ClaimTypes.NameIdentifier);
         return value is not null && long.TryParse(value, out var userId) ? userId : null;
+    }
+
+    private static string? ValidateTags(IReadOnlyList<string>? tags)
+    {
+        if (tags is null)
+        {
+            return null;
+        }
+
+        return tags.Any(tag => tag.Length > SceneTag.MaxTagLength)
+            ? $"Each tag must be {SceneTag.MaxTagLength} characters or fewer."
+            : null;
     }
 }

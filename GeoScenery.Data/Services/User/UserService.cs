@@ -39,8 +39,16 @@ public sealed class UserService : IUserService
             return null;
         }
 
+        var normalizedEmail = user.Email.Trim().ToLowerInvariant();
+        if (await _dbContext.Users
+                .AsNoTracking()
+                .AnyAsync(candidate => candidate.Email == normalizedEmail && candidate.Id != id, cancellationToken))
+        {
+            throw new DuplicateEmailException();
+        }
+
         existingUser.DisplayName = user.DisplayName;
-        existingUser.Email = user.Email;
+        existingUser.Email = normalizedEmail;
         existingUser.ProfileImageUrl = user.ProfileImageUrl;
         existingUser.Latitude = user.Latitude;
         existingUser.Longitude = user.Longitude;
@@ -49,7 +57,17 @@ public sealed class UserService : IUserService
         existingUser.Hobbies = user.Hobbies;
         existingUser.Employment = user.Employment;
         existingUser.Bio = user.Bio;
-        await _dbContext.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await _dbContext.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException exception) when (UniqueConstraintGuard.IsUniqueConstraintViolation(exception))
+        {
+            // Another account claimed the email between the validation above and
+            // the save. Translate the database race into the same conflict signal.
+            throw new DuplicateEmailException();
+        }
+
         return existingUser;
     }
 
