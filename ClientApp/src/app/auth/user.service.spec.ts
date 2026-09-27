@@ -12,8 +12,7 @@ describe('UserService', () => {
   const usersUrl = `${environment.apiUrl}/api/users`;
   const user: User = new User(1, 'Ava', 'ava@example.com');
   const request: UpdateUserRequest = {
-    displayName: user.displayName,
-    email: user.email ?? ''
+    displayName: user.displayName
   };
 
   beforeEach(() => {
@@ -46,6 +45,24 @@ describe('UserService', () => {
     expect(httpRequest.request.method).toBe('PUT');
     expect(httpRequest.request.body).toEqual(request);
     httpRequest.flush(user);
+  });
+
+  it('changes the current user email', () => {
+    const changeRequest = { email: 'new@example.com', currentPassword: 'Password123!' };
+    service.changeEmail(changeRequest).subscribe(result => expect(result).toEqual(user));
+    const httpRequest = http.expectOne(`${usersUrl}/me/email`);
+    expect(httpRequest.request.method).toBe('PUT');
+    expect(httpRequest.request.body).toEqual(changeRequest);
+    httpRequest.flush(user);
+  });
+
+  it('changes the current user password', () => {
+    const changeRequest = { currentPassword: 'Password123!', newPassword: 'NewPassword456!' };
+    service.changePassword(changeRequest).subscribe();
+    const httpRequest = http.expectOne(`${usersUrl}/me/password`);
+    expect(httpRequest.request.method).toBe('PUT');
+    expect(httpRequest.request.body).toEqual(changeRequest);
+    httpRequest.flush(null);
   });
 
   it('deletes a user', () => {

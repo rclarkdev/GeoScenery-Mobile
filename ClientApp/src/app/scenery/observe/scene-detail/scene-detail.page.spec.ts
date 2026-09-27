@@ -10,6 +10,7 @@ import { SceneryService } from '../../scenery.service';
 import { Scene } from '../../scene.model';
 import { AuthService } from '../../../auth/auth.service';
 import { VisitsService } from '../../../visits/visits.service';
+import { ImageUrlPipe } from '../../../shared/image-url.pipe';
 
 describe('SceneDetailPage', () => {
   let component: SceneDetailPage;
@@ -25,7 +26,7 @@ describe('SceneDetailPage', () => {
 
     TestBed.configureTestingModule({
       declarations: [ SceneDetailPage ],
-      imports: [HttpClientTestingModule],
+      imports: [HttpClientTestingModule, ImageUrlPipe],
       providers: [
         { provide: ActivatedRoute, useValue: { paramMap: of(new Map([['sceneId', '1']])) } },
         { provide: SceneryService, useValue: sceneryService },
@@ -52,14 +53,16 @@ describe('SceneDetailPage', () => {
     expect(component.scene?.id).toBe(1);
   });
 
-  it('should record a visit and navigate to visit history', () => {
+  it('records a visit and confirms it without leaving the scene', () => {
     const visitsService = TestBed.inject(VisitsService);
     const navController = TestBed.inject(NavController);
 
     component.onVisitScene();
 
     expect(visitsService.recordVisit).toHaveBeenCalledWith(1);
-    expect(navController.navigateBack).toHaveBeenCalledWith('/visits');
+    expect(component.visitRecorded).toBeTrue();
+    expect(component.isVisiting).toBeFalse();
+    expect(navController.navigateBack).not.toHaveBeenCalled();
   });
 
   it('is not the owner when the current user does not own the scene', () => {
@@ -88,6 +91,14 @@ describe('SceneDetailPage', () => {
 
   it('does not submit a rating when none is entered', () => {
     component.pendingRating = null;
+
+    component.onSubmitRating();
+
+    expect(sceneryService.rateScene).not.toHaveBeenCalled();
+  });
+
+  it('does not submit a rating outside the allowed range', () => {
+    component.pendingRating = 11;
 
     component.onSubmitRating();
 

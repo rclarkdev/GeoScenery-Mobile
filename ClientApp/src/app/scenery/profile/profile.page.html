@@ -1,121 +1,71 @@
 <ion-header>
   <ion-toolbar>
     <ion-title>Profile</ion-title>
-    <ion-buttons slot="end" *ngIf="isOwnProfile">
-      <ion-button routerLink="/scenery/tabs/profile/edit">
-        <ion-icon slot="icon-only" name="create-outline"></ion-icon>
-      </ion-button>
-    </ion-buttons>
   </ion-toolbar>
 </ion-header>
 
-<ion-content class="ion-padding" *ngIf="user">
-  <div class="ion-text-center">
-    <ion-avatar>
-      <ion-img *ngIf="user.profileImageUrl; else placeholder" [src]="user.profileImageUrl"></ion-img>
-      <ng-template #placeholder>
-        <ion-icon name="person-circle-outline"></ion-icon>
-      </ng-template>
-    </ion-avatar>
-    <ion-button *ngIf="isOwnProfile" fill="outline" (click)="onPickPhoto()">
-      <ion-icon slot="start" name="camera-outline"></ion-icon>
-      {{ user.profileImageUrl ? 'Change photo' : 'Add photo' }}
-    </ion-button>
-    <ion-button *ngIf="!isOwnProfile" [color]="user.isFollowedByCurrentUser ? 'medium' : 'primary'" [disabled]="isFollowChanging" (click)="toggleFollow()">
-      <ion-icon slot="start" [name]="user.isFollowedByCurrentUser ? 'person-remove-outline' : 'person-add-outline'"></ion-icon>
-      {{ user.isFollowedByCurrentUser ? 'Unfollow' : 'Follow' }}
-    </ion-button>
-  </div>
+<ion-content *ngIf="user">
+  <main class="profile-shell">
+    <section class="identity" aria-labelledby="profile-name">
+      <ion-avatar>
+        <ion-img *ngIf="user.profileImageUrl; else placeholder" [src]="user.profileImageUrl | imageUrl"></ion-img>
+        <ng-template #placeholder>
+          <ion-icon name="person-circle-outline"></ion-icon>
+        </ng-template>
+      </ion-avatar>
+      <h1 id="profile-name">{{ user.displayName }}</h1>
+      <p class="email" *ngIf="user.email">{{ user.email }}</p>
+      <ion-button class="identity-action" *ngIf="isOwnProfile" fill="outline" size="small" routerLink="/scenery/tabs/profile/edit">
+        <ion-icon slot="start" name="create-outline"></ion-icon>
+        Edit profile
+      </ion-button>
+      <ion-button class="identity-action" *ngIf="!isOwnProfile" fill="outline" size="small"
+        [color]="user.isFollowedByCurrentUser ? 'medium' : 'primary'" [disabled]="isFollowChanging" (click)="toggleFollow()">
+        <ion-icon slot="start" [name]="user.isFollowedByCurrentUser ? 'person-remove-outline' : 'person-add-outline'"></ion-icon>
+        {{ user.isFollowedByCurrentUser ? 'Unfollow' : 'Follow' }}
+      </ion-button>
+    </section>
 
-  <ion-item lines="none">
-    <ion-label>
-      <h1>{{ user.displayName }}</h1>
-      <p *ngIf="user.email">{{ user.email }}</p>
-    </ion-label>
-  </ion-item>
+    <nav class="profile-stats" aria-label="Profile connections">
+      <a [routerLink]="['/scenery/tabs/profile', user.id, 'followers']">
+        <strong>{{ user.followerCount }}</strong>
+        <span>Followers</span>
+      </a>
+      <a [routerLink]="['/scenery/tabs/profile', user.id, 'following']">
+        <strong>{{ user.followingCount }}</strong>
+        <span>Following</span>
+      </a>
+    </nav>
 
-  <ion-item lines="none" *ngIf="user.bio">
-    <ion-label class="ion-text-wrap">
-      <h3>Bio</h3>
-      <p>{{ user.bio }}</p>
-    </ion-label>
-  </ion-item>
+    <section class="profile-section" *ngIf="user.bio || user.birthDate || user.employment || user.education || user.hobbies">
+      <h2>About</h2>
+      <p class="bio" *ngIf="user.bio">{{ user.bio }}</p>
+      <dl class="profile-details">
+        <div *ngIf="user.employment">
+          <dt>Employment</dt>
+          <dd>{{ user.employment }}</dd>
+        </div>
+        <div *ngIf="user.education">
+          <dt>Education</dt>
+          <dd>{{ user.education }}</dd>
+        </div>
+        <div *ngIf="user.hobbies">
+          <dt>Hobbies</dt>
+          <dd>{{ user.hobbies }}</dd>
+        </div>
+        <div *ngIf="user.birthDate">
+          <dt>Birth date</dt>
+          <dd>{{ user.birthDate | date:'longDate' }}</dd>
+        </div>
+      </dl>
+    </section>
 
-  <ion-item lines="none" *ngIf="user.birthDate">
-    <ion-label>
-      <h3>Birth date</h3>
-      <p>{{ user.birthDate | date:'longDate' }}</p>
-    </ion-label>
-  </ion-item>
-
-  <ion-item lines="none" *ngIf="user.employment">
-    <ion-label class="ion-text-wrap">
-      <h3>Employment</h3>
-      <p>{{ user.employment }}</p>
-    </ion-label>
-  </ion-item>
-
-  <ion-item lines="none" *ngIf="user.education">
-    <ion-label class="ion-text-wrap">
-      <h3>Education</h3>
-      <p>{{ user.education }}</p>
-    </ion-label>
-  </ion-item>
-
-  <ion-item lines="none" *ngIf="user.hobbies">
-    <ion-label class="ion-text-wrap">
-      <h3>Hobbies</h3>
-      <p>{{ user.hobbies }}</p>
-    </ion-label>
-  </ion-item>
-
-  <ion-item lines="none" button [routerLink]="['/scenery/tabs/profile', user.id, 'followers']">
-    <ion-label>Followers</ion-label>
-    <ion-note slot="end">{{ user.followerCount }}</ion-note>
-  </ion-item>
-  <ion-item lines="none" button [routerLink]="['/scenery/tabs/profile', user.id, 'following']">
-    <ion-label>Following</ion-label>
-    <ion-note slot="end">{{ user.followingCount }}</ion-note>
-  </ion-item>
-
-  <ion-item lines="none">
-    <ion-label>
-      <h3>Current location</h3>
+    <section class="profile-section">
+      <h2>Location</h2>
       <p *ngIf="user.latitude != null && user.longitude != null">
         {{ user.latitude | number:'1.4-4' }}, {{ user.longitude | number:'1.4-4' }}
       </p>
       <p *ngIf="user.latitude == null || user.longitude == null">Not set</p>
-    </ion-label>
-  </ion-item>
-  <ion-button *ngIf="isOwnProfile" expand="block" fill="outline" [disabled]="isLocating" (click)="useCurrentLocation()">
-    <ion-icon slot="start" name="locate-outline"></ion-icon>
-    {{ isLocating ? 'Locating...' : 'Use current location' }}
-  </ion-button>
-  <ion-note color="danger" *ngIf="locationError">
-    Couldn't get your current location.
-  </ion-note>
-
-  <ion-button *ngIf="isOwnProfile" expand="block" routerLink="/scenery/tabs/my-scenes">
-    <ion-icon slot="start" name="globe"></ion-icon>
-    View my scenes
-  </ion-button>
-
-  <ion-note color="medium" *ngIf="isSaving">Saving...</ion-note>
-  <ion-note color="danger" *ngIf="saveError">Unable to save your profile.</ion-note>
-
-  <ion-item *ngIf="isOwnProfile" lines="none">
-    <ion-label>
-      <h3>Account</h3>
-      <p>Manage your account and data.</p>
-    </ion-label>
-  </ion-item>
-  <ion-button *ngIf="isOwnProfile" expand="block" fill="outline" color="danger" (click)="confirmDeleteAccount()">
-    Delete account
-  </ion-button>
-  <ion-button *ngIf="isOwnProfile" expand="block" fill="clear" routerLink="/legal/support">
-    Contact support
-  </ion-button>
-  <ion-button *ngIf="isOwnProfile" expand="block" fill="clear" routerLink="/about">
-    About GeoScenery
-  </ion-button>
+    </section>
+  </main>
 </ion-content>

@@ -23,7 +23,7 @@
       Enter a description.
     </ion-note>
 
-    <ion-img *ngIf="sceneForm.controls.imageUrl.value" [src]="sceneForm.controls.imageUrl.value"></ion-img>
+    <ion-img *ngIf="sceneForm.controls.imageUrl.value" [src]="sceneForm.controls.imageUrl.value | imageUrl"></ion-img>
     <ion-button expand="block" fill="outline" type="button" (click)="onPickImage()">
       <ion-icon slot="start" name="camera-outline"></ion-icon>
       {{ sceneForm.controls.imageUrl.value ? 'Change photo' : 'Add photo' }}

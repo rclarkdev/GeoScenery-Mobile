@@ -1,7 +1,7 @@
 import { Component, OnInit } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 import { FormBuilder, Validators } from '@angular/forms';
-import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
+import { Camera, CameraDirection, CameraResultType, CameraSource } from '@capacitor/camera';
 import { Geolocation } from '@capacitor/geolocation';
 import { SceneryService } from '../../scenery.service';
 import { NavController } from '@ionic/angular';
@@ -87,6 +87,7 @@ export class EditScenePage implements OnInit {
       // Prompt lets the user choose between the camera and their photo library
       const photo = await Camera.getPhoto({
         quality: 80,
+        direction: CameraDirection.Front,
         resultType: CameraResultType.Uri,
         source: CameraSource.Prompt
       });
@@ -109,11 +110,9 @@ export class EditScenePage implements OnInit {
     this.saveError = false;
     const { tags, ...rest } = this.sceneForm.getRawValue();
     try {
-      const imageUrl = rest.imageUrl.startsWith('data:')
-        ? (await firstValueFrom(this.imageUploadService.uploadDataUrl(rest.imageUrl, 'scene'))).url
-        : rest.imageUrl.startsWith('http') && !rest.imageUrl.startsWith('/uploads/')
-          ? (await firstValueFrom(this.imageUploadService.uploadUri(rest.imageUrl, 'scene'))).url
-        : rest.imageUrl;
+      const imageUrl = (await firstValueFrom(
+        this.imageUploadService.uploadSelectedImage(rest.imageUrl, 'scene')
+      )).url;
       await firstValueFrom(this.sceneryService.updateScene(this.scene.id, {
         ...rest,
         imageUrl,

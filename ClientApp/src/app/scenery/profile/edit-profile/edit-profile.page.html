@@ -7,45 +7,183 @@
   </ion-toolbar>
 </ion-header>
 
-<ion-content class="ion-padding">
-  <form [formGroup]="profileForm" (ngSubmit)="onSave()">
-    <ion-item>
-      <ion-input label="Name" labelPlacement="stacked" formControlName="displayName"></ion-input>
-    </ion-item>
-    <ion-note color="danger" *ngIf="profileForm.controls.displayName.touched && profileForm.controls.displayName.invalid">
-      Enter a name.
-    </ion-note>
+<ion-content>
+  <main class="editor-shell">
+    <form [formGroup]="profileForm" (ngSubmit)="onSave()">
+      <section class="photo-editor" aria-labelledby="photo-heading">
+        <ion-avatar>
+          <ion-img *ngIf="profileImageUrl; else photoPlaceholder" [src]="profileImageUrl | imageUrl"></ion-img>
+          <ng-template #photoPlaceholder>
+            <ion-icon name="person-circle-outline"></ion-icon>
+          </ng-template>
+        </ion-avatar>
+        <div>
+          <h2 id="photo-heading">Profile photo</h2>
+          <ion-button fill="outline" size="small" type="button" (click)="onPickPhoto()">
+            <ion-icon slot="start" name="camera-outline"></ion-icon>
+            {{ profileImageUrl ? 'Change photo' : 'Add photo' }}
+          </ion-button>
+          <ion-note color="danger" *ngIf="photoError">Unable to select that photo.</ion-note>
+        </div>
+      </section>
 
-    <ion-item>
-      <ion-input label="Email" labelPlacement="stacked" type="email" formControlName="email"></ion-input>
-    </ion-item>
-    <ion-note color="danger" *ngIf="profileForm.controls.email.touched && profileForm.controls.email.invalid">
-      Enter a valid email.
-    </ion-note>
+      <section class="form-section" aria-labelledby="details-heading">
+        <div class="section-heading">
+          <h2 id="details-heading">Profile details</h2>
+          <p>Information shown on your profile.</p>
+        </div>
+        <ion-list lines="full">
+          <ion-item>
+            <ion-input label="Name" labelPlacement="stacked" formControlName="displayName"></ion-input>
+          </ion-item>
+          <ion-note class="field-error" color="danger" *ngIf="profileForm.controls.displayName.touched && profileForm.controls.displayName.invalid">
+            Enter a name.
+          </ion-note>
+          <ion-item>
+            <ion-textarea label="Bio" labelPlacement="stacked" formControlName="bio" [autoGrow]="true" rows="3"></ion-textarea>
+          </ion-item>
+          <ion-item>
+            <ion-input label="Employment" labelPlacement="stacked" formControlName="employment"></ion-input>
+          </ion-item>
+          <ion-item>
+            <ion-input label="Education" labelPlacement="stacked" formControlName="education"></ion-input>
+          </ion-item>
+          <ion-item>
+            <ion-input label="Hobbies" labelPlacement="stacked" formControlName="hobbies"></ion-input>
+          </ion-item>
+          <ion-item>
+            <ion-input label="Birth date" labelPlacement="stacked" type="date" formControlName="birthDate"></ion-input>
+          </ion-item>
+        </ion-list>
+      </section>
 
-    <ion-item>
-      <ion-input label="Birth date" labelPlacement="stacked" type="date" formControlName="birthDate"></ion-input>
-    </ion-item>
+      <section class="location-editor" aria-labelledby="location-heading">
+        <div>
+          <h2 id="location-heading">Location</h2>
+          <p *ngIf="user?.latitude != null && user?.longitude != null">
+            {{ user?.latitude | number:'1.4-4' }}, {{ user?.longitude | number:'1.4-4' }}
+          </p>
+          <p *ngIf="user?.latitude == null || user?.longitude == null">Not set</p>
+        </div>
+        <ion-button fill="outline" size="small" type="button" [disabled]="isLocating" (click)="useCurrentLocation()">
+          <ion-icon slot="start" name="locate-outline"></ion-icon>
+          {{ isLocating ? 'Locating...' : (user?.latitude != null ? 'Update location' : 'Use current location') }}
+        </ion-button>
+        <ion-note color="danger" *ngIf="locationError">Couldn't get your current location.</ion-note>
+      </section>
 
-    <ion-item>
-      <ion-input label="Employment" labelPlacement="stacked" formControlName="employment"></ion-input>
-    </ion-item>
+      <div class="save-actions">
+        <ion-button expand="block" type="submit" [disabled]="isSaving">
+          {{ isSaving ? 'Saving...' : 'Save profile' }}
+        </ion-button>
+        <ion-note color="danger" *ngIf="saveError">Unable to save your profile.</ion-note>
+      </div>
+    </form>
 
-    <ion-item>
-      <ion-input label="Education" labelPlacement="stacked" formControlName="education"></ion-input>
-    </ion-item>
+    <ion-accordion-group class="advanced-settings" *ngIf="user">
+      <ion-accordion value="account">
+        <ion-item slot="header" lines="none">
+          <ion-label>Advanced account settings</ion-label>
+        </ion-item>
+        <div class="advanced-content" slot="content">
+          <section class="account-setting" aria-labelledby="email-heading">
+            <div class="setting-summary">
+              <div>
+                <h3 id="email-heading">Email address</h3>
+                <p>{{ user?.email }}</p>
+              </div>
+              <ion-button fill="clear" size="small" type="button" (click)="toggleEmailForm()"
+                [attr.aria-expanded]="isEmailFormOpen" aria-controls="email-settings-form"
+                [attr.aria-label]="isEmailFormOpen ? 'Cancel email change' : 'Change email address'">
+                {{ isEmailFormOpen ? 'Cancel' : 'Change' }}
+              </ion-button>
+            </div>
+            <form id="email-settings-form" *ngIf="isEmailFormOpen" [formGroup]="emailForm" (ngSubmit)="onChangeEmail()">
+              <ion-list lines="full">
+                <ion-item>
+                  <ion-input label="Email address" labelPlacement="stacked" type="email" autocomplete="email" formControlName="email"></ion-input>
+                </ion-item>
+                <ion-note class="field-error" color="danger" *ngIf="emailForm.controls.email.touched && emailForm.controls.email.invalid">
+                  Enter a valid email address.
+                </ion-note>
+                <ion-item>
+                  <ion-input label="Current password" labelPlacement="stacked" type="password" autocomplete="current-password" formControlName="currentPassword">
+                    <ion-input-password-toggle slot="end"></ion-input-password-toggle>
+                  </ion-input>
+                </ion-item>
+                <ion-note class="field-error" color="danger" *ngIf="emailForm.controls.currentPassword.touched && emailForm.controls.currentPassword.invalid">
+                  Enter your current password.
+                </ion-note>
+              </ion-list>
+              <div class="setting-action">
+                <ion-button type="submit" size="small" [disabled]="isChangingEmail">
+                  {{ isChangingEmail ? 'Updating...' : 'Update email' }}
+                </ion-button>
+                <ion-note color="danger" *ngIf="emailError">{{ emailError }}</ion-note>
+              </div>
+            </form>
+            <ion-note class="setting-message" color="success" role="status" *ngIf="emailMessage">{{ emailMessage }}</ion-note>
+          </section>
 
-    <ion-item>
-      <ion-input label="Hobbies" labelPlacement="stacked" formControlName="hobbies"></ion-input>
-    </ion-item>
+          <section class="account-setting" aria-labelledby="password-heading">
+            <div class="setting-summary">
+              <div>
+                <h3 id="password-heading">Password</h3>
+                <p>********</p>
+              </div>
+              <ion-button fill="clear" size="small" type="button" (click)="togglePasswordForm()"
+                [attr.aria-expanded]="isPasswordFormOpen" aria-controls="password-settings-form"
+                [attr.aria-label]="isPasswordFormOpen ? 'Cancel password change' : 'Change password'">
+                {{ isPasswordFormOpen ? 'Cancel' : 'Change' }}
+              </ion-button>
+            </div>
+            <form id="password-settings-form" *ngIf="isPasswordFormOpen" [formGroup]="passwordForm" (ngSubmit)="onChangePassword()">
+              <ion-list lines="full">
+                <ion-item>
+                  <ion-input label="Current password" labelPlacement="stacked" type="password" autocomplete="current-password" formControlName="currentPassword">
+                    <ion-input-password-toggle slot="end"></ion-input-password-toggle>
+                  </ion-input>
+                </ion-item>
+                <ion-note class="field-error" color="danger" *ngIf="passwordForm.controls.currentPassword.touched && passwordForm.controls.currentPassword.invalid">
+                  Enter your current password.
+                </ion-note>
+                <ion-item>
+                  <ion-input label="New password" labelPlacement="stacked" type="password" autocomplete="new-password" formControlName="newPassword">
+                    <ion-input-password-toggle slot="end"></ion-input-password-toggle>
+                  </ion-input>
+                </ion-item>
+                <ion-note class="field-error" color="danger" *ngIf="passwordForm.controls.newPassword.touched && passwordForm.controls.newPassword.invalid">
+                  Use 8 to 128 characters.
+                </ion-note>
+                <ion-item>
+                  <ion-input label="Confirm new password" labelPlacement="stacked" type="password" autocomplete="new-password" formControlName="confirmPassword">
+                    <ion-input-password-toggle slot="end"></ion-input-password-toggle>
+                  </ion-input>
+                </ion-item>
+                <ion-note class="field-error" color="danger" *ngIf="passwordForm.controls.confirmPassword.touched && passwordForm.controls.confirmPassword.hasError('required')">
+                  Confirm your new password.
+                </ion-note>
+                <ion-note class="field-error" color="danger" *ngIf="passwordForm.controls.confirmPassword.touched && passwordForm.controls.confirmPassword.hasError('passwordMismatch')">
+                  Passwords do not match.
+                </ion-note>
+              </ion-list>
+              <div class="setting-action">
+                <ion-button type="submit" size="small" [disabled]="isChangingPassword">
+                  {{ isChangingPassword ? 'Updating...' : 'Update password' }}
+                </ion-button>
+                <ion-note color="danger" *ngIf="passwordError">{{ passwordError }}</ion-note>
+              </div>
+            </form>
+            <ion-note class="setting-message" color="success" role="status" *ngIf="passwordMessage">{{ passwordMessage }}</ion-note>
+          </section>
 
-    <ion-item>
-      <ion-textarea label="Bio" labelPlacement="stacked" formControlName="bio" [autoGrow]="true"></ion-textarea>
-    </ion-item>
-
-    <ion-button expand="block" type="submit" [disabled]="isSaving">
-      {{ isSaving ? 'Saving...' : 'Save profile' }}
-    </ion-button>
-    <ion-note color="danger" *ngIf="saveError">Unable to save your profile.</ion-note>
-  </form>
+          <section class="account-setting danger-setting" aria-label="Delete account">
+            <ion-button type="button" fill="outline" color="danger" size="small" (click)="confirmDeleteAccount()">
+              Delete account
+            </ion-button>
+          </section>
+        </div>
+      </ion-accordion>
+    </ion-accordion-group>
+  </main>
 </ion-content>

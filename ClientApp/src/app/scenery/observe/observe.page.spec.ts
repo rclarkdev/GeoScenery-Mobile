@@ -39,6 +39,12 @@ describe('ObservePage', () => {
     expect(component.loadedScenery.length).toBe(1);
   });
 
+  it('renders only the map and filter controls, without a scene feed', () => {
+    expect(fixture.nativeElement.querySelector('.scene-map')).not.toBeNull();
+    expect(fixture.nativeElement.querySelector('ion-card')).toBeNull();
+    expect(fixture.nativeElement.querySelector('ion-thumbnail')).toBeNull();
+  });
+
   it('searches scenery using the form values and marks results as filtered', () => {
     component.searchForm.setValue({ tags: 'sunset, beach', latitude: 1, longitude: 2, radiusKm: 5 });
 
@@ -51,6 +57,42 @@ describe('ObservePage', () => {
       radiusKm: 5
     });
     expect(component.isFiltered).toBe(true);
+    expect(component.activeFilterCount).toBe(3);
+    expect(component.isFilterPanelOpen).toBe(false);
+  });
+
+  it('does not count draft values as active filters', () => {
+    component.searchForm.patchValue({ tags: 'hiking' });
+
+    expect(component.activeFilterCount).toBe(0);
+    expect(component.hasFilterValues).toBeTrue();
+  });
+
+  it('clears unapplied values without reloading scenery', () => {
+    component.searchForm.patchValue({ tags: 'hiking' });
+
+    component.clearSearch();
+
+    expect(component.searchForm.controls.tags.value).toBe('');
+    expect(sceneryService.getScenery).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not search by distance without a location', () => {
+    component.searchForm.patchValue({ radiusKm: 10 });
+
+    component.onSearch();
+
+    expect(component.radiusNeedsLocation).toBeTrue();
+    expect(sceneryService.searchScenery).not.toHaveBeenCalled();
+  });
+
+  it('does not search with out-of-range coordinates', () => {
+    component.searchForm.patchValue({ latitude: 91, longitude: 0 });
+
+    component.onSearch();
+
+    expect(component.hasInvalidCoordinates).toBeTrue();
+    expect(sceneryService.searchScenery).not.toHaveBeenCalled();
   });
 
   it('clears the search and reloads all scenery', () => {

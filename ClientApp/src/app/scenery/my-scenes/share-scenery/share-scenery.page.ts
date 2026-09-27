@@ -13,6 +13,9 @@ import { AuthService } from '../../../auth/auth.service';
 export class ShareSceneryPage implements OnInit {
 
   scene?: Scene;
+  isLoading = true;
+  loadError = false;
+  private sceneId?: number;
 
   constructor(private route: ActivatedRoute, private navCtrl: NavController, private sceneryService: SceneryService, private authService: AuthService) { }
 
@@ -26,12 +29,36 @@ export class ShareSceneryPage implements OnInit {
         this.navCtrl.navigateBack('/scenery/tabs/my-scenes');
         return;
       }
-      const sceneId = Number(paramMap.get('sceneId'));
-      if (!Number.isInteger(sceneId)) {
+      this.sceneId = Number(paramMap.get('sceneId'));
+      if (!Number.isInteger(this.sceneId)) {
         this.navCtrl.navigateBack('/scenery/tabs/my-scenes');
         return;
       }
-      this.sceneryService.getScene(sceneId).subscribe(scene => this.scene = scene);
+      this.loadScene();
+    });
+  }
+
+  retryLoad(): void {
+    this.loadScene();
+  }
+
+  private loadScene(): void {
+    if (this.sceneId == null) {
+      return;
+    }
+
+    this.isLoading = true;
+    this.loadError = false;
+    this.scene = undefined;
+    this.sceneryService.getScene(this.sceneId).subscribe({
+      next: scene => {
+        this.scene = scene;
+        this.isLoading = false;
+      },
+      error: () => {
+        this.isLoading = false;
+        this.loadError = true;
+      }
     });
   }
 

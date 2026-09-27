@@ -114,9 +114,6 @@ public sealed record UpdateUserRequest
     [Required, MaxLength(200)]
     public required string DisplayName { get; init; }
 
-    [Required, EmailAddress, MaxLength(320)]
-    public required string Email { get; init; }
-
     public string? ProfileImageUrl { get; init; }
 
     [Range(-90, 90)]
@@ -138,6 +135,26 @@ public sealed record UpdateUserRequest
 
     [MaxLength(2000)]
     public string? Bio { get; init; }
+}
+
+/// <summary>Payload for securely changing the authenticated user's email.</summary>
+public sealed record ChangeEmailRequest
+{
+    [Required, EmailAddress, MaxLength(320)]
+    public required string Email { get; init; }
+
+    [Required]
+    public required string CurrentPassword { get; init; }
+}
+
+/// <summary>Payload for securely changing the authenticated user's password.</summary>
+public sealed record ChangePasswordRequest
+{
+    [Required]
+    public required string CurrentPassword { get; init; }
+
+    [Required, MinLength(8), MaxLength(128)]
+    public required string NewPassword { get; init; }
 }
 
 /// <summary>Represents a recorded scene visit.</summary>

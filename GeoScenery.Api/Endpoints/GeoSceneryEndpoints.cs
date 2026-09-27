@@ -1,8 +1,11 @@
 using GeoScenery.Api.ViewModels;
 using GeoScenery.Api.Storage;
+using GeoScenery.Data.Context;
 using GeoScenery.Data.Models;
 using GeoScenery.Data.Services;
 using Microsoft.AspNetCore.Http.HttpResults;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
 
 namespace GeoScenery.Api.Endpoints;
@@ -70,10 +73,16 @@ public static class GeoSceneryEndpoints
 
             try
             {
+                var existingUser = await service.GetByIdAsync(id, cancellationToken);
+                if (existingUser is null)
+                {
+                    return TypedResults.NotFound();
+                }
+
                 var user = await service.UpdateAsync(id, new User
                 {
                     DisplayName = request.DisplayName,
-                    Email = request.Email,
+                    Email = existingUser.Email,
                     ProfileImageUrl = string.IsNullOrEmpty(request.ProfileImageUrl) ? null : request.ProfileImageUrl,
                     Latitude = request.Latitude,
                     Longitude = request.Longitude,
@@ -90,6 +99,69 @@ public static class GeoSceneryEndpoints
                 return TypedResults.Conflict("An account with this email already exists.");
             }
         });
+
+        group.MapPut("/me/email", async Task<Results<Ok<UserResponse>, UnauthorizedHttpResult, Conflict<string>, NotFound>>
+            (ChangeEmailRequest request, ClaimsPrincipal principal, MyProjectDbContext db, IPasswordHasher<User> hasher,
+                IFollowService followService, CancellationToken cancellationToken) =>
+        {
+            var userId = GetUserId(principal);
+            var user = await db.Users.FindAsync([userId], cancellationToken);
+            if (user is null)
+            {
+                return TypedResults.NotFound();
+            }
+
+            if (hasher.VerifyHashedPassword(user, user.PasswordHash, request.CurrentPassword) == PasswordVerificationResult.Failed)
+            {
+                return TypedResults.Unauthorized();
+            }
+
+            var normalizedEmail = request.Email.Trim().ToLowerInvariant();
+            if (await db.Users.AnyAsync(candidate => candidate.Id != userId && candidate.Email == normalizedEmail, cancellationToken))
+            {
+                return TypedResults.Conflict("An account with this email already exists.");
+            }
+
+            user.Email = normalizedEmail;
+            try
+            {
+                await db.SaveChangesAsync(cancellationToken);
+            }
+            catch (DbUpdateException exception) when (UniqueConstraintGuard.IsUniqueConstraintViolation(exception))
+            {
+                return TypedResults.Conflict("An account with this email already exists.");
+            }
+
+            return TypedResults.Ok(await ToResponseAsync(user, userId, followService, cancellationToken));
+        })
+        .RequireRateLimiting("account-security");
+
+        group.MapPut("/me/password", async Task<Results<NoContent, UnauthorizedHttpResult, BadRequest<string>, NotFound>>
+            (ChangePasswordRequest request, ClaimsPrincipal principal, MyProjectDbContext db, IPasswordHasher<User> hasher,
+                CancellationToken cancellationToken) =>
+        {
+            var userId = GetUserId(principal);
+            var user = await db.Users.FindAsync([userId], cancellationToken);
+            if (user is null)
+            {
+                return TypedResults.NotFound();
+            }
+
+            if (hasher.VerifyHashedPassword(user, user.PasswordHash, request.CurrentPassword) == PasswordVerificationResult.Failed)
+            {
+                return TypedResults.Unauthorized();
+            }
+
+            if (hasher.VerifyHashedPassword(user, user.PasswordHash, request.NewPassword) != PasswordVerificationResult.Failed)
+            {
+                return TypedResults.BadRequest("Choose a new password that differs from your current password.");
+            }
+
+            user.PasswordHash = hasher.HashPassword(user, request.NewPassword);
+            await db.SaveChangesAsync(cancellationToken);
+            return TypedResults.NoContent();
+        })
+        .RequireRateLimiting("account-security");
 
         group.MapDelete("/{id:long}", async Task<Results<NoContent, NotFound>>
             (long id, ClaimsPrincipal principal, IUserService service, CancellationToken cancellationToken) =>

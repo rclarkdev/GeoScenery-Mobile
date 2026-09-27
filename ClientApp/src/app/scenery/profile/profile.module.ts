@@ -8,6 +8,7 @@ import { IonicModule } from '@ionic/angular';
 import { ProfilePage } from './profile.page';
 import { FollowListPage } from './follow-list/follow-list.page';
 import { EditProfilePage } from './edit-profile/edit-profile.page';
+import { ImageUrlPipe } from '../../shared/image-url.pipe';
 
 const routes: Routes = [
   {
@@ -40,6 +41,7 @@ const routes: Routes = [
     FormsModule,
     ReactiveFormsModule,
     IonicModule,
+    ImageUrlPipe,
     RouterModule.forChild(routes)
   ],
   declarations: [ProfilePage, FollowListPage, EditProfilePage]

@@ -3,41 +3,85 @@
     <ion-buttons slot="start">
       <ion-back-button defaultHref="/scenery/tabs/observe"></ion-back-button>
     </ion-buttons>
-    <ion-title>{{ scene?.title }}</ion-title>
+    <ion-title>Scene details</ion-title>
   </ion-toolbar>
 </ion-header>
 
-<ion-content class="ion-padding" *ngIf="scene">
-  <ion-img *ngIf="scene.imageUrl" [src]="scene.imageUrl"></ion-img>
-  <h1>{{ scene.title }}</h1>
-  <p>{{ scene.description }}</p>
-  <p *ngIf="scene.tags.length > 0">
-    <ion-chip *ngFor="let tag of scene.tags">{{ tag }}</ion-chip>
-  </p>
+<ion-content>
+  <div class="page-state" *ngIf="isLoading">
+    <ion-spinner name="crescent"></ion-spinner>
+    <p>Loading scene...</p>
+  </div>
+  <div class="page-state" *ngIf="loadError">
+    <h2>Scene unavailable</h2>
+    <p>We couldn't load this scene.</p>
+    <ion-button fill="outline" (click)="retryLoad()">Try again</ion-button>
+  </div>
 
-  <ion-item lines="none">
-    <ion-label>
-      <h3>Community rating</h3>
-      <p *ngIf="scene.ratingCount > 0">{{ scene.averageRating | number:'1.1-1' }} / 10 ({{ scene.ratingCount }} rating{{ scene.ratingCount === 1 ? '' : 's' }})</p>
-      <p *ngIf="scene.ratingCount === 0">No ratings yet.</p>
-    </ion-label>
-  </ion-item>
+  <main class="scene-detail-shell" *ngIf="scene && !isLoading">
+    <div class="scene-hero" *ngIf="scene.imageUrl">
+      <ion-img [src]="scene.imageUrl | imageUrl"></ion-img>
+    </div>
 
-  <ng-container *ngIf="!isOwnScene">
-    <ion-item>
-      <ion-input label="Your rating (0-10)" labelPlacement="stacked" type="number" min="0" max="10" [(ngModel)]="pendingRating"></ion-input>
-    </ion-item>
-    <ion-button expand="block" [disabled]="isRating || pendingRating == null" (click)="onSubmitRating()">
-      {{ isRating ? 'Saving...' : (scene.currentUserRating != null ? 'Update rating' : 'Submit rating') }}
-    </ion-button>
-    <ion-button expand="block" fill="clear" *ngIf="scene.currentUserRating != null" [disabled]="isRating" (click)="onRemoveRating()">
-      Remove my rating
-    </ion-button>
-    <ion-note color="danger" *ngIf="ratingError">Unable to save your rating.</ion-note>
-  </ng-container>
+    <article class="scene-heading">
+      <h1>{{ scene.title }}</h1>
+      <p class="description">{{ scene.description }}</p>
+      <div class="scene-tags" *ngIf="scene.tags.length > 0" aria-label="Scene tags">
+        <ion-chip *ngFor="let tag of scene.tags">{{ tag }}</ion-chip>
+      </div>
+    </article>
 
-  <ion-button color="primary" margin (click)="onVisitScene()" [disabled]="isVisiting">
-    {{ isVisiting ? 'Recording...' : 'Visit' }}
-  </ion-button>
-  <ion-note color="danger" *ngIf="visitError">Unable to record this visit.</ion-note>
+    <dl class="scene-facts">
+      <div>
+        <dt>Community rating</dt>
+        <dd *ngIf="scene.ratingCount > 0">
+          {{ scene.averageRating | number:'1.1-1' }} / 10 · {{ scene.ratingCount }} {{ scene.ratingCount === 1 ? 'rating' : 'ratings' }}
+        </dd>
+        <dd *ngIf="scene.ratingCount === 0">No ratings yet</dd>
+      </div>
+      <div *ngIf="scene.latitude != null && scene.longitude != null">
+        <dt>Location</dt>
+        <dd>{{ scene.latitude | number:'1.4-4' }}, {{ scene.longitude | number:'1.4-4' }}</dd>
+      </div>
+    </dl>
+
+    <ng-container *ngIf="isOwnScene; else visitorActions">
+      <ion-button class="primary-action" expand="block"
+        [routerLink]="['/', 'scenery', 'tabs', 'my-scenes', 'edit', scene.id]">
+        Edit scene
+      </ion-button>
+    </ng-container>
+
+    <ng-template #visitorActions>
+      <section class="scene-section" aria-labelledby="rating-heading">
+        <div class="rating-value">
+          <h2 id="rating-heading">Rate this place</h2>
+          <output>{{ pendingRating == null ? 'Choose 0-10' : (pendingRating + ' / 10') }}</output>
+        </div>
+        <p class="section-copy">Share your rating with the community.</p>
+        <ion-range min="0" max="10" step="1" [snaps]="true" [ticks]="true" [pin]="true"
+          aria-label="Your rating from 0 to 10" [(ngModel)]="pendingRating"></ion-range>
+        <div class="rating-actions">
+          <ion-button [disabled]="isRating || pendingRating == null" (click)="onSubmitRating()">
+            {{ isRating ? 'Saving...' : (scene.currentUserRating != null ? 'Update rating' : 'Submit rating') }}
+          </ion-button>
+          <ion-button fill="clear" color="medium" *ngIf="scene.currentUserRating != null"
+            [disabled]="isRating" (click)="onRemoveRating()">
+            Remove rating
+          </ion-button>
+        </div>
+        <ion-note class="action-note" color="danger" *ngIf="ratingError">Unable to save your rating.</ion-note>
+      </section>
+
+      <section class="scene-section" aria-labelledby="visit-heading">
+        <h2 id="visit-heading">Visit history</h2>
+        <p class="section-copy">Add this place to your personal visit history.</p>
+        <ion-button class="primary-action" expand="block" [disabled]="isVisiting || visitRecorded" (click)="onVisitScene()">
+          {{ isVisiting ? 'Saving...' : (visitRecorded ? 'Added to visit history' : 'Mark as visited') }}
+        </ion-button>
+        <ion-note class="action-note" color="success" role="status" *ngIf="visitRecorded">Visit saved.</ion-note>
+        <ion-note class="action-note" color="danger" *ngIf="visitError">Unable to record this visit.</ion-note>
+      </section>
+    </ng-template>
+  </main>
 </ion-content>

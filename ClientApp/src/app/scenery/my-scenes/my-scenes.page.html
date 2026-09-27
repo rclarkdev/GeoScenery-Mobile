@@ -17,7 +17,7 @@
               detail
             >
               <ion-thumbnail slot="start">
-                <ion-img [src]="scene.imageUrl"></ion-img>
+                <ion-img [src]="scene.imageUrl | imageUrl"></ion-img>
               </ion-thumbnail>
               <ion-label>
                 <h2>{{ scene.title }}</h2>

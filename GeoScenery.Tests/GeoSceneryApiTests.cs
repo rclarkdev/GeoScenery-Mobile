@@ -738,7 +738,6 @@ public sealed class GeoSceneryApiTests
         var response = await _client.PutAsJsonAsync("/api/users/1", new
         {
             displayName = "Updated Name",
-            email = "updated@example.com",
             bio = "Loves scenic views.",
             education = "State University",
             hobbies = "Hiking, photography",
@@ -753,6 +752,7 @@ public sealed class GeoSceneryApiTests
         Assert.That(updated?.Bio, Is.EqualTo("Loves scenic views."));
         Assert.That(updated?.Education, Is.EqualTo("State University"));
         Assert.That(updated?.Latitude, Is.EqualTo(12.5));
+        Assert.That(updated?.Email, Is.EqualTo("test@example.com"));
     }
 
     [Test]
@@ -762,23 +762,92 @@ public sealed class GeoSceneryApiTests
 
         var response = await _client.PutAsJsonAsync($"/api/users/{other.UserId}", new
         {
-            displayName = "Hijacked",
-            email = "hijacked@example.com"
+            displayName = "Hijacked"
         });
 
         Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.NotFound));
     }
 
     [Test]
-    public async Task GivenAnInvalidEmail_WhenUpdatingYourProfile_ThenTheApiReturnsBadRequest()
+    public async Task GivenTheCorrectPassword_WhenChangingEmail_ThenTheNewEmailCanBeUsedToLogIn()
     {
-        var response = await _client.PutAsJsonAsync("/api/users/1", new
+        var user = await RegisterUserAsync("Email User", "old-email@example.com");
+        _client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", CreateToken(user.UserId));
+
+        var response = await _client.PutAsJsonAsync("/api/users/me/email", new
         {
-            displayName = "Ava",
-            email = "not-an-email"
+            email = " New-Email@Example.com ",
+            currentPassword = "Password123!"
         });
 
-        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.BadRequest));
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK));
+        var updated = await response.Content.ReadFromJsonAsync<UserResponse>();
+        Assert.That(updated?.Email, Is.EqualTo("new-email@example.com"));
+        var login = await _client.PostAsJsonAsync("/api/auth/login", new
+        {
+            email = "new-email@example.com",
+            password = "Password123!"
+        });
+        Assert.That(login.StatusCode, Is.EqualTo(HttpStatusCode.OK));
+    }
+
+    [Test]
+    public async Task GivenTheWrongPassword_WhenChangingEmail_ThenTheEmailIsNotChanged()
+    {
+        var user = await RegisterUserAsync("Email User", "unchanged@example.com");
+        _client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", CreateToken(user.UserId));
+
+        var response = await _client.PutAsJsonAsync("/api/users/me/email", new
+        {
+            email = "attacker@example.com",
+            currentPassword = "WrongPassword!"
+        });
+
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.Unauthorized));
+        var profile = await (await _client.GetAsync("/api/users/me")).Content.ReadFromJsonAsync<UserResponse>();
+        Assert.That(profile?.Email, Is.EqualTo("unchanged@example.com"));
+    }
+
+    [Test]
+    public async Task GivenTheCorrectPassword_WhenChangingPassword_ThenOnlyTheNewPasswordCanBeUsedToLogIn()
+    {
+        var user = await RegisterUserAsync("Password User", "password-user@example.com");
+        _client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", CreateToken(user.UserId));
+
+        var response = await _client.PutAsJsonAsync("/api/users/me/password", new
+        {
+            currentPassword = "Password123!",
+            newPassword = "UpdatedPassword456!"
+        });
+
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.NoContent));
+        var oldLogin = await _client.PostAsJsonAsync("/api/auth/login", new
+        {
+            email = "password-user@example.com",
+            password = "Password123!"
+        });
+        var newLogin = await _client.PostAsJsonAsync("/api/auth/login", new
+        {
+            email = "password-user@example.com",
+            password = "UpdatedPassword456!"
+        });
+        Assert.That(oldLogin.StatusCode, Is.EqualTo(HttpStatusCode.Unauthorized));
+        Assert.That(newLogin.StatusCode, Is.EqualTo(HttpStatusCode.OK));
+    }
+
+    [Test]
+    public async Task GivenTheWrongPassword_WhenChangingPassword_ThenTheApiReturnsUnauthorized()
+    {
+        var user = await RegisterUserAsync("Password User", "wrong-password@example.com");
+        _client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", CreateToken(user.UserId));
+
+        var response = await _client.PutAsJsonAsync("/api/users/me/password", new
+        {
+            currentPassword = "WrongPassword!",
+            newPassword = "UpdatedPassword456!"
+        });
+
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.Unauthorized));
     }
 
     [Test]

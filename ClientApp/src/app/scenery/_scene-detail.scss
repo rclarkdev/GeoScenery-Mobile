@@ -1,0 +1,199 @@
+:host {
+  display: block;
+}
+
+ion-content {
+  --background: #f7f8fa;
+}
+
+.scene-detail-shell {
+  width: min(100%, 720px);
+  min-height: 100%;
+  margin: 0 auto;
+  padding: 20px 20px 112px;
+  background: var(--ion-background-color, #fff);
+}
+
+.scene-hero {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  border-radius: 8px;
+  background: var(--ion-color-light);
+
+  ion-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+}
+
+.scene-heading {
+  padding: 22px 4px 18px;
+
+  h1 {
+    margin: 0;
+    font-size: 28px;
+    font-weight: 650;
+    line-height: 1.2;
+    overflow-wrap: anywhere;
+  }
+
+  .description {
+    margin: 10px 0 0;
+    color: var(--ion-color-dark-tint);
+    line-height: 1.6;
+    white-space: pre-wrap;
+  }
+}
+
+.scene-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 14px;
+
+  ion-chip {
+    margin: 0;
+    pointer-events: none;
+    cursor: default;
+  }
+}
+
+.scene-facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  margin: 0;
+  border-top: 1px solid var(--ion-color-light-shade);
+  border-bottom: 1px solid var(--ion-color-light-shade);
+
+  div {
+    min-height: 82px;
+    padding: 16px 12px;
+  }
+
+  div + div {
+    border-left: 1px solid var(--ion-color-light-shade);
+  }
+
+  dt {
+    color: var(--ion-color-medium-shade);
+    font-size: 13px;
+  }
+
+  dd {
+    margin: 6px 0 0;
+    font-weight: 600;
+    line-height: 1.35;
+    overflow-wrap: anywhere;
+  }
+}
+
+.scene-section {
+  padding: 22px 4px 0;
+
+  h2 {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 650;
+  }
+
+  .section-copy {
+    margin: 5px 0 14px;
+    color: var(--ion-color-medium-shade);
+    font-size: 14px;
+    line-height: 1.45;
+  }
+}
+
+.rating-value {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 2px;
+
+  output {
+    color: var(--ion-color-primary);
+    font-weight: 700;
+  }
+}
+
+.rating-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+
+  ion-button {
+    min-height: 44px;
+    margin: 0;
+  }
+}
+
+.primary-action {
+  min-height: 48px;
+  margin: 18px 0 0;
+}
+
+.action-note {
+  display: block;
+  margin-top: 10px;
+}
+
+.page-state {
+  min-height: 55vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  text-align: center;
+
+  h2 {
+    margin: 12px 0 6px;
+    font-size: 20px;
+  }
+
+  p {
+    margin: 0 0 16px;
+    color: var(--ion-color-medium-shade);
+  }
+
+  ion-button {
+    min-height: 44px;
+  }
+}
+
+@media (max-width: 420px) {
+  .scene-detail-shell {
+    padding: 12px 14px 120px;
+  }
+
+  .scene-heading h1 {
+    font-size: 25px;
+  }
+
+  .scene-facts {
+    grid-template-columns: 1fr;
+
+    div {
+      min-height: 68px;
+      padding: 13px 4px;
+    }
+
+    div + div {
+      border-top: 1px solid var(--ion-color-light-shade);
+      border-left: 0;
+    }
+  }
+
+  .rating-actions {
+    display: grid;
+    grid-template-columns: 1fr;
+
+    ion-button {
+      width: 100%;
+    }
+  }
+}

@@ -1,4 +1,4 @@
-@GeoScenery.Api_HostAddress = http://localhost:5022
+@GeoScenery.Api_HostAddress = http://localhost:44331
 
 GET {{GeoScenery.Api_HostAddress}}/weatherforecast/
 Accept: application/json

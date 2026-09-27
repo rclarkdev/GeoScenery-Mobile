@@ -1,90 +1,84 @@
 <ion-header>
   <ion-toolbar>
-    <ion-title>Observe Scenery</ion-title>
+    <ion-title>Search</ion-title>
+    <ion-buttons slot="end">
+      <ion-button class="filters-button" [class.filters-active]="isFilterPanelOpen"
+        (click)="toggleFilters()" [attr.aria-expanded]="isFilterPanelOpen" aria-controls="scenery-filters">
+        <ion-icon slot="start" name="options-outline"></ion-icon>
+        Filters<span class="filter-count" *ngIf="activeFilterCount > 0">{{ activeFilterCount }}</span>
+      </ion-button>
+    </ion-buttons>
   </ion-toolbar>
 </ion-header>
 
-<ion-content padding>
-  <ion-grid>
-    <ion-row>
-      <ion-col size="12" size-sm="8" offset-sm="2">
-        <form [formGroup]="searchForm" (ngSubmit)="onSearch()">
-          <ion-item>
-            <ion-input label="Tags" labelPlacement="stacked" placeholder="e.g. sunset, hiking" formControlName="tags"></ion-input>
-          </ion-item>
-          <ion-item>
-            <ion-input label="Latitude" labelPlacement="stacked" type="number" formControlName="latitude"></ion-input>
-          </ion-item>
-          <ion-item>
-            <ion-input label="Longitude" labelPlacement="stacked" type="number" formControlName="longitude"></ion-input>
-          </ion-item>
-          <ion-item>
-            <ion-input label="Distance (km)" labelPlacement="stacked" type="number" formControlName="radiusKm"></ion-input>
-          </ion-item>
-          <ion-button expand="block" fill="outline" type="button" [disabled]="isLocating" (click)="useCurrentLocation()">
-            <ion-icon slot="start" name="locate-outline"></ion-icon>
-            {{ isLocating ? 'Locating...' : 'Use current location' }}
-          </ion-button>
-          <ion-note color="danger" *ngIf="locationError">Couldn't get your current location.</ion-note>
-          <ion-button expand="block" type="submit">Search</ion-button>
-          <ion-button expand="block" fill="clear" type="button" *ngIf="isFiltered" (click)="clearSearch()">Clear filters</ion-button>
-        </form>
+<ion-content class="map-content" [scrollY]="false">
+  <main class="map-workspace" aria-label="Scenery map">
+    <div #mapContainer class="scene-map"></div>
 
-        <div #mapContainer class="scene-map"></div>
-      </ion-col>
-    </ion-row>
-    <ion-row>
-      <ion-col size="12" size-sm="8" offset-sm="2" text-center>
-        <ion-card *ngIf="loadedScenery.length > 0">
-          <ion-card-header>
-            <ion-card-title>{{ loadedScenery[0].title }}</ion-card-title>
-            <ion-card-subtitle>
-              Rating: {{ loadedScenery[0].rating }} / 10
-              <span *ngIf="loadedScenery[0].distanceKm != null">, {{ loadedScenery[0].distanceKm | number:'1.0-1' }} km away</span>
-            </ion-card-subtitle>
-          </ion-card-header>
-          <ion-img [src]="loadedScenery[0].imageUrl"></ion-img>
-          <ion-card-content>
-            <p> {{ loadedScenery[0].description }} </p>
-            <p *ngIf="loadedScenery[0].tags.length > 0">
-              <ion-chip *ngFor="let tag of loadedScenery[0].tags">{{ tag }}</ion-chip>
-            </p>
-          </ion-card-content>
-            <ion-button 
-              fill="clear" 
-              color="primary" 
-              [routerLink]="[
-                '/',
-                'scenery', 
-                'tabs',
-                'observe', 
-                loadedScenery[0].id
-              ]"
-            >
-            Details
-            </ion-button>
-        </ion-card>
-      </ion-col>
-    </ion-row>
-    <ion-row>
-      <ion-col size="12" size-sm="8" offset-sm="2" text-center>
-        <ion-list>
-          <ion-item *ngFor="let scene of loadedScenery.slice(1)" 
-            [routerLink]="['/','scenery','tabs','observe', scene.id]"
-            detail
-          >
-            <ion-thumbnail slot="start">
-              <ion-img [src]="scene.imageUrl"></ion-img>
-            </ion-thumbnail>
-            <ion-label>
-              <h2>{{ scene.title }}</h2>
-              <p>{{ scene.description }}</p>
-              <p *ngIf="scene.distanceKm != null">{{ scene.distanceKm | number:'1.0-1' }} km away</p>
-            </ion-label>
+    <div class="result-status" role="status" *ngIf="!isFilterPanelOpen">
+      <strong>{{ loadedScenery.length }}</strong>
+      {{ loadedScenery.length === 1 ? 'place' : 'places' }}{{ isFiltered ? ' found' : '' }}
+    </div>
+
+    <section id="scenery-filters" class="filter-panel" *ngIf="isFilterPanelOpen" aria-labelledby="filter-heading">
+      <div class="filter-header">
+        <div>
+          <h2 id="filter-heading">Filter scenery</h2>
+          <p>{{ loadedScenery.length }} {{ loadedScenery.length === 1 ? 'place' : 'places' }} on the map</p>
+        </div>
+        <ion-button fill="clear" size="small" type="button" aria-label="Close filters" (click)="toggleFilters()">
+          <ion-icon slot="icon-only" name="close"></ion-icon>
+        </ion-button>
+      </div>
+
+      <form [formGroup]="searchForm" (ngSubmit)="onSearch()">
+        <ion-list lines="full">
+          <ion-item>
+            <ion-input label="Tags" labelPlacement="stacked" placeholder="sunset, hiking" formControlName="tags"></ion-input>
           </ion-item>
+
+          <div class="location-heading">
+            <span>Location</span>
+            <ion-button fill="clear" size="small" type="button" [disabled]="isLocating" (click)="useCurrentLocation()">
+              <ion-icon slot="start" name="locate-outline"></ion-icon>
+              {{ isLocating ? 'Finding...' : 'Use my location' }}
+            </ion-button>
+          </div>
+          <div class="coordinate-fields">
+            <ion-item>
+              <ion-input label="Latitude" labelPlacement="stacked" type="number" inputmode="decimal" formControlName="latitude"></ion-input>
+            </ion-item>
+            <ion-item>
+              <ion-input label="Longitude" labelPlacement="stacked" type="number" inputmode="decimal" formControlName="longitude"></ion-input>
+            </ion-item>
+          </div>
+          <ion-note class="field-error" color="danger" *ngIf="hasInvalidCoordinates">
+            Enter both coordinates within their valid ranges.
+          </ion-note>
+
+          <ion-item>
+            <ion-input label="Distance" labelPlacement="stacked" type="number" inputmode="decimal"
+              placeholder="Any distance" formControlName="radiusKm">
+              <span slot="end">km</span>
+            </ion-input>
+          </ion-item>
+          <ion-note class="field-error" color="danger" *ngIf="radiusNeedsLocation">
+            Add a location to filter by distance.
+          </ion-note>
         </ion-list>
-        <ion-note *ngIf="loadedScenery.length === 0">No scenery is available.</ion-note>
-      </ion-col>
-    </ion-row>
-  </ion-grid>
+
+        <ion-note class="field-error" color="danger" *ngIf="locationError">Couldn't get your current location.</ion-note>
+
+        <div class="filter-actions">
+          <ion-button fill="clear" type="button" [disabled]="!isFiltered && !hasFilterValues" (click)="clearSearch()">
+            Clear all
+          </ion-button>
+          <ion-button type="submit" [disabled]="!canSearch || isSearching">
+            {{ isSearching ? 'Applying...' : 'Apply filters' }}
+          </ion-button>
+        </div>
+        <ion-note class="field-error" color="danger" *ngIf="searchError">Unable to load scenery. Try again.</ion-note>
+      </form>
+    </section>
+  </main>
 </ion-content>

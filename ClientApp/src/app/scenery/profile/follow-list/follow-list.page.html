@@ -11,7 +11,7 @@
   <ion-list>
     <ion-item *ngFor="let user of users" button [routerLink]="['/scenery/tabs/profile', user.id]">
       <ion-avatar slot="start">
-        <ion-img *ngIf="user.profileImageUrl; else placeholder" [src]="user.profileImageUrl"></ion-img>
+        <ion-img *ngIf="user.profileImageUrl; else placeholder" [src]="user.profileImageUrl | imageUrl"></ion-img>
         <ng-template #placeholder>
           <ion-icon name="person-circle-outline"></ion-icon>
         </ng-template>

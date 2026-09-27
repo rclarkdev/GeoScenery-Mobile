@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { firstValueFrom, from, Observable } from 'rxjs';
+import { firstValueFrom, from, Observable, of } from 'rxjs';
 import { environment } from '../../environments/environment';
 
 interface UploadedImageResponse {
@@ -12,6 +12,16 @@ export class ImageUploadService {
   private readonly imagesUrl = `${environment.apiUrl}/api/images`;
 
   constructor(private http: HttpClient) { }
+
+  uploadSelectedImage(uri: string, kind: 'scene' | 'profile'): Observable<UploadedImageResponse> {
+    if (uri.startsWith('/uploads/')) {
+      return of({ url: uri });
+    }
+
+    return uri.startsWith('data:')
+      ? this.uploadDataUrl(uri, kind)
+      : this.uploadUri(uri, kind);
+  }
 
   uploadDataUrl(dataUrl: string, kind: 'scene' | 'profile'): Observable<UploadedImageResponse> {
     const [metadata, encoded] = dataUrl.split(',', 2);

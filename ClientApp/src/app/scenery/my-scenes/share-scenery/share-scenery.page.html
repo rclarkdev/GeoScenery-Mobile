@@ -3,14 +3,53 @@
     <ion-buttons slot="start">
       <ion-back-button defaultHref="/scenery/tabs/my-scenes"></ion-back-button>
     </ion-buttons>
-  <ion-title>{{ scene?.title }}</ion-title>
+    <ion-title>My scene</ion-title>
   </ion-toolbar>
 </ion-header>
 
-<ion-content padding>
-  <ion-button *ngIf="canEdit"
-    margin 
-    color="primary" 
-    [routerLink]="['/', 'scenery', 'tabs', 'my-scenes', 'edit', scene.id]"
-  >Edit</ion-button>
+<ion-content>
+  <div class="page-state" *ngIf="isLoading">
+    <ion-spinner name="crescent"></ion-spinner>
+    <p>Loading scene...</p>
+  </div>
+  <div class="page-state" *ngIf="loadError">
+    <h2>Scene unavailable</h2>
+    <p>We couldn't load this scene.</p>
+    <ion-button fill="outline" (click)="retryLoad()">Try again</ion-button>
+  </div>
+
+  <main class="scene-detail-shell" *ngIf="scene && !isLoading">
+    <div class="scene-hero" *ngIf="scene.imageUrl">
+      <ion-img [src]="scene.imageUrl | imageUrl"></ion-img>
+    </div>
+
+    <article class="scene-heading">
+      <h1>{{ scene.title }}</h1>
+      <p class="description">{{ scene.description }}</p>
+      <div class="scene-tags" *ngIf="scene.tags.length > 0" aria-label="Scene tags">
+        <ion-chip *ngFor="let tag of scene.tags">{{ tag }}</ion-chip>
+      </div>
+    </article>
+
+    <dl class="scene-facts">
+      <div>
+        <dt>Your rating</dt>
+        <dd>{{ scene.rating | number:'1.0-1' }} / 10</dd>
+      </div>
+      <div>
+        <dt>Community rating</dt>
+        <dd *ngIf="scene.ratingCount > 0">{{ scene.averageRating | number:'1.1-1' }} / 10 · {{ scene.ratingCount }} {{ scene.ratingCount === 1 ? 'rating' : 'ratings' }}</dd>
+        <dd *ngIf="scene.ratingCount === 0">No ratings yet</dd>
+      </div>
+      <div *ngIf="scene.latitude != null && scene.longitude != null">
+        <dt>Location</dt>
+        <dd>{{ scene.latitude | number:'1.4-4' }}, {{ scene.longitude | number:'1.4-4' }}</dd>
+      </div>
+    </dl>
+
+    <ion-button class="primary-action" *ngIf="canEdit" expand="block"
+      [routerLink]="['/', 'scenery', 'tabs', 'my-scenes', 'edit', scene.id]">
+      Edit scene
+    </ion-button>
+  </main>
 </ion-content>

@@ -1,15 +1,14 @@
 import { CUSTOM_ELEMENTS_SCHEMA } from '@angular/core';
 import { ComponentFixture, TestBed, waitForAsync } from '@angular/core/testing';
-import { ActivatedRoute, Router } from '@angular/router';
-import { AlertController } from '@ionic/angular';
-import { Geolocation } from '@capacitor/geolocation';
+import { ActivatedRoute } from '@angular/router';
+import { RouterTestingModule } from '@angular/router/testing';
 import { of, throwError } from 'rxjs';
 
 import { ProfilePage } from './profile.page';
 import { UserService } from '../../auth/user.service';
 import { AuthService } from '../../auth/auth.service';
 import { User } from '../../auth/user.model';
-import { ImageUploadService } from '../../shared/image-upload.service';
+import { ImageUrlPipe } from '../../shared/image-url.pipe';
 
 describe('ProfilePage', () => {
   let component: ProfilePage;
@@ -20,6 +19,7 @@ describe('ProfilePage', () => {
     const paramMap = userIdParam === null ? new Map() : new Map([['userId', userIdParam]]);
     TestBed.configureTestingModule({
       declarations: [ ProfilePage ],
+      imports: [ImageUrlPipe, RouterTestingModule],
       providers: [
         {
           provide: UserService,
@@ -33,10 +33,7 @@ describe('ProfilePage', () => {
           }
         },
         { provide: AuthService, useValue: { currentUserId } },
-        { provide: Router, useValue: { navigateByUrl: jasmine.createSpy('navigateByUrl') } },
-        { provide: AlertController, useValue: { create: jasmine.createSpy('create') } },
         { provide: ActivatedRoute, useValue: { paramMap: of(paramMap) } }
-        ,{ provide: ImageUploadService, useValue: {} }
       ],
       schemas: [CUSTOM_ELEMENTS_SCHEMA],
     });
@@ -55,6 +52,23 @@ describe('ProfilePage', () => {
   it('should create', () => {
     expect(component).toBeTruthy();
     expect(component.user?.displayName).toBe('Test user');
+  });
+
+  it('keeps account management and app links off the profile', () => {
+    const content = fixture.nativeElement.textContent;
+
+    expect(content).not.toContain('Delete account');
+    expect(content).not.toContain('Contact support');
+    expect(content).not.toContain('About GeoScenery');
+    expect(content).not.toContain('View my scenes');
+  });
+
+  it('provides one clear edit action without inline profile controls', () => {
+    const content = fixture.nativeElement.textContent;
+
+    expect(content).toContain('Edit profile');
+    expect(content).not.toContain('Change photo');
+    expect(content).not.toContain('Update location');
   });
 
   it('treats the profile as your own when no userId param is present', () => {
@@ -104,13 +118,11 @@ describe('ProfilePage', () => {
     TestBed.resetTestingModule();
     TestBed.configureTestingModule({
       declarations: [ ProfilePage ],
+      imports: [ImageUrlPipe, RouterTestingModule],
       providers: [
         { provide: UserService, useValue: userService },
         { provide: AuthService, useValue: { currentUserId: 1 } },
-        { provide: Router, useValue: { navigateByUrl: jasmine.createSpy('navigateByUrl') } },
-        { provide: AlertController, useValue: { create: jasmine.createSpy('create') } },
         { provide: ActivatedRoute, useValue: { paramMap: of(new Map([['userId', '2']])) } }
-        ,{ provide: ImageUploadService, useValue: {} }
       ],
       schemas: [CUSTOM_ELEMENTS_SCHEMA],
     });
@@ -123,12 +135,4 @@ describe('ProfilePage', () => {
     expect(component.isFollowChanging).toBe(false);
   });
 
-  it('sets locationError when useCurrentLocation fails', async () => {
-    spyOn(Geolocation, 'getCurrentPosition').and.rejectWith(new Error('denied'));
-
-    await component.useCurrentLocation();
-
-    expect(component.locationError).toBe(true);
-    expect(component.isLocating).toBe(false);
-  });
 });

@@ -108,6 +108,16 @@ builder.Services.AddRateLimiter(options =>
                 QueueLimit = 0
             }));
 
+    options.AddPolicy("account-security", context =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: GetRateLimitPartitionKey(context),
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 10,
+                Window = TimeSpan.FromMinutes(15),
+                QueueLimit = 0
+            }));
+
     // 429 Too Many Requests is the correct status for an exhausted policy
     // (the framework default of 503 is a poor fit for client abuse).
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;

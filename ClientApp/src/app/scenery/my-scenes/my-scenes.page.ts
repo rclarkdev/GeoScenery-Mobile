@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component } from '@angular/core';
 import { Scene } from '../scene.model';
 import { SceneryService } from '../scenery.service';
 
@@ -7,14 +7,13 @@ import { SceneryService } from '../scenery.service';
   templateUrl: './my-scenes.page.html',
   styleUrls: ['./my-scenes.page.scss'],
 })
-export class MyScenesPage implements OnInit {
+export class MyScenesPage {
 
   myScenes: Scene[] = [];
 
   constructor(private sceneryService: SceneryService) { }
 
-  ngOnInit() {
+  ionViewWillEnter(): void {
     this.sceneryService.getMyScenes().subscribe(scenes => this.myScenes = scenes);
- 
   }
 }

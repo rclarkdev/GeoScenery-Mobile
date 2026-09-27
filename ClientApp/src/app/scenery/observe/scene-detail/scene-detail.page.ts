@@ -14,11 +14,15 @@ import { VisitsService } from '../../../visits/visits.service';
 export class SceneDetailPage implements OnInit {
 
   scene?: Scene;
+  isLoading = true;
+  loadError = false;
   isVisiting = false;
   visitError = false;
+  visitRecorded = false;
   pendingRating: number | null = null;
   isRating = false;
   ratingError = false;
+  private sceneId?: number;
 
   constructor(
     private navCtrl: NavController,
@@ -31,16 +35,39 @@ export class SceneDetailPage implements OnInit {
     this.route.paramMap.subscribe(paramMap => {
       if (!paramMap.has('sceneId')) {
         this.navCtrl.navigateBack('/scenery/tabs/observe');
+        return;
       }
-      const sceneId = Number(paramMap.get('sceneId'));
-      if (!Number.isInteger(sceneId)) {
+      this.sceneId = Number(paramMap.get('sceneId'));
+      if (!Number.isInteger(this.sceneId)) {
         this.navCtrl.navigateBack('/scenery/tabs/observe');
         return;
       }
-      this.sceneryService.getScene(sceneId).subscribe(scene => {
+      this.loadScene();
+    });
+  }
+
+  retryLoad(): void {
+    this.loadScene();
+  }
+
+  private loadScene(): void {
+    if (this.sceneId == null) {
+      return;
+    }
+
+    this.isLoading = true;
+    this.loadError = false;
+    this.scene = undefined;
+    this.sceneryService.getScene(this.sceneId).subscribe({
+      next: scene => {
         this.scene = scene;
         this.pendingRating = scene.currentUserRating ?? null;
-      });
+        this.isLoading = false;
+      },
+      error: () => {
+        this.isLoading = false;
+        this.loadError = true;
+      }
     });
   }
 
@@ -56,7 +83,10 @@ export class SceneDetailPage implements OnInit {
     this.isVisiting = true;
     this.visitError = false;
     this.visitsService.recordVisit(this.scene.id).subscribe({
-      next: () => this.navCtrl.navigateBack('/visits'),
+      next: () => {
+        this.isVisiting = false;
+        this.visitRecorded = true;
+      },
       error: () => {
         this.isVisiting = false;
         this.visitError = true;
@@ -65,7 +95,8 @@ export class SceneDetailPage implements OnInit {
   }
 
   onSubmitRating() {
-    if (!this.scene || this.isRating || this.pendingRating == null) {
+    if (!this.scene || this.isRating || this.pendingRating == null
+      || this.pendingRating < 0 || this.pendingRating > 10) {
       return;
     }
 

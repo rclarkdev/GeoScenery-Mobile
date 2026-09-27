@@ -1,14 +1,131 @@
-ion-avatar {
-  width: 96px;
-  height: 96px;
-  margin: 0 auto 12px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--ion-color-light);
+:host {
+  display: block;
+}
 
-  ion-icon {
-    font-size: 64px;
-    color: var(--ion-color-medium);
+ion-content {
+  --background: #f7f8fa;
+}
+
+.profile-shell {
+  width: min(100%, 680px);
+  min-height: 100%;
+  margin: 0 auto;
+  padding: 24px 20px 32px;
+  background: var(--ion-background-color, #fff);
+}
+
+.identity {
+  text-align: center;
+
+  ion-avatar {
+    width: 112px;
+    height: 112px;
+    margin: 0 auto 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--ion-color-light);
+
+    ion-icon {
+      font-size: 76px;
+      color: var(--ion-color-medium);
+    }
+  }
+
+  h1 {
+    margin: 0;
+    font-size: 26px;
+    font-weight: 650;
+  }
+
+  .email {
+    margin: 5px 0 8px;
+    color: var(--ion-color-medium-shade);
+    overflow-wrap: anywhere;
+  }
+}
+
+.identity-action {
+  min-height: 44px;
+  margin: 0;
+}
+
+.profile-stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-top: 18px;
+  border-top: 1px solid var(--ion-color-light-shade);
+  border-bottom: 1px solid var(--ion-color-light-shade);
+
+  a {
+    min-height: 72px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: var(--ion-text-color, #222428);
+    text-decoration: none;
+  }
+
+  a + a {
+    border-left: 1px solid var(--ion-color-light-shade);
+  }
+
+  strong {
+    font-size: 20px;
+  }
+
+  span {
+    margin-top: 3px;
+    color: var(--ion-color-medium-shade);
+    font-size: 14px;
+  }
+}
+
+.profile-section {
+  padding: 22px 4px;
+  border-bottom: 1px solid var(--ion-color-light-shade);
+
+  h2 {
+    margin: 0 0 10px;
+    font-size: 17px;
+    font-weight: 650;
+  }
+
+  p {
+    margin: 0;
+    color: var(--ion-color-medium-shade);
+    line-height: 1.5;
+  }
+
+  .bio {
+    color: var(--ion-text-color, #222428);
+  }
+}
+
+.profile-details {
+  margin: 16px 0 0;
+
+  div {
+    display: grid;
+    grid-template-columns: minmax(100px, 0.35fr) 1fr;
+    gap: 16px;
+    padding: 8px 0;
+  }
+
+  dt {
+    color: var(--ion-color-medium-shade);
+    font-size: 14px;
+  }
+
+  dd {
+    margin: 0;
+    overflow-wrap: anywhere;
+  }
+}
+
+@media (max-width: 420px) {
+  .profile-shell {
+    padding: 20px 16px 28px;
   }
 }

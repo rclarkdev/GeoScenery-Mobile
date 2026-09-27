@@ -7,6 +7,7 @@ import { of } from 'rxjs';
 import { NewScenePage } from './new-scene.page';
 import { SceneryService } from '../../scenery.service';
 import { ImageUploadService } from '../../../shared/image-upload.service';
+import { ImageUrlPipe } from '../../../shared/image-url.pipe';
 
 describe('NewScenePage', () => {
   let component: NewScenePage;
@@ -15,10 +16,13 @@ describe('NewScenePage', () => {
   beforeEach(waitForAsync(() => {
     TestBed.configureTestingModule({
       declarations: [ NewScenePage ],
-      imports: [ReactiveFormsModule, IonicModule.forRoot()],
+      imports: [ReactiveFormsModule, IonicModule.forRoot(), ImageUrlPipe],
       providers: [
         { provide: SceneryService, useValue: { createScene: jasmine.createSpy('createScene').and.returnValue(of({})) } },
-        { provide: ImageUploadService, useValue: {} },
+        {
+          provide: ImageUploadService,
+          useValue: { uploadSelectedImage: jasmine.createSpy('uploadSelectedImage').and.returnValue(of({ url: '/uploads/image.jpg' })) }
+        },
         { provide: NavController, useValue: { navigateBack: jasmine.createSpy('navigateBack') } }
       ],
       schemas: [CUSTOM_ELEMENTS_SCHEMA],
@@ -44,11 +48,12 @@ describe('NewScenePage', () => {
 
   it('should create a scene and navigate back after a valid submission', async () => {
     const service = TestBed.inject(SceneryService);
+    const imageUploadService = TestBed.inject(ImageUploadService);
     const navController = TestBed.inject(NavController);
     component.sceneForm.setValue({
       title: 'New scene',
       description: 'A description',
-      imageUrl: '/uploads/image.jpg',
+      imageUrl: 'blob:http://localhost/photo-id',
       rating: 8,
       tags: 'sunset, beach',
       latitude: null,
@@ -57,6 +62,7 @@ describe('NewScenePage', () => {
 
     await component.onSave();
 
+  expect(imageUploadService.uploadSelectedImage).toHaveBeenCalledWith('blob:http://localhost/photo-id', 'scene');
     expect(service.createScene).toHaveBeenCalledWith({
       title: 'New scene',
       description: 'A description',

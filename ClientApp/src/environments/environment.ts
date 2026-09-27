@@ -6,7 +6,7 @@ import { Capacitor } from '@capacitor/core';
 
 export const environment = {
   production: false,
-  apiUrl: Capacitor.isNativePlatform() ? 'http://10.0.2.2:5022' : 'http://localhost:5022',
+  apiUrl: Capacitor.isNativePlatform() ? 'http://10.0.2.2:5022' : 'https://localhost:44311',
   currentUserId: 1
 };
 

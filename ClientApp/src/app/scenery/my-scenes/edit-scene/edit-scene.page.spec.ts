@@ -9,6 +9,7 @@ import { EditScenePage } from './edit-scene.page';
 import { SceneryService } from '../../scenery.service';
 import { Scene } from '../../scene.model';
 import { ImageUploadService } from '../../../shared/image-upload.service';
+import { ImageUrlPipe } from '../../../shared/image-url.pipe';
 
 describe('EditScenePage', () => {
   let component: EditScenePage;
@@ -17,14 +18,17 @@ describe('EditScenePage', () => {
   beforeEach(waitForAsync(() => {
     TestBed.configureTestingModule({
       declarations: [ EditScenePage ],
-      imports: [ReactiveFormsModule, IonicModule.forRoot()],
+      imports: [ReactiveFormsModule, IonicModule.forRoot(), ImageUrlPipe],
       providers: [
         { provide: ActivatedRoute, useValue: { paramMap: of(new Map([['sceneId', '1']])) } },
         { provide: SceneryService, useValue: {
           getScene: jasmine.createSpy('getScene').and.returnValue(of(new Scene(1, 'Test scene', 'Description', '/uploads/image.jpg', 8))),
           updateScene: jasmine.createSpy('updateScene').and.returnValue(of(new Scene(1, 'Updated scene', 'Updated description', 'https://example.com/updated.jpg', 9)))
         } },
-        { provide: ImageUploadService, useValue: {} },
+        {
+          provide: ImageUploadService,
+          useValue: { uploadSelectedImage: jasmine.createSpy('uploadSelectedImage').and.returnValue(of({ url: '/uploads/image.jpg' })) }
+        },
         { provide: NavController, useValue: { navigateBack: jasmine.createSpy('navigateBack') } }
       ],
       schemas: [CUSTOM_ELEMENTS_SCHEMA],

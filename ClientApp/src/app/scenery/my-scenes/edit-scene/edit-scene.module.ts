@@ -6,6 +6,7 @@ import { Routes, RouterModule } from '@angular/router';
 import { IonicModule } from '@ionic/angular';
 
 import { EditScenePage } from './edit-scene.page';
+import { ImageUrlPipe } from '../../../shared/image-url.pipe';
 
 const routes: Routes = [
   {
@@ -19,6 +20,7 @@ const routes: Routes = [
     CommonModule,
     ReactiveFormsModule,
     IonicModule,
+    ImageUrlPipe,
     RouterModule.forChild(routes)
   ],
   declarations: [EditScenePage]
