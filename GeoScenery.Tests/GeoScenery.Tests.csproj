@@ -24,6 +24,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Content Include="..\ClientApp\src\assets\icon\favicon.png" Link="TestAssets\favicon.png" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\GeoScenery.Data\GeoScenery.Data.csproj" />
     <ProjectReference Include="..\GeoScenery.Api\GeoScenery.Api.csproj" />
   </ItemGroup>

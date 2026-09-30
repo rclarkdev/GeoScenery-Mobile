@@ -19,11 +19,40 @@
         <ion-icon slot="start" name="create-outline"></ion-icon>
         Edit profile
       </ion-button>
-      <ion-button class="identity-action" *ngIf="!isOwnProfile" fill="outline" size="small"
-        [color]="user.isFollowedByCurrentUser ? 'medium' : 'primary'" [disabled]="isFollowChanging" (click)="toggleFollow()">
-        <ion-icon slot="start" [name]="user.isFollowedByCurrentUser ? 'person-remove-outline' : 'person-add-outline'"></ion-icon>
-        {{ user.isFollowedByCurrentUser ? 'Unfollow' : 'Follow' }}
-      </ion-button>
+      <div class="relationship-actions" *ngIf="!isOwnProfile">
+        <ion-button class="identity-action" *ngIf="!user.isBlockedByCurrentUser && !user.hasBlockedCurrentUser"
+          fill="outline" size="small" [color]="user.isFollowedByCurrentUser ? 'medium' : 'primary'"
+          [disabled]="isFollowChanging || isBlockChanging" (click)="toggleFollow()">
+          <ion-icon slot="start" [name]="user.isFollowedByCurrentUser ? 'person-remove-outline' : 'person-add-outline'"></ion-icon>
+          {{ isFollowChanging ? 'Updating...' : (user.isFollowedByCurrentUser ? 'Unfollow' : 'Follow') }}
+        </ion-button>
+        <ion-button class="identity-action" *ngIf="user.canMessage && !user.isBlockedByCurrentUser && !user.hasBlockedCurrentUser"
+          fill="solid" size="small" [routerLink]="['/scenery/tabs/messages', user.id]">
+          <ion-icon slot="start" name="chatbubble-ellipses-outline"></ion-icon>
+          Message
+        </ion-button>
+        <ion-button class="identity-action" *ngIf="user.isBlockedByCurrentUser" fill="outline" color="medium"
+          size="small" [disabled]="isBlockChanging" (click)="unblockUser()">
+          <ion-icon slot="start" name="shield-checkmark-outline"></ion-icon>
+          {{ isBlockChanging ? 'Updating...' : 'Unblock' }}
+        </ion-button>
+        <ion-button class="identity-action" *ngIf="!user.isBlockedByCurrentUser" fill="clear" color="danger"
+          size="small" [disabled]="isBlockChanging || isFollowChanging" (click)="confirmBlock()">
+          <ion-icon slot="start" name="ban-outline"></ion-icon>
+          Block
+        </ion-button>
+      </div>
+      <ion-note class="relationship-status" color="medium"
+        *ngIf="!isOwnProfile && user.hasBlockedCurrentUser && !user.isBlockedByCurrentUser">
+        You can't follow this profile.
+      </ion-note>
+      <ion-note class="relationship-status" color="medium"
+        *ngIf="!isOwnProfile && !user.canMessage && !user.isBlockedByCurrentUser && !user.hasBlockedCurrentUser">
+        You can message this user when they follow you or an existing conversation is open.
+      </ion-note>
+      <ion-note class="relationship-status" color="danger" *ngIf="relationshipError">
+        Unable to update this relationship. Try again.
+      </ion-note>
     </section>
 
     <nav class="profile-stats" aria-label="Profile connections">

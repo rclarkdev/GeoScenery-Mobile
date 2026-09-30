@@ -53,6 +53,49 @@ describe('SearchPage', () => {
     expect((component as any).initialMapZoom).toBe(12);
   });
 
+  it('refreshes all scenes when returning to the cached Search view', () => {
+    const newScene = new Scene(2, 'New scene', 'Created by another user', 'https://example.com/new.jpg', 9, 45, -93);
+    sceneryService.getScenery.and.returnValue(of([newScene]));
+
+    component.ionViewWillEnter();
+    component.ionViewWillEnter();
+
+    expect(sceneryService.getScenery).toHaveBeenCalledTimes(2);
+    expect(component.loadedScenery).toEqual([newScene]);
+  });
+
+  it('reruns active filters when returning to the cached Search view', () => {
+    component.searchForm.setValue({ tags: 'sunset', latitude: 45, longitude: -93, radiusKm: 10 });
+    component.isFiltered = true;
+
+    component.ionViewWillEnter();
+    component.ionViewWillEnter();
+
+    expect(sceneryService.searchScenery).toHaveBeenCalledWith({
+      tags: ['sunset'],
+      latitude: 45,
+      longitude: -93,
+      radiusKm: 10
+    });
+  });
+
+  it('keeps returned scene locations in view when the user profile loads later', () => {
+    clearTimeout((component as any).mapInitializationTimer);
+    sceneryService.getScenery.and.returnValue(of([
+      new Scene(2, 'Shared scene', 'Created by another user', 'https://example.com/shared.jpg', 9, 44, -92)
+    ]));
+    const updateMap = spyOn<any>(component, 'updateMap');
+    (component as any).map = {
+      setView: jasmine.createSpy('setView'),
+      remove: jasmine.createSpy('remove')
+    };
+
+    (component as any).refreshViewData();
+
+    expect(updateMap).toHaveBeenCalled();
+    expect((component as any).map.setView).not.toHaveBeenCalled();
+  });
+
   it('renders only the map and filter controls, without a scene feed', () => {
     expect(fixture.nativeElement.querySelector('.scene-map')).not.toBeNull();
     expect(fixture.nativeElement.querySelector('ion-card')).toBeNull();

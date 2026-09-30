@@ -135,6 +135,7 @@ builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<ISceneService, SceneService>();
 builder.Services.AddScoped<IVisitService, VisitService>();
 builder.Services.AddScoped<IFollowService, FollowService>();
+builder.Services.AddScoped<IUserBlockService, UserBlockService>();
 builder.Services.AddScoped<ISqlAuditLog, SqlAuditLog>();
 builder.Services.AddValidation();
 builder.Services.AddOpenApi();

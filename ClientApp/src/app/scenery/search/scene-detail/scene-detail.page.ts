@@ -2,6 +2,8 @@ import { Component, OnInit } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 import { NavController } from '@ionic/angular';
 import { AuthService } from '../../../auth/auth.service';
+import { User } from '../../../auth/user.model';
+import { UserService } from '../../../auth/user.service';
 import { SceneryService } from '../../scenery.service';
 import { Scene } from '../../scene.model';
 import { VisitsService } from '../../../visits/visits.service';
@@ -14,6 +16,7 @@ import { VisitsService } from '../../../visits/visits.service';
 export class SceneDetailPage implements OnInit {
 
   scene?: Scene;
+  owner?: User;
   isLoading = true;
   loadError = false;
   isVisiting = false;
@@ -28,6 +31,7 @@ export class SceneDetailPage implements OnInit {
     private navCtrl: NavController,
     private route: ActivatedRoute,
     private authService: AuthService,
+    private userService: UserService,
     private sceneryService: SceneryService,
     private visitsService: VisitsService) { }
 
@@ -58,11 +62,18 @@ export class SceneDetailPage implements OnInit {
     this.isLoading = true;
     this.loadError = false;
     this.scene = undefined;
+    this.owner = undefined;
     this.sceneryService.getScene(this.sceneId).subscribe({
       next: scene => {
         this.scene = scene;
         this.pendingRating = scene.currentUserRating ?? null;
         this.isLoading = false;
+        if (scene.ownerUserId != null) {
+          this.userService.getUser(scene.ownerUserId).subscribe({
+            next: owner => this.owner = owner,
+            error: () => this.owner = undefined
+          });
+        }
       },
       error: () => {
         this.isLoading = false;

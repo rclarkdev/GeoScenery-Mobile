@@ -93,7 +93,31 @@ public sealed record UserResponse(
     int FollowerCount,
     int FollowingCount,
     bool IsFollowedByCurrentUser,
+    bool IsBlockedByCurrentUser,
+    bool HasBlockedCurrentUser,
+    DateTimeOffset CreatedAt,
+    bool CanMessage);
+
+/// <summary>Represents a message exchanged between two users.</summary>
+public sealed record MessageResponse(
+    long Id,
+    long SenderId,
+    long RecipientId,
+    string Body,
     DateTimeOffset CreatedAt);
+
+/// <summary>Represents the latest message in a user's inbox.</summary>
+public sealed record ConversationResponse(
+    UserSummaryResponse User,
+    MessageResponse LastMessage,
+    int UnreadCount);
+
+/// <summary>Payload for sending a message to another user.</summary>
+public sealed record SendMessageRequest
+{
+    [Required, MaxLength(2000)]
+    public required string Body { get; init; }
+}
 
 /// <summary>Represents a user in a follower/following list.</summary>
 public sealed record UserSummaryResponse(long Id, string DisplayName, string? ProfileImageUrl);

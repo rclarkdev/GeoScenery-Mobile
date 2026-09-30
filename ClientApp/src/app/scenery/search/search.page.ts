@@ -34,6 +34,7 @@ export class SearchPage implements OnInit, AfterViewInit, OnDestroy {
   private mapInitializationTimer?: ReturnType<typeof setTimeout>;
   private initialMapCenter: L.LatLngExpression = [0, 0];
   private initialMapZoom = 2;
+  private hasEnteredView = false;
 
   readonly searchForm = this.formBuilder.nonNullable.group({
     tags: [''],
@@ -71,10 +72,39 @@ export class SearchPage implements OnInit, AfterViewInit, OnDestroy {
   ) { }
 
   ngOnInit() {
-    this.sceneryService.getScenery().subscribe(scenery => {
-      this.loadedScenery = scenery;
-      this.updateMap();
+    this.refreshViewData();
+  }
+
+  ionViewWillEnter(): void {
+    if (!this.hasEnteredView) {
+      this.hasEnteredView = true;
+      return;
+    }
+
+    this.refreshViewData();
+  }
+
+  private refreshViewData(): void {
+    const { tags, latitude, longitude, radiusKm } = this.searchForm.getRawValue();
+    const tagList = tags.split(',').map(tag => tag.trim()).filter(tag => tag.length > 0);
+    const sceneryRequest = this.isFiltered
+      ? this.sceneryService.searchScenery({
+          tags: tagList,
+          latitude: latitude ?? undefined,
+          longitude: longitude ?? undefined,
+          radiusKm: radiusKm ?? undefined
+        })
+      : this.sceneryService.getScenery();
+
+    sceneryRequest.subscribe({
+      next: scenery => {
+        this.loadedScenery = scenery;
+        this.searchError = false;
+        this.updateMap();
+      },
+      error: () => this.searchError = true
     });
+
     this.userService.getCurrentUser().subscribe({
       next: user => {
         if (user.latitude == null || user.longitude == null) {
@@ -83,7 +113,11 @@ export class SearchPage implements OnInit, AfterViewInit, OnDestroy {
 
         this.initialMapCenter = [user.latitude, user.longitude];
         this.initialMapZoom = 12;
-        this.map?.setView(this.initialMapCenter, this.initialMapZoom);
+        if (this.loadedScenery.some(scene => scene.latitude != null && scene.longitude != null)) {
+          this.updateMap();
+        } else {
+          this.map?.setView(this.initialMapCenter, this.initialMapZoom);
+        }
       },
       error: () => undefined
     });
@@ -188,6 +222,11 @@ export class SearchPage implements OnInit, AfterViewInit, OnDestroy {
       return;
     }
 
+    L.Icon.Default.mergeOptions({
+      iconRetinaUrl: 'assets/leaflet/marker-icon-2x.png',
+      iconUrl: 'assets/leaflet/marker-icon.png',
+      shadowUrl: 'assets/leaflet/marker-shadow.png'
+    });
     this.map = L.map(container, { zoomControl: false }).setView(this.initialMapCenter, this.initialMapZoom);
     L.control.zoom({ position: 'bottomright' }).addTo(this.map);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {

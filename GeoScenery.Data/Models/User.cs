@@ -50,4 +50,10 @@ public class User
 
     /// <summary>Follow rows where this user is being followed (their followers).</summary>
     public ICollection<Follow> Followers { get; set; } = new List<Follow>();
+
+    /// <summary>Block rows created by this user.</summary>
+    public ICollection<UserBlock> Blocking { get; set; } = new List<UserBlock>();
+
+    /// <summary>Block rows targeting this user.</summary>
+    public ICollection<UserBlock> BlockedBy { get; set; } = new List<UserBlock>();
 }

@@ -1,0 +1,24 @@
+:host { display: block; }
+
+ion-content { --background: #f7f8fa; }
+.conversation-shell { width: min(100%, 680px); min-height: 100%; margin: 0 auto; padding: 18px 16px 24px; background: var(--ion-background-color, #fff); }
+.conversation-intro { display: flex; align-items: center; gap: 10px; padding: 0 4px 18px; }
+.conversation-intro ion-avatar { width: 42px; height: 42px; display: flex; align-items: center; justify-content: center; background: var(--ion-color-light); }
+.conversation-intro ion-icon { font-size: 36px; color: var(--ion-color-medium); }
+.conversation-intro h1 { margin: 0; font-size: 18px; font-weight: 650; }
+.message-list { display: flex; flex-direction: column; gap: 10px; }
+.message { align-self: flex-start; max-width: min(82%, 460px); padding: 10px 13px; border-radius: 16px 16px 16px 4px; background: var(--ion-color-light); }
+.message.mine { align-self: flex-end; border-radius: 16px 16px 4px 16px; background: var(--ion-color-primary); color: var(--ion-color-primary-contrast); }
+.message p { margin: 0; line-height: 1.4; overflow-wrap: anywhere; }
+.message time { display: block; margin-top: 5px; font-size: 11px; opacity: .7; }
+.conversation-state { padding: 54px 20px; text-align: center; color: var(--ion-color-medium-shade); }
+.conversation-state ion-icon { font-size: 48px; color: var(--ion-color-primary); }
+.conversation-state h2 { margin: 12px 0 6px; color: var(--ion-text-color); font-size: 19px; }
+.conversation-state p { margin: 0; line-height: 1.5; }
+.loading { display: block; margin: 70px auto; }
+ion-footer { background: var(--ion-background-color, #fff); }
+.composer { display: flex; align-items: flex-end; gap: 8px; max-width: 680px; margin: 0 auto; padding: 8px 12px calc(8px + env(safe-area-inset-bottom)); }
+.composer ion-textarea { --background: var(--ion-color-light); --padding-start: 12px; --padding-end: 12px; --padding-top: 9px; --padding-bottom: 9px; margin: 0; border-radius: 18px; }
+.composer ion-button { width: 44px; height: 44px; margin: 0; flex: 0 0 44px; }
+.locked-composer { max-width: 680px; margin: 0 auto; padding: 12px 18px calc(12px + env(safe-area-inset-bottom)); color: var(--ion-color-medium-shade); font-size: 13px; line-height: 1.4; text-align: center; }
+.locked-composer ion-icon { vertical-align: -2px; margin-right: 4px; }

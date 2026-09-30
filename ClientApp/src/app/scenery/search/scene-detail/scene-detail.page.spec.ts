@@ -2,6 +2,7 @@ import { CUSTOM_ELEMENTS_SCHEMA } from '@angular/core';
 import { ComponentFixture, TestBed, waitForAsync } from '@angular/core/testing';
 import { ActivatedRoute } from '@angular/router';
 import { HttpClientTestingModule } from '@angular/common/http/testing';
+import { RouterTestingModule } from '@angular/router/testing';
 import { NavController } from '@ionic/angular';
 import { of, throwError } from 'rxjs';
 
@@ -9,6 +10,8 @@ import { SceneDetailPage } from './scene-detail.page';
 import { SceneryService } from '../../scenery.service';
 import { Scene } from '../../scene.model';
 import { AuthService } from '../../../auth/auth.service';
+import { User } from '../../../auth/user.model';
+import { UserService } from '../../../auth/user.service';
 import { VisitsService } from '../../../visits/visits.service';
 import { ImageUrlPipe } from '../../../shared/image-url.pipe';
 
@@ -26,11 +29,12 @@ describe('SceneDetailPage', () => {
 
     TestBed.configureTestingModule({
       declarations: [ SceneDetailPage ],
-      imports: [HttpClientTestingModule, ImageUrlPipe],
+      imports: [HttpClientTestingModule, RouterTestingModule, ImageUrlPipe],
       providers: [
         { provide: ActivatedRoute, useValue: { paramMap: of(new Map([['sceneId', '1']])) } },
         { provide: SceneryService, useValue: sceneryService },
         { provide: AuthService, useValue: { currentUserId } },
+        { provide: UserService, useValue: { getUser: jasmine.createSpy('getUser').and.returnValue(of(new User(2, 'Scene owner', null))) } },
         { provide: VisitsService, useValue: { recordVisit: jasmine.createSpy('recordVisit').and.returnValue(of({})) } },
         { provide: NavController, useValue: { navigateBack: jasmine.createSpy('navigateBack') } }
       ],
@@ -67,6 +71,18 @@ describe('SceneDetailPage', () => {
 
   it('is not the owner when the current user does not own the scene', () => {
     expect(component.isOwnScene).toBe(false);
+  });
+
+  it('links the scene owner to their public profile', () => {
+    configure(new Scene(1, 'Test scene', 'Description', 'https://example.com/image.jpg', 8,
+      45, -93, [], undefined, undefined, 0, undefined, 2), 999);
+    fixture = TestBed.createComponent(SceneDetailPage);
+    component = fixture.componentInstance;
+    fixture.detectChanges();
+
+    const ownerLink = fixture.nativeElement.querySelector('.scene-owner');
+    expect(ownerLink?.textContent).toContain('Scene owner');
+    expect(ownerLink?.getAttribute('href')).toBe('/scenery/tabs/profile/2');
   });
 
   it('is the owner when the current user owns the scene', () => {

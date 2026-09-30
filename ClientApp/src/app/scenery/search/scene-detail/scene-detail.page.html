@@ -25,6 +25,19 @@
 
     <article class="scene-heading">
       <h1>{{ scene.title }}</h1>
+      <a class="scene-owner" *ngIf="owner" [routerLink]="['/scenery/tabs/profile', owner.id]">
+        <ion-avatar>
+          <ion-img *ngIf="owner.profileImageUrl; else ownerPlaceholder" [src]="owner.profileImageUrl | imageUrl"></ion-img>
+          <ng-template #ownerPlaceholder>
+            <ion-icon name="person-circle-outline"></ion-icon>
+          </ng-template>
+        </ion-avatar>
+        <span>
+          <small>Created by</small>
+          <strong>{{ owner.displayName }}</strong>
+        </span>
+        <ion-icon class="owner-chevron" name="chevron-forward" aria-hidden="true"></ion-icon>
+      </a>
       <p class="description">{{ scene.description }}</p>
       <div class="scene-tags" *ngIf="scene.tags.length > 0" aria-label="Scene tags">
         <ion-chip *ngFor="let tag of scene.tags">{{ tag }}</ion-chip>

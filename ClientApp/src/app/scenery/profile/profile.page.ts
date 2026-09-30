@@ -14,6 +14,8 @@ export class ProfilePage implements OnInit {
   user?: User;
   isOwnProfile = false;
   isFollowChanging = false;
+  isBlockChanging = false;
+  relationshipError = false;
   private viewedUserId: number | null = null;
 
   constructor(
@@ -39,11 +41,13 @@ export class ProfilePage implements OnInit {
   }
 
   toggleFollow() {
-    if (!this.user || this.isFollowChanging) {
+    if (!this.user || this.isFollowChanging || this.isBlockChanging
+      || this.user.isBlockedByCurrentUser || this.user.hasBlockedCurrentUser) {
       return;
     }
 
     this.isFollowChanging = true;
+    this.relationshipError = false;
     const request = this.user.isFollowedByCurrentUser
       ? this.userService.unfollowUser(this.user.id)
       : this.userService.followUser(this.user.id);
@@ -56,7 +60,51 @@ export class ProfilePage implements OnInit {
         }
         this.isFollowChanging = false;
       },
-      error: () => this.isFollowChanging = false
+      error: () => {
+        this.isFollowChanging = false;
+        this.relationshipError = true;
+      }
+    });
+  }
+
+  async confirmBlock(): Promise<void> {
+    if (!this.user || this.isBlockChanging) {
+      return;
+    }
+
+    const alert = await this.alertController.create({
+      header: `Block ${this.user.displayName}?`,
+      message: 'You will stop following each other, and neither of you can follow the other until you unblock them.',
+      buttons: [
+        { text: 'Cancel', role: 'cancel' },
+        {
+          text: 'Block',
+          role: 'destructive',
+          handler: () => this.blockUser()
+        }
+      ]
+    });
+    await alert.present();
+  }
+
+  unblockUser(): void {
+    if (!this.user || this.isBlockChanging) {
+      return;
+    }
+
+    this.isBlockChanging = true;
+    this.relationshipError = false;
+    this.userService.unblockUser(this.user.id).subscribe({
+      next: () => {
+        if (this.user) {
+          this.user.isBlockedByCurrentUser = false;
+        }
+        this.isBlockChanging = false;
+      },
+      error: () => {
+        this.isBlockChanging = false;
+        this.relationshipError = true;
+      }
     });
   }
 
@@ -84,6 +132,32 @@ export class ProfilePage implements OnInit {
       ? this.userService.getCurrentUser()
       : this.userService.getUser(this.viewedUserId);
     request.subscribe(user => this.user = user);
+  }
+
+  private blockUser(): void {
+    if (!this.user || this.isBlockChanging) {
+      return;
+    }
+
+    const wasFollowing = this.user.isFollowedByCurrentUser;
+    this.isBlockChanging = true;
+    this.relationshipError = false;
+    this.userService.blockUser(this.user.id).subscribe({
+      next: () => {
+        if (this.user) {
+          this.user.isBlockedByCurrentUser = true;
+          this.user.isFollowedByCurrentUser = false;
+          if (wasFollowing) {
+            this.user.followerCount = Math.max(0, this.user.followerCount - 1);
+          }
+        }
+        this.isBlockChanging = false;
+      },
+      error: () => {
+        this.isBlockChanging = false;
+        this.relationshipError = true;
+      }
+    });
   }
 
   private logout(): void {

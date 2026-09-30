@@ -46,6 +46,10 @@ const routes: Routes = [
                 loadChildren: () => import('./profile/profile.module').then(m => m.ProfilePageModule)
             },
             {
+                path: 'messages',
+                loadChildren: () => import('../messages/messages.module').then(m => m.MessagesModule)
+            },
+            {
                 path: '',
                 redirectTo: '/scenery/tabs/search',
                 pathMatch: 'full'

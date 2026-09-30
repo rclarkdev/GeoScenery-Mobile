@@ -35,6 +35,8 @@ describe('ProfilePage', () => {
             getUser: jasmine.createSpy('getUser').and.returnValue(of(user)),
             followUser: jasmine.createSpy('followUser').and.returnValue(of(undefined)),
             unfollowUser: jasmine.createSpy('unfollowUser').and.returnValue(of(undefined)),
+            blockUser: jasmine.createSpy('blockUser').and.returnValue(of(undefined)),
+            unblockUser: jasmine.createSpy('unblockUser').and.returnValue(of(undefined)),
             updateUser: jasmine.createSpy('updateUser').and.returnValue(of(user))
             ,deleteUser: jasmine.createSpy('deleteUser').and.returnValue(of(undefined))
           }
@@ -133,6 +135,75 @@ describe('ProfilePage', () => {
     expect(TestBed.inject(UserService).unfollowUser).toHaveBeenCalledWith(2);
     expect(component.user?.isFollowedByCurrentUser).toBe(false);
     expect(component.user?.followerCount).toBe(2);
+  });
+
+  it('offers follow and block actions for an unblocked other user', () => {
+    const otherUser = new User(2, 'Other user', null);
+    configure('2', 1, otherUser);
+    fixture = TestBed.createComponent(ProfilePage);
+    fixture.detectChanges();
+
+    const content = fixture.nativeElement.textContent;
+    expect(content).toContain('Follow');
+    expect(content).toContain('Block');
+    expect(content).not.toContain('Unblock');
+  });
+
+  it('blocks a followed user, removes follow state, and offers unblock', async () => {
+    const otherUser = new User(2, 'Other user', null, undefined, undefined, undefined,
+      undefined, undefined, undefined, undefined, undefined, 3, 0, true);
+    configure('2', 1, otherUser);
+    fixture = TestBed.createComponent(ProfilePage);
+    component = fixture.componentInstance;
+    fixture.detectChanges();
+    const present = jasmine.createSpy('present');
+    alertController.create.and.callFake(async options => {
+      (options.buttons?.[1] as any).handler();
+      return { present } as any;
+    });
+
+    await component.confirmBlock();
+    fixture.detectChanges();
+
+    expect(TestBed.inject(UserService).blockUser).toHaveBeenCalledWith(2);
+    expect(component.user?.isBlockedByCurrentUser).toBeTrue();
+    expect(component.user?.isFollowedByCurrentUser).toBeFalse();
+    expect(component.user?.followerCount).toBe(2);
+    expect(fixture.nativeElement.textContent).toContain('Unblock');
+    const buttonLabels = Array.from(fixture.nativeElement.querySelectorAll('ion-button'))
+      .map((button: any) => button.textContent.trim());
+    expect(buttonLabels).not.toContain('Follow');
+  });
+
+  it('unblocks a user and restores the follow option', () => {
+    const otherUser = new User(2, 'Other user', null);
+    otherUser.isBlockedByCurrentUser = true;
+    configure('2', 1, otherUser);
+    fixture = TestBed.createComponent(ProfilePage);
+    component = fixture.componentInstance;
+    fixture.detectChanges();
+
+    component.unblockUser();
+    fixture.detectChanges();
+
+    expect(TestBed.inject(UserService).unblockUser).toHaveBeenCalledWith(2);
+    expect(component.user?.isBlockedByCurrentUser).toBeFalse();
+    expect(fixture.nativeElement.textContent).toContain('Follow');
+  });
+
+  it('hides follow when the other user has blocked the current user', () => {
+    const otherUser = new User(2, 'Other user', null);
+    otherUser.hasBlockedCurrentUser = true;
+    configure('2', 1, otherUser);
+    fixture = TestBed.createComponent(ProfilePage);
+    fixture.detectChanges();
+
+    const content = fixture.nativeElement.textContent;
+    expect(content).toContain("You can't follow this profile.");
+    const buttonLabels = Array.from(fixture.nativeElement.querySelectorAll('ion-button'))
+      .map((button: any) => button.textContent.trim());
+    expect(buttonLabels).not.toContain('Follow');
+    expect(content).toContain('Block');
   });
 
   it('sets isFollowChanging back to false when the follow request fails', () => {

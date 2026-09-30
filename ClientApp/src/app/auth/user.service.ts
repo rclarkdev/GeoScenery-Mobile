@@ -67,6 +67,14 @@ export class UserService {
     return this.http.delete<void>(`${this.usersUrl}/${id}/follow`);
   }
 
+  blockUser(id: number): Observable<void> {
+    return this.http.post<void>(`${this.usersUrl}/${id}/block`, {});
+  }
+
+  unblockUser(id: number): Observable<void> {
+    return this.http.delete<void>(`${this.usersUrl}/${id}/block`);
+  }
+
   getFollowers(id: number): Observable<UserSummary[]> {
     return this.http.get<UserSummary[]>(`${this.usersUrl}/${id}/followers`);
   }

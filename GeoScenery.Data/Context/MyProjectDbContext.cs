@@ -14,6 +14,8 @@ public class MyProjectDbContext : DbContext
     public DbSet<Scene> Scenes => Set<Scene>();
     public DbSet<Visit> Visits => Set<Visit>();
     public DbSet<Follow> Follows => Set<Follow>();
+    public DbSet<UserBlock> UserBlocks => Set<UserBlock>();
+    public DbSet<Message> Messages => Set<Message>();
     public DbSet<SceneTag> SceneTags => Set<SceneTag>();
     public DbSet<SceneRating> SceneRatings => Set<SceneRating>();
     public DbSet<PasswordResetToken> PasswordResetTokens => Set<PasswordResetToken>();
@@ -116,5 +118,36 @@ public class MyProjectDbContext : DbContext
             .WithMany(user => user.Followers)
             .HasForeignKey(follow => follow.FollowingId)
             .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<UserBlock>()
+            .HasIndex(block => new { block.BlockerId, block.BlockedId })
+            .IsUnique();
+
+        modelBuilder.Entity<UserBlock>()
+            .HasOne(block => block.Blocker)
+            .WithMany(user => user.Blocking)
+            .HasForeignKey(block => block.BlockerId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<UserBlock>()
+            .HasOne(block => block.Blocked)
+            .WithMany(user => user.BlockedBy)
+            .HasForeignKey(block => block.BlockedId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<Message>()
+            .HasOne(message => message.Sender)
+            .WithMany()
+            .HasForeignKey(message => message.SenderId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<Message>()
+            .HasOne(message => message.Recipient)
+            .WithMany()
+            .HasForeignKey(message => message.RecipientId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<Message>()
+            .HasIndex(message => new { message.SenderId, message.RecipientId, message.CreatedAt });
     }
 }

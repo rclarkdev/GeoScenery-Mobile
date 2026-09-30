@@ -18,6 +18,7 @@ public static class GeoSceneryEndpoints
         MapUserEndpoints(api.MapGroup("/users"));
         MapSceneEndpoints(api.MapGroup("/scenes"));
         MapVisitEndpoints(api.MapGroup("/visits").RequireAuthorization());
+        MapMessageEndpoints(api.MapGroup("/messages").RequireAuthorization());
         return endpoints;
     }
 
@@ -26,11 +27,12 @@ public static class GeoSceneryEndpoints
         group.RequireAuthorization();
 
         group.MapGet("/me", async Task<Results<Ok<UserResponse>, NotFound>>
-            (ClaimsPrincipal principal, IUserService service, IFollowService followService, CancellationToken cancellationToken) =>
+            (ClaimsPrincipal principal, IUserService service, IFollowService followService, IUserBlockService blockService,
+                MyProjectDbContext db, CancellationToken cancellationToken) =>
         {
             var viewerId = GetUserId(principal);
             var user = await service.GetByIdAsync(viewerId, cancellationToken);
-            return user is null ? TypedResults.NotFound() : TypedResults.Ok(await ToResponseAsync(user, viewerId, followService, cancellationToken));
+            return user is null ? TypedResults.NotFound() : TypedResults.Ok(await ToResponseAsync(user, viewerId, followService, blockService, db, cancellationToken));
         })
         .WithName("GetCurrentUser");
 
@@ -47,15 +49,17 @@ public static class GeoSceneryEndpoints
         .WithName("GetMyScenes");
 
         group.MapGet("/{id:long}", async Task<Results<Ok<UserResponse>, NotFound>>
-            (long id, ClaimsPrincipal principal, IUserService service, IFollowService followService, CancellationToken cancellationToken) =>
+            (long id, ClaimsPrincipal principal, IUserService service, IFollowService followService, IUserBlockService blockService,
+                MyProjectDbContext db, CancellationToken cancellationToken) =>
         {
             var user = await service.GetByIdAsync(id, cancellationToken);
-            return user is null ? TypedResults.NotFound() : TypedResults.Ok(await ToResponseAsync(user, GetUserId(principal), followService, cancellationToken));
+            return user is null ? TypedResults.NotFound() : TypedResults.Ok(await ToResponseAsync(user, GetUserId(principal), followService, blockService, db, cancellationToken));
         })
         .WithName("GetUser");
 
         group.MapPut("/{id:long}", async Task<Results<Ok<UserResponse>, NotFound, Conflict<string>, BadRequest<string>>>
-            (long id, UpdateUserRequest request, ClaimsPrincipal principal, IUserService service, IFollowService followService, IFileStorageService storage, CancellationToken cancellationToken) =>
+            (long id, UpdateUserRequest request, ClaimsPrincipal principal, IUserService service, IFollowService followService, IUserBlockService blockService,
+                IFileStorageService storage, MyProjectDbContext db, CancellationToken cancellationToken) =>
         {
             if (id != GetUserId(principal))
             {
@@ -92,7 +96,7 @@ public static class GeoSceneryEndpoints
                     Employment = request.Employment,
                     Bio = request.Bio
                 }, cancellationToken);
-                return user is null ? TypedResults.NotFound() : TypedResults.Ok(await ToResponseAsync(user, id, followService, cancellationToken));
+                return user is null ? TypedResults.NotFound() : TypedResults.Ok(await ToResponseAsync(user, id, followService, blockService, db, cancellationToken));
             }
             catch (DuplicateEmailException)
             {
@@ -102,7 +106,7 @@ public static class GeoSceneryEndpoints
 
         group.MapPut("/me/email", async Task<Results<Ok<UserResponse>, UnauthorizedHttpResult, Conflict<string>, NotFound>>
             (ChangeEmailRequest request, ClaimsPrincipal principal, MyProjectDbContext db, IPasswordHasher<User> hasher,
-                IFollowService followService, CancellationToken cancellationToken) =>
+                IFollowService followService, IUserBlockService blockService, CancellationToken cancellationToken) =>
         {
             var userId = GetUserId(principal);
             var user = await db.Users.FindAsync([userId], cancellationToken);
@@ -132,7 +136,7 @@ public static class GeoSceneryEndpoints
                 return TypedResults.Conflict("An account with this email already exists.");
             }
 
-            return TypedResults.Ok(await ToResponseAsync(user, userId, followService, cancellationToken));
+            return TypedResults.Ok(await ToResponseAsync(user, userId, followService, blockService, db, cancellationToken));
         })
         .RequireRateLimiting("account-security");
 
@@ -177,7 +181,7 @@ public static class GeoSceneryEndpoints
         });
 
         group.MapPost("/{id:long}/follow", async Task<Results<NoContent, NotFound, BadRequest>>
-            (long id, ClaimsPrincipal principal, IUserService userService, IFollowService followService, CancellationToken cancellationToken) =>
+            (long id, ClaimsPrincipal principal, IUserService userService, IFollowService followService, IUserBlockService blockService, CancellationToken cancellationToken) =>
         {
             var followerId = GetUserId(principal);
             if (followerId == id)
@@ -189,6 +193,11 @@ public static class GeoSceneryEndpoints
             if (target is null)
             {
                 return TypedResults.NotFound();
+            }
+
+            if (await blockService.HasBlockBetweenAsync(followerId, id, cancellationToken))
+            {
+                return TypedResults.BadRequest();
             }
 
             await followService.FollowAsync(followerId, id, cancellationToken);
@@ -203,6 +212,44 @@ public static class GeoSceneryEndpoints
             return TypedResults.NoContent();
         })
         .WithName("UnfollowUser");
+
+        group.MapPost("/{id:long}/block", async Task<Results<NoContent, NotFound, BadRequest>>
+            (long id, ClaimsPrincipal principal, IUserService userService, IUserBlockService blockService, CancellationToken cancellationToken) =>
+        {
+            var blockerId = GetUserId(principal);
+            if (blockerId == id)
+            {
+                return TypedResults.BadRequest();
+            }
+
+            if (await userService.GetByIdAsync(id, cancellationToken) is null)
+            {
+                return TypedResults.NotFound();
+            }
+
+            await blockService.BlockAsync(blockerId, id, cancellationToken);
+            return TypedResults.NoContent();
+        })
+        .WithName("BlockUser");
+
+        group.MapDelete("/{id:long}/block", async Task<Results<NoContent, NotFound, BadRequest>>
+            (long id, ClaimsPrincipal principal, IUserService userService, IUserBlockService blockService, CancellationToken cancellationToken) =>
+        {
+            var blockerId = GetUserId(principal);
+            if (blockerId == id)
+            {
+                return TypedResults.BadRequest();
+            }
+
+            if (await userService.GetByIdAsync(id, cancellationToken) is null)
+            {
+                return TypedResults.NotFound();
+            }
+
+            await blockService.UnblockAsync(blockerId, id, cancellationToken);
+            return TypedResults.NoContent();
+        })
+        .WithName("UnblockUser");
 
         group.MapGet("/{id:long}/followers", async Task<Results<Ok<IEnumerable<UserSummaryResponse>>, NotFound>>
             (long id, IUserService userService, IFollowService followService, CancellationToken cancellationToken) =>
@@ -232,6 +279,113 @@ public static class GeoSceneryEndpoints
         })
         .WithName("GetUserFollowing");
     }
+
+    private static void MapMessageEndpoints(RouteGroupBuilder group)
+    {
+        group.MapGet("", async Task<Ok<IReadOnlyList<ConversationResponse>>>
+            (ClaimsPrincipal principal, MyProjectDbContext db, CancellationToken cancellationToken) =>
+        {
+            var userId = GetUserId(principal);
+            var messages = await db.Messages
+                .AsNoTracking()
+                .Where(message => message.SenderId == userId || message.RecipientId == userId)
+                .OrderByDescending(message => message.CreatedAt)
+                .Take(500)
+                .Include(message => message.Sender)
+                .Include(message => message.Recipient)
+                .ToListAsync(cancellationToken);
+
+            var conversations = messages
+                .GroupBy(message => message.SenderId == userId ? message.RecipientId : message.SenderId)
+                .Select(grouping => grouping.First())
+                .Select(message => new ConversationResponse(
+                    ToSummaryResponse(message.SenderId == userId ? message.Recipient : message.Sender),
+                    ToMessageResponse(message),
+                    0))
+                .ToList();
+            return TypedResults.Ok<IReadOnlyList<ConversationResponse>>(conversations);
+        })
+        .WithName("GetConversations");
+
+        group.MapGet("/{userId:long}", async Task<Results<Ok<IReadOnlyList<MessageResponse>>, NotFound>>
+            (long userId, ClaimsPrincipal principal, MyProjectDbContext db, CancellationToken cancellationToken) =>
+        {
+            if (!await db.Users.AsNoTracking().AnyAsync(user => user.Id == userId, cancellationToken))
+            {
+                return TypedResults.NotFound();
+            }
+
+            var currentUserId = GetUserId(principal);
+            var messages = await db.Messages
+                .AsNoTracking()
+                .Where(message =>
+                    (message.SenderId == currentUserId && message.RecipientId == userId)
+                    || (message.SenderId == userId && message.RecipientId == currentUserId))
+                .OrderBy(message => message.CreatedAt)
+                .Select(message => new MessageResponse(message.Id, message.SenderId, message.RecipientId, message.Body, message.CreatedAt))
+                .ToListAsync(cancellationToken);
+            return TypedResults.Ok<IReadOnlyList<MessageResponse>>(messages);
+        })
+        .WithName("GetConversation");
+
+        group.MapPost("/{userId:long}", async Task<Results<Created<MessageResponse>, NotFound, BadRequest<string>, ForbidHttpResult>>
+            (long userId, SendMessageRequest request, ClaimsPrincipal principal, MyProjectDbContext db,
+                IFollowService followService, IUserBlockService blockService, CancellationToken cancellationToken) =>
+        {
+            var senderId = GetUserId(principal);
+            if (senderId == userId)
+            {
+                return TypedResults.BadRequest("You cannot message yourself.");
+            }
+
+            if (!await db.Users.AsNoTracking().AnyAsync(user => user.Id == userId, cancellationToken))
+            {
+                return TypedResults.NotFound();
+            }
+
+            if (!await CanMessageAsync(senderId, userId, db, followService, blockService, cancellationToken))
+            {
+                return TypedResults.Forbid();
+            }
+
+            var message = new Message
+            {
+                SenderId = senderId,
+                RecipientId = userId,
+                Body = request.Body.Trim()
+            };
+            if (message.Body.Length == 0)
+            {
+                return TypedResults.BadRequest("Message body cannot be empty.");
+            }
+
+            db.Messages.Add(message);
+            await db.SaveChangesAsync(cancellationToken);
+            return TypedResults.Created($"/api/messages/{userId}", ToMessageResponse(message));
+        })
+        .WithName("SendMessage");
+    }
+
+    private static async Task<bool> CanMessageAsync(long senderId, long recipientId, MyProjectDbContext db,
+        IFollowService followService, IUserBlockService blockService, CancellationToken cancellationToken)
+    {
+        if (await blockService.HasBlockBetweenAsync(senderId, recipientId, cancellationToken))
+        {
+            return false;
+        }
+
+        if (await followService.IsFollowingAsync(recipientId, senderId, cancellationToken))
+        {
+            return true;
+        }
+
+        return await db.Messages.AsNoTracking().AnyAsync(message =>
+            (message.SenderId == senderId && message.RecipientId == recipientId)
+            || (message.SenderId == recipientId && message.RecipientId == senderId), cancellationToken);
+    }
+
+    private static MessageResponse ToMessageResponse(Message message) =>
+        new(message.Id, message.SenderId, message.RecipientId, message.Body, message.CreatedAt);
 
     private static void MapSceneEndpoints(RouteGroupBuilder group)
     {
@@ -412,15 +566,22 @@ public static class GeoSceneryEndpoints
             .RequireAuthorization();
     }
 
-    private static async Task<UserResponse> ToResponseAsync(User user, long viewerId, IFollowService followService, CancellationToken cancellationToken)
+    private static async Task<UserResponse> ToResponseAsync(User user, long viewerId, IFollowService followService,
+        IUserBlockService blockService, MyProjectDbContext db, CancellationToken cancellationToken)
     {
         var followerCount = await followService.GetFollowerCountAsync(user.Id, cancellationToken);
         var followingCount = await followService.GetFollowingCountAsync(user.Id, cancellationToken);
         var isFollowedByCurrentUser = viewerId != user.Id && await followService.IsFollowingAsync(viewerId, user.Id, cancellationToken);
+        var isBlockedByCurrentUser = viewerId != user.Id && await blockService.IsBlockedAsync(viewerId, user.Id, cancellationToken);
+        var hasBlockedCurrentUser = viewerId != user.Id && await blockService.IsBlockedAsync(user.Id, viewerId, cancellationToken);
+        var canMessage = viewerId != user.Id
+            && !isBlockedByCurrentUser
+            && !hasBlockedCurrentUser
+            && await CanMessageAsync(viewerId, user.Id, db, followService, blockService, cancellationToken);
         var email = user.Id == viewerId ? user.Email : null;
         return new(user.Id, user.DisplayName, email, user.ProfileImageUrl, user.Latitude, user.Longitude,
             user.BirthDate, user.Education, user.Hobbies, user.Employment, user.Bio,
-            followerCount, followingCount, isFollowedByCurrentUser, user.CreatedAt);
+            followerCount, followingCount, isFollowedByCurrentUser, isBlockedByCurrentUser, hasBlockedCurrentUser, user.CreatedAt, canMessage);
     }
 
     private static UserSummaryResponse ToSummaryResponse(User user) =>

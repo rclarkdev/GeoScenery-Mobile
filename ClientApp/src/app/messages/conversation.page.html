@@ -1,0 +1,55 @@
+<ion-header>
+  <ion-toolbar>
+    <ion-buttons slot="start">
+      <ion-back-button defaultHref="/scenery/tabs/messages"></ion-back-button>
+    </ion-buttons>
+    <ion-title>{{ recipient?.displayName || 'Conversation' }}</ion-title>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content>
+  <main class="conversation-shell">
+    <section class="conversation-intro" *ngIf="recipient">
+      <ion-avatar>
+        <ion-img *ngIf="recipient.profileImageUrl; else placeholder" [src]="recipient.profileImageUrl | imageUrl"></ion-img>
+        <ng-template #placeholder><ion-icon name="person-circle-outline"></ion-icon></ng-template>
+      </ion-avatar>
+      <h1>{{ recipient.displayName }}</h1>
+    </section>
+
+    <section class="conversation-state" *ngIf="!isLoading && hasError">
+      <ion-icon name="cloud-offline-outline"></ion-icon>
+      <h2>Conversation unavailable</h2>
+      <p>Check your connection and try again.</p>
+    </section>
+
+    <section class="conversation-state" *ngIf="!isLoading && !hasError && messages.length === 0">
+      <ion-icon name="chatbubble-ellipses-outline"></ion-icon>
+      <h2>Start the conversation</h2>
+      <p>Keep it thoughtful and relevant to your shared scenery.</p>
+    </section>
+
+    <section class="message-list" *ngIf="!isLoading && !hasError" aria-live="polite">
+      <article class="message" *ngFor="let message of messages" [class.mine]="isMine(message)">
+        <p>{{ message.body }}</p>
+        <time>{{ message.createdAt | date:'short' }}</time>
+      </article>
+    </section>
+
+    <ion-spinner *ngIf="isLoading" class="loading" aria-label="Loading conversation"></ion-spinner>
+  </main>
+</ion-content>
+
+<ion-footer *ngIf="!isLoading && !hasError">
+  <div class="composer" *ngIf="recipient?.canMessage; else lockedComposer">
+    <ion-textarea [(ngModel)]="draft" [disabled]="isSending" placeholder="Write a message..."
+      aria-label="Message" [autoGrow]="true" rows="1" maxlength="2000"
+      (keydown)="handleComposerKeydown($event)"></ion-textarea>
+    <ion-button (click)="sendMessage()" [disabled]="!draft.trim() || isSending" aria-label="Send message" title="Send message">
+      <ion-icon slot="icon-only" name="send-outline"></ion-icon>
+    </ion-button>
+  </div>
+  <ng-template #lockedComposer>
+    <p class="locked-composer"><ion-icon name="lock-closed-outline"></ion-icon> Messaging is available when this user follows you or an existing conversation is open.</p>
+  </ng-template>
+</ion-footer>

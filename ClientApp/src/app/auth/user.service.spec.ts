@@ -86,6 +86,20 @@ describe('UserService', () => {
     httpRequest.flush(null);
   });
 
+  it('blocks a user', () => {
+    service.blockUser(user.id).subscribe();
+    const httpRequest = http.expectOne(`${usersUrl}/${user.id}/block`);
+    expect(httpRequest.request.method).toBe('POST');
+    httpRequest.flush(null);
+  });
+
+  it('unblocks a user', () => {
+    service.unblockUser(user.id).subscribe();
+    const httpRequest = http.expectOne(`${usersUrl}/${user.id}/block`);
+    expect(httpRequest.request.method).toBe('DELETE');
+    httpRequest.flush(null);
+  });
+
   it('gets followers', () => {
     const summary = new UserSummary(2, 'Bob');
     service.getFollowers(user.id).subscribe(result => expect(result).toEqual([summary]));

@@ -1,0 +1,43 @@
+<ion-header>
+  <ion-toolbar>
+    <ion-title>Messages</ion-title>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content>
+  <main class="messages-shell">
+    <section class="messages-heading">
+      <p class="eyebrow">Your conversations</p>
+      <h1>Stay in touch</h1>
+      <p>Messages are available when someone follows you or a conversation has already been opened.</p>
+    </section>
+
+    <ion-list *ngIf="!isLoading && !hasError && conversations.length > 0" lines="full">
+      <ion-item *ngFor="let conversation of conversations" button detail
+        [routerLink]="['/scenery/tabs/messages', conversation.user.id]">
+        <ion-avatar slot="start">
+          <ion-img *ngIf="conversation.user.profileImageUrl; else placeholder"
+            [src]="conversation.user.profileImageUrl | imageUrl"></ion-img>
+          <ng-template #placeholder><ion-icon name="person-circle-outline"></ion-icon></ng-template>
+        </ion-avatar>
+        <ion-label>
+          <h2>{{ conversation.user.displayName }}</h2>
+          <p>{{ conversation.lastMessage.body }}</p>
+        </ion-label>
+        <ion-badge *ngIf="conversation.unreadCount > 0" color="primary">{{ conversation.unreadCount }}</ion-badge>
+      </ion-item>
+    </ion-list>
+
+    <section class="messages-state" *ngIf="!isLoading && !hasError && conversations.length === 0">
+      <ion-icon name="chatbubbles-outline"></ion-icon>
+      <h2>No messages yet</h2>
+      <p>Visit a profile to see whether you can start a conversation.</p>
+    </section>
+    <section class="messages-state" *ngIf="!isLoading && hasError">
+      <ion-icon name="cloud-offline-outline"></ion-icon>
+      <h2>Messages are unavailable</h2>
+      <p>Please check your connection and try again.</p>
+    </section>
+    <ion-spinner *ngIf="isLoading" class="loading" aria-label="Loading messages"></ion-spinner>
+  </main>
+</ion-content>

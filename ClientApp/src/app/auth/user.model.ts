@@ -14,8 +14,12 @@ export class User {
         public followerCount = 0,
         public followingCount = 0,
         public isFollowedByCurrentUser = false,
-        public createdAt?: string
+        public createdAt?: string,
+        public canMessage = false
     ) {
 
     }
+
+    public isBlockedByCurrentUser = false;
+    public hasBlockedCurrentUser = false;
 }

@@ -42,17 +42,23 @@ public sealed class GeoSceneryApiFactory : WebApplicationFactory<Program>
             using var scope = serviceProvider.CreateScope();
             var context = scope.ServiceProvider.GetRequiredService<MyProjectDbContext>();
             context.Database.EnsureCreated();
-            if (!context.Users.Any())
+            var testUser = context.Users.Find(1L);
+            if (testUser is null)
             {
-                context.Users.Add(new User
+                testUser = new User
                 {
                     Id = 1,
                     DisplayName = "Test User",
                     Email = "test@example.com",
                     PasswordHash = "test-password-hash"
-                });
-                context.SaveChanges();
+                };
+                context.Users.Add(testUser);
             }
+
+            testUser.DisplayName = "Test User";
+            testUser.Email = "test@example.com";
+            testUser.PasswordHash = "test-password-hash";
+            context.SaveChanges();
         });
     }
 

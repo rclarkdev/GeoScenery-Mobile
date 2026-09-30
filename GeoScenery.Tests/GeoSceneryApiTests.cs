@@ -6,6 +6,7 @@ using System.Text;
 using GeoScenery.Api.ViewModels;
 using GeoScenery.Api.Auth;
 using GeoScenery.Data.Context;
+using GeoScenery.Data.Models;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.EntityFrameworkCore;
@@ -57,17 +58,36 @@ public sealed class GeoSceneryApiTests
 
     private async Task<SceneResponse> CreateSceneAsync(string title = "Observation Point", string[]? tags = null, double? latitude = null, double? longitude = null)
     {
+        var imageUrl = await UploadTestSceneImageAsync();
         var response = await _client.PostAsJsonAsync("/api/scenes", new
         {
             title,
             description = "A scenic view.",
-            imageUrl = "https://example.com/view.jpg",
+            imageUrl,
             rating = 9,
             tags,
             latitude,
             longitude
         });
         return (await response.Content.ReadFromJsonAsync<SceneResponse>())!;
+    }
+
+    private async Task<string> UploadTestSceneImageAsync()
+    {
+        var imageBytes = await File.ReadAllBytesAsync(Path.Combine(AppContext.BaseDirectory, "TestAssets", "favicon.png"));
+        using var content = new MultipartFormDataContent();
+        using var image = new ByteArrayContent(imageBytes);
+        image.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("image/png");
+        content.Add(image, "file", "test.png");
+        content.Add(new StringContent("scene"), "kind");
+
+        var response = await _client.PostAsync("/api/images", content);
+        if (!response.IsSuccessStatusCode)
+        {
+            throw new InvalidOperationException($"Test image upload failed: {await response.Content.ReadAsStringAsync()}");
+        }
+        var uploaded = (await response.Content.ReadFromJsonAsync<UploadedImageResponse>())!;
+        return uploaded.Url;
     }
 
     // ----- Scenes: basic CRUD -----
@@ -112,16 +132,51 @@ public sealed class GeoSceneryApiTests
     [Test]
     public async Task GivenValidSceneData_WhenPostingAScene_ThenTheApiReturnsCreatedAndALocation()
     {
+        var imageUrl = await UploadTestSceneImageAsync();
         var response = await _client.PostAsJsonAsync("/api/scenes", new
         {
             title = "Observation Point",
             description = "A scenic view.",
-            imageUrl = "https://example.com/view.jpg",
+            imageUrl,
             rating = 9
         });
 
         Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.Created));
         Assert.That(response.Headers.Location?.ToString(), Does.Match(@"/api/scenes/\d+"));
+    }
+
+    [Test]
+    public async Task GivenASceneCreatedByAnotherUser_WhenListingAndFilteringScenes_ThenTheSceneIsReturned()
+    {
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<MyProjectDbContext>();
+        var scene = new Scene
+        {
+            Title = "Shared overlook",
+            Description = "A scenic view.",
+            ImageUrl = "/uploads/00000000000000000000000000000000.jpg",
+            Rating = 9,
+            Latitude = 45,
+            Longitude = -93,
+            OwnerUserId = 1,
+            Tags = [new SceneTag { Tag = "sunset" }]
+        };
+        db.Scenes.Add(scene);
+        await db.SaveChangesAsync();
+        _client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", CreateToken(2));
+
+        var allResponse = await _client.GetAsync("/api/scenes");
+        var allScenes = await allResponse.Content.ReadFromJsonAsync<List<SceneResponse>>();
+        var filteredResponse = await _client.GetAsync("/api/scenes?tags=sunset&latitude=45&longitude=-93&radiusKm=10");
+        var filteredScenes = await filteredResponse.Content.ReadFromJsonAsync<List<SceneResponse>>();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(allResponse.StatusCode, Is.EqualTo(HttpStatusCode.OK));
+            Assert.That(allScenes, Has.Some.Matches<SceneResponse>(candidate => candidate.Id == scene.Id));
+            Assert.That(filteredResponse.StatusCode, Is.EqualTo(HttpStatusCode.OK));
+            Assert.That(filteredScenes, Has.Some.Matches<SceneResponse>(candidate => candidate.Id == scene.Id));
+        });
     }
 
     [Test]
@@ -158,7 +213,7 @@ public sealed class GeoSceneryApiTests
         {
             title = "Hijacked",
             description = "Not yours.",
-            imageUrl = "https://example.com/view.jpg",
+            imageUrl = scene.ImageUrl,
             rating = 1
         });
 
@@ -187,11 +242,12 @@ public sealed class GeoSceneryApiTests
     [Test]
     public async Task GivenAMissingSceneId_WhenUpdatingIt_ThenTheApiReturnsNotFound()
     {
+        var imageUrl = await UploadTestSceneImageAsync();
         var response = await _client.PutAsJsonAsync("/api/scenes/404", new
         {
             title = "Missing",
             description = "No such scene.",
-            imageUrl = "https://example.com/view.jpg",
+            imageUrl,
             rating = 5
         });
 
@@ -700,6 +756,116 @@ public sealed class GeoSceneryApiTests
     }
 
     [Test]
+    public async Task GivenUsersWhoFollowEachOther_WhenBlocking_ThenBothFollowsAreRemovedAndProfileShowsBlocked()
+    {
+        var other = await RegisterUserAsync("Blocked", "blocked@example.com");
+        await _client.PostAsync($"/api/users/{other.UserId}/follow", null);
+        _client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", other.Token);
+        await _client.PostAsync("/api/users/1/follow", null);
+        _client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", CreateToken(1));
+
+        var firstBlock = await _client.PostAsync($"/api/users/{other.UserId}/block", null);
+        var repeatedBlock = await _client.PostAsync($"/api/users/{other.UserId}/block", null);
+        var profile = await (await _client.GetAsync($"/api/users/{other.UserId}")).Content.ReadFromJsonAsync<UserResponse>();
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<MyProjectDbContext>();
+        var followsRemain = await db.Follows.AnyAsync(follow =>
+            (follow.FollowerId == 1 && follow.FollowingId == other.UserId)
+            || (follow.FollowerId == other.UserId && follow.FollowingId == 1));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(firstBlock.StatusCode, Is.EqualTo(HttpStatusCode.NoContent));
+            Assert.That(repeatedBlock.StatusCode, Is.EqualTo(HttpStatusCode.NoContent));
+            Assert.That(profile?.IsBlockedByCurrentUser, Is.True);
+            Assert.That(profile?.HasBlockedCurrentUser, Is.False);
+            Assert.That(profile?.IsFollowedByCurrentUser, Is.False);
+            Assert.That(followsRemain, Is.False);
+        });
+    }
+
+    [Test]
+    public async Task GivenABlockedUser_WhenUnblocking_ThenFollowCanBeCreatedAgain()
+    {
+        var other = await RegisterUserAsync("Unblocked", "unblocked@example.com");
+        await _client.PostAsync($"/api/users/{other.UserId}/block", null);
+
+        var firstUnblock = await _client.DeleteAsync($"/api/users/{other.UserId}/block");
+        var repeatedUnblock = await _client.DeleteAsync($"/api/users/{other.UserId}/block");
+        var follow = await _client.PostAsync($"/api/users/{other.UserId}/follow", null);
+        var profile = await (await _client.GetAsync($"/api/users/{other.UserId}")).Content.ReadFromJsonAsync<UserResponse>();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(firstUnblock.StatusCode, Is.EqualTo(HttpStatusCode.NoContent));
+            Assert.That(repeatedUnblock.StatusCode, Is.EqualTo(HttpStatusCode.NoContent));
+            Assert.That(follow.StatusCode, Is.EqualTo(HttpStatusCode.NoContent));
+            Assert.That(profile?.IsBlockedByCurrentUser, Is.False);
+            Assert.That(profile?.IsFollowedByCurrentUser, Is.True);
+        });
+    }
+
+    [Test]
+    public async Task GivenTheOtherUserBlockedYou_WhenViewingAndFollowing_ThenProfileShowsStateAndFollowIsRejected()
+    {
+        var other = await RegisterUserAsync("Blocker", "blocker@example.com");
+        _client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", other.Token);
+        await _client.PostAsync("/api/users/1/block", null);
+        _client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", CreateToken(1));
+
+        var profile = await (await _client.GetAsync($"/api/users/{other.UserId}")).Content.ReadFromJsonAsync<UserResponse>();
+        var follow = await _client.PostAsync($"/api/users/{other.UserId}/follow", null);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(profile?.IsBlockedByCurrentUser, Is.False);
+            Assert.That(profile?.HasBlockedCurrentUser, Is.True);
+            Assert.That(follow.StatusCode, Is.EqualTo(HttpStatusCode.BadRequest));
+        });
+    }
+
+    [Test]
+    public async Task GivenYouBlockedTheOtherUser_WhenFollowing_ThenTheApiReturnsBadRequest()
+    {
+        var other = await RegisterUserAsync("Blocked follow", "blocked-follow@example.com");
+        await _client.PostAsync($"/api/users/{other.UserId}/block", null);
+
+        var response = await _client.PostAsync($"/api/users/{other.UserId}/follow", null);
+
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.BadRequest));
+    }
+
+    [TestCase("block")]
+    [TestCase("follow")]
+    public async Task GivenYourself_WhenCreatingARelationship_ThenTheApiReturnsBadRequest(string relationship)
+    {
+        var response = await _client.PostAsync($"/api/users/1/{relationship}", null);
+
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.BadRequest));
+    }
+
+    [Test]
+    public async Task GivenYourself_WhenUnblocking_ThenTheApiReturnsBadRequest()
+    {
+        var response = await _client.DeleteAsync("/api/users/1/block");
+
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.BadRequest));
+    }
+
+    [Test]
+    public async Task GivenAMissingUser_WhenBlockingOrUnblocking_ThenTheApiReturnsNotFound()
+    {
+        var block = await _client.PostAsync("/api/users/999/block", null);
+        var unblock = await _client.DeleteAsync("/api/users/999/block");
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(block.StatusCode, Is.EqualTo(HttpStatusCode.NotFound));
+            Assert.That(unblock.StatusCode, Is.EqualTo(HttpStatusCode.NotFound));
+        });
+    }
+
+    [Test]
     public async Task GivenAFollowedUser_WhenGettingTheirFollowers_ThenTheFollowingUserIsListed()
     {
         var other = await RegisterUserAsync("Other", "followers@example.com");
@@ -869,6 +1035,69 @@ public sealed class GeoSceneryApiTests
         var response = await _client.DeleteAsync($"/api/users/{other.UserId}");
 
         Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.NotFound));
+    }
+
+    // ----- Messages -----
+
+    [Test]
+    public async Task GivenNoMessagingRelationship_WhenSendingAMessage_ThenTheApiReturnsForbidden()
+    {
+        var recipient = await RegisterUserAsync("Message Recipient", "message-recipient@example.com");
+
+        var response = await _client.PostAsJsonAsync($"/api/messages/{recipient.UserId}", new
+        {
+            body = "This should not be delivered."
+        });
+
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.Forbidden));
+    }
+
+    [Test]
+    public async Task GivenTheRecipientFollowsTheSender_WhenSendingAMessage_ThenTheApiCreatesIt()
+    {
+        var recipient = await RegisterUserAsync("Following Recipient", "following-recipient@example.com");
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<MyProjectDbContext>();
+            db.Follows.Add(new Follow { FollowerId = recipient.UserId, FollowingId = 1 });
+            await db.SaveChangesAsync();
+        }
+
+        var profile = await _client.GetFromJsonAsync<UserResponse>($"/api/users/{recipient.UserId}");
+        var response = await _client.PostAsJsonAsync($"/api/messages/{recipient.UserId}", new
+        {
+            body = "Hello from the trail."
+        });
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(profile?.CanMessage, Is.True);
+            Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.Created));
+        });
+    }
+
+    [Test]
+    public async Task GivenAnExistingConversation_WhenSendingAMessage_ThenTheApiAllowsIt()
+    {
+        var recipient = await RegisterUserAsync("Existing Conversation", "existing-conversation@example.com");
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<MyProjectDbContext>();
+            db.Messages.Add(new Message
+            {
+                SenderId = recipient.UserId,
+                RecipientId = 1,
+                Body = "A message to open the conversation."
+            });
+            await db.SaveChangesAsync();
+        }
+
+        var response = await _client.PostAsJsonAsync($"/api/messages/{recipient.UserId}", new
+        {
+            body = "Thanks for reaching out."
+        });
+
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.Created));
     }
 
     // ----- Visits -----

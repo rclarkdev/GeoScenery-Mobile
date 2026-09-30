@@ -1,0 +1,19 @@
+:host { display: block; }
+
+ion-content { --background: #f7f8fa; }
+
+.messages-shell { width: min(100%, 680px); min-height: 100%; margin: 0 auto; padding-bottom: 84px; background: var(--ion-background-color, #fff); }
+.messages-heading { padding: 26px 20px 18px; }
+.eyebrow { margin: 0 0 6px; color: var(--ion-color-primary); font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+.messages-heading h1 { margin: 0; font-size: 28px; }
+.messages-heading > p:last-child { margin: 8px 0 0; color: var(--ion-color-medium-shade); line-height: 1.45; }
+ion-list { padding: 0; }
+ion-avatar { display: flex; align-items: center; justify-content: center; background: var(--ion-color-light); }
+ion-avatar ion-icon { font-size: 40px; color: var(--ion-color-medium); }
+ion-label h2 { font-weight: 650; }
+ion-label p { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.messages-state { padding: 72px 28px; text-align: center; color: var(--ion-color-medium-shade); }
+.messages-state ion-icon { font-size: 54px; color: var(--ion-color-primary); }
+.messages-state h2 { margin: 14px 0 8px; color: var(--ion-text-color); }
+.messages-state p { margin: 0; line-height: 1.5; }
+.loading { display: block; margin: 72px auto; }
