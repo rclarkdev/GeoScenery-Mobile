@@ -5,31 +5,39 @@ import { IonicModule } from '@ionic/angular';
 import { Geolocation } from '@capacitor/geolocation';
 import { of } from 'rxjs';
 
-import { ObservePage } from './observe.page';
+import { User } from '../../auth/user.model';
+import { UserService } from '../../auth/user.service';
+import { SearchPage } from './search.page';
 import { SceneryService } from '../scenery.service';
 import { Scene } from '../scene.model';
 
-describe('ObservePage', () => {
-  let component: ObservePage;
-  let fixture: ComponentFixture<ObservePage>;
+describe('SearchPage', () => {
+  let component: SearchPage;
+  let fixture: ComponentFixture<SearchPage>;
   let sceneryService: jasmine.SpyObj<SceneryService>;
+  let userService: jasmine.SpyObj<UserService>;
 
   beforeEach(waitForAsync(() => {
     sceneryService = jasmine.createSpyObj('SceneryService', ['getScenery', 'searchScenery']);
     sceneryService.getScenery.and.returnValue(of([new Scene(1, 'Test scene', 'Description', 'https://example.com/image.jpg', 8)]));
     sceneryService.searchScenery.and.returnValue(of([]));
+    userService = jasmine.createSpyObj('UserService', ['getCurrentUser']);
+    userService.getCurrentUser.and.returnValue(of(new User(1, 'Test user', 'test@example.com', undefined, 45, -93)));
 
     TestBed.configureTestingModule({
-      declarations: [ ObservePage ],
+      declarations: [ SearchPage ],
       imports: [ReactiveFormsModule, IonicModule.forRoot()],
-      providers: [{ provide: SceneryService, useValue: sceneryService }],
+      providers: [
+        { provide: SceneryService, useValue: sceneryService },
+        { provide: UserService, useValue: userService }
+      ],
       schemas: [CUSTOM_ELEMENTS_SCHEMA],
     })
     .compileComponents();
   }));
 
   beforeEach(() => {
-    fixture = TestBed.createComponent(ObservePage);
+    fixture = TestBed.createComponent(SearchPage);
     component = fixture.componentInstance;
     fixture.detectChanges();
   });
@@ -37,6 +45,12 @@ describe('ObservePage', () => {
   it('should create', () => {
     expect(component).toBeTruthy();
     expect(component.loadedScenery.length).toBe(1);
+  });
+
+  it('uses the logged-in user location as the initial map center', () => {
+    expect(userService.getCurrentUser).toHaveBeenCalled();
+    expect((component as any).initialMapCenter).toEqual([45, -93]);
+    expect((component as any).initialMapZoom).toBe(12);
   });
 
   it('renders only the map and filter controls, without a scene feed', () => {

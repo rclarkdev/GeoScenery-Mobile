@@ -2,16 +2,18 @@ import { AfterViewInit, Component, ElementRef, OnDestroy, OnInit, ViewChild } fr
 import { FormBuilder, Validators } from '@angular/forms';
 import { Router } from '@angular/router';
 import { Geolocation } from '@capacitor/geolocation';
+import * as L from 'leaflet';
+import { UserService } from '../../auth/user.service';
 import { SceneryService } from '../scenery.service';
 import { Scene } from '../scene.model';
 import { createScenePopupContent } from './scene-popup';
 
 @Component({
-  selector: 'app-observe',
-  templateUrl: './observe.page.html',
-  styleUrls: ['./observe.page.scss'],
+  selector: 'app-search',
+  templateUrl: './search.page.html',
+  styleUrls: ['./search.page.scss'],
 })
-export class ObservePage implements OnInit, AfterViewInit, OnDestroy {
+export class SearchPage implements OnInit, AfterViewInit, OnDestroy {
   @ViewChild('mapContainer') mapContainerRef?: ElementRef<HTMLDivElement>;
 
   loadedScenery: Scene[] = [];
@@ -29,6 +31,9 @@ export class ObservePage implements OnInit, AfterViewInit, OnDestroy {
   private searchCircle?: any;
   private popupCloseTimer?: ReturnType<typeof setTimeout>;
   private pinnedPopupMarker?: any;
+  private mapInitializationTimer?: ReturnType<typeof setTimeout>;
+  private initialMapCenter: L.LatLngExpression = [0, 0];
+  private initialMapZoom = 2;
 
   readonly searchForm = this.formBuilder.nonNullable.group({
     tags: [''],
@@ -61,7 +66,8 @@ export class ObservePage implements OnInit, AfterViewInit, OnDestroy {
   constructor(
     private formBuilder: FormBuilder,
     private router: Router,
-    private sceneryService: SceneryService
+    private sceneryService: SceneryService,
+    private userService: UserService
   ) { }
 
   ngOnInit() {
@@ -69,29 +75,31 @@ export class ObservePage implements OnInit, AfterViewInit, OnDestroy {
       this.loadedScenery = scenery;
       this.updateMap();
     });
+    this.userService.getCurrentUser().subscribe({
+      next: user => {
+        if (user.latitude == null || user.longitude == null) {
+          return;
+        }
+
+        this.initialMapCenter = [user.latitude, user.longitude];
+        this.initialMapZoom = 12;
+        this.map?.setView(this.initialMapCenter, this.initialMapZoom);
+      },
+      error: () => undefined
+    });
   }
 
   ngAfterViewInit() {
-    // Leaflet is loaded globally via a CDN <script> tag (see index.html); it isn't present in the Karma test environment
-    if (!this.mapContainerRef || typeof L === 'undefined') {
-      return;
-    }
-
-    this.map = L.map(this.mapContainerRef.nativeElement, { zoomControl: false }).setView([0, 0], 2);
-    L.control.zoom({ position: 'bottomright' }).addTo(this.map);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '&copy; OpenStreetMap contributors',
-      maxZoom: 19
-    }).addTo(this.map);
-    this.updateMap();
+    this.scheduleMapInitialization();
   }
 
   ionViewDidEnter(): void {
-    setTimeout(() => this.map?.invalidateSize(), 0);
+    this.scheduleMapInitialization();
   }
 
   ngOnDestroy(): void {
     this.cancelPopupClose();
+    clearTimeout(this.mapInitializationTimer);
     this.map?.remove();
   }
 
@@ -174,6 +182,34 @@ export class ObservePage implements OnInit, AfterViewInit, OnDestroy {
     });
   }
 
+  private initializeMap(): void {
+    const container = this.mapContainerRef?.nativeElement;
+    if (this.map || !container) {
+      return;
+    }
+
+    this.map = L.map(container, { zoomControl: false }).setView(this.initialMapCenter, this.initialMapZoom);
+    L.control.zoom({ position: 'bottomright' }).addTo(this.map);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; OpenStreetMap contributors',
+      maxZoom: 19
+    }).addTo(this.map);
+    this.updateMap();
+  }
+
+  private scheduleMapInitialization(attempt = 0): void {
+    clearTimeout(this.mapInitializationTimer);
+    this.mapInitializationTimer = setTimeout(() => {
+      this.initializeMap();
+      if (!this.map && attempt < 20) {
+        this.scheduleMapInitialization(attempt + 1);
+        return;
+      }
+
+      requestAnimationFrame(() => this.map?.invalidateSize());
+    }, attempt === 0 ? 0 : 50);
+  }
+
   private updateMap() {
     if (!this.map) {
       return;
@@ -202,7 +238,7 @@ export class ObservePage implements OnInit, AfterViewInit, OnDestroy {
       })
         .bindPopup(() => createScenePopupContent(scene, () => {
           marker.closePopup();
-          void this.router.navigate(['/scenery/tabs/observe', scene.id]);
+          void this.router.navigate(['/scenery/tabs/search', scene.id]);
         }), {
           closeButton: false,
           className: 'scene-preview-popup'

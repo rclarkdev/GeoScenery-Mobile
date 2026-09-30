@@ -10,7 +10,7 @@ ion-content {
   width: min(100%, 680px);
   min-height: 100%;
   margin: 0 auto;
-  padding: 24px 20px 32px;
+  padding: 24px 20px calc(80px + env(safe-area-inset-bottom));
   background: var(--ion-background-color, #fff);
 }
 
@@ -124,8 +124,19 @@ ion-content {
   }
 }
 
+.session-actions {
+  display: flex;
+  justify-content: center;
+  padding: 24px 4px 0;
+
+  ion-button {
+    min-height: 44px;
+    margin: 0;
+  }
+}
+
 @media (max-width: 420px) {
   .profile-shell {
-    padding: 20px 16px 28px;
+    padding: 20px 16px calc(76px + env(safe-area-inset-bottom));
   }
 }

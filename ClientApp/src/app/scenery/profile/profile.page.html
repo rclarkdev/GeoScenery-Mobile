@@ -67,5 +67,12 @@
       </p>
       <p *ngIf="user.latitude == null || user.longitude == null">Not set</p>
     </section>
+
+    <section class="session-actions" *ngIf="isOwnProfile" aria-label="Account session">
+      <ion-button fill="outline" color="medium" size="small" type="button" (click)="confirmLogout()">
+        <ion-icon slot="start" name="log-out-outline"></ion-icon>
+        Log out
+      </ion-button>
+    </section>
   </main>
 </ion-content>

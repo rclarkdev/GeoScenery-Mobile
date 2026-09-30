@@ -34,12 +34,12 @@ export class SceneDetailPage implements OnInit {
   ngOnInit() {
     this.route.paramMap.subscribe(paramMap => {
       if (!paramMap.has('sceneId')) {
-        this.navCtrl.navigateBack('/scenery/tabs/observe');
+        this.navCtrl.navigateBack('/scenery/tabs/search');
         return;
       }
       this.sceneId = Number(paramMap.get('sceneId'));
       if (!Number.isInteger(this.sceneId)) {
-        this.navCtrl.navigateBack('/scenery/tabs/observe');
+        this.navCtrl.navigateBack('/scenery/tabs/search');
         return;
       }
       this.loadScene();

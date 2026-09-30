@@ -25,8 +25,12 @@ export interface AuthRequest {
 export class AuthService {
   private readonly authUrl = `${environment.apiUrl}/api/auth`;
   private readonly tokenKey = 'geoscenery.auth.token';
+  private readonly userKey = 'geoscenery.auth.user';
 
-  constructor(private http: HttpClient) { }
+  constructor(private http: HttpClient) {
+    localStorage.removeItem(this.tokenKey);
+    localStorage.removeItem(this.userKey);
+  }
 
   login(request: AuthRequest): Observable<AuthResponse> {
     return this.http.post<AuthResponse>(`${this.authUrl}/login`, request).pipe(tap(response => this.store(response)));
@@ -44,10 +48,10 @@ export class AuthService {
     return this.http.post<void>(`${this.authUrl}/reset-password`, { token, password });
   }
 
-  get token(): string | null { return localStorage.getItem(this.tokenKey); }
+  get token(): string | null { return sessionStorage.getItem(this.tokenKey); }
 
   get currentUserId(): number | null {
-    const stored = localStorage.getItem('geoscenery.auth.user');
+    const stored = sessionStorage.getItem(this.userKey);
     if (!stored) {
       return null;
     }
@@ -74,13 +78,15 @@ export class AuthService {
   }
 
   logout(): void {
+    sessionStorage.removeItem(this.tokenKey);
+    sessionStorage.removeItem(this.userKey);
     localStorage.removeItem(this.tokenKey);
-    localStorage.removeItem('geoscenery.auth.user');
+    localStorage.removeItem(this.userKey);
   }
 
   private store(response: AuthResponse): void {
-    localStorage.setItem(this.tokenKey, response.token);
-    localStorage.setItem('geoscenery.auth.user', JSON.stringify(response));
+    sessionStorage.setItem(this.tokenKey, response.token);
+    sessionStorage.setItem(this.userKey, JSON.stringify(response));
   }
 
   private decodeBase64Url(value: string): string {

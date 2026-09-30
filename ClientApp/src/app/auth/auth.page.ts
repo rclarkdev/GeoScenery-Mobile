@@ -54,7 +54,7 @@ export class AuthPage {
       ? this.authService.register(this.authForm.getRawValue())
       : this.authService.login(this.authForm.getRawValue());
     operation.subscribe({
-      next: () => this.navController.navigateRoot('/scenery/tabs/observe'),
+      next: () => this.navController.navigateRoot('/scenery/tabs/search'),
       error: (error: HttpErrorResponse) => {
         this.isSubmitting = false;
         this.authError = this.getAuthError(error);

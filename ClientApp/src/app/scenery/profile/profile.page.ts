@@ -1,5 +1,6 @@
 import { Component, OnInit } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
+import { AlertController, NavController } from '@ionic/angular';
 import { AuthService } from '../../auth/auth.service';
 import { User } from '../../auth/user.model';
 import { UserService } from '../../auth/user.service';
@@ -18,7 +19,9 @@ export class ProfilePage implements OnInit {
   constructor(
     private route: ActivatedRoute,
     private authService: AuthService,
-    private userService: UserService
+    private userService: UserService,
+    private alertController: AlertController,
+    private navController: NavController
   ) { }
 
   ngOnInit() {
@@ -57,6 +60,21 @@ export class ProfilePage implements OnInit {
     });
   }
 
+  async confirmLogout(): Promise<void> {
+    const alert = await this.alertController.create({
+      header: 'Log out?',
+      message: 'You will need to sign in again to access your account.',
+      buttons: [
+        { text: 'Cancel', role: 'cancel' },
+        {
+          text: 'Log out',
+          handler: () => this.logout()
+        }
+      ]
+    });
+    await alert.present();
+  }
+
   private loadUser(): void {
     if (this.viewedUserId == null) {
       return;
@@ -66,6 +84,11 @@ export class ProfilePage implements OnInit {
       ? this.userService.getCurrentUser()
       : this.userService.getUser(this.viewedUserId);
     request.subscribe(user => this.user = user);
+  }
+
+  private logout(): void {
+    this.authService.logout();
+    void this.navController.navigateRoot('/auth');
   }
 
 }

@@ -8,15 +8,15 @@ const routes: Routes = [
         component: SceneryPage,
         children: [
             {
-                path: 'observe',
+                path: 'search',
                 children: [
                     {
                         path: '',
-                        loadChildren: () => import('./observe/observe.module').then(m => m.ObservePageModule)
+                        loadChildren: () => import('./search/search.module').then(m => m.SearchPageModule)
                     },
                     {
                         path: ':sceneId',
-                        loadChildren: () => import('./observe/scene-detail/scene-detail.module').then(m => m.SceneDetailPageModule)
+                        loadChildren: () => import('./search/scene-detail/scene-detail.module').then(m => m.SceneDetailPageModule)
                     }
                 ]
             },
@@ -47,14 +47,14 @@ const routes: Routes = [
             },
             {
                 path: '',
-                redirectTo: '/scenery/tabs/observe',
+                redirectTo: '/scenery/tabs/search',
                 pathMatch: 'full'
             }
         ]
     },
     {
         path: '',
-        redirectTo: '/scenery/tabs/observe',
+        redirectTo: '/scenery/tabs/search',
         pathMatch: 'full'
     }
 ];

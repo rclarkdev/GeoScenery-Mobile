@@ -2,6 +2,7 @@ import { CUSTOM_ELEMENTS_SCHEMA } from '@angular/core';
 import { ComponentFixture, TestBed, waitForAsync } from '@angular/core/testing';
 import { ActivatedRoute } from '@angular/router';
 import { RouterTestingModule } from '@angular/router/testing';
+import { AlertController, NavController } from '@ionic/angular';
 import { of, throwError } from 'rxjs';
 
 import { ProfilePage } from './profile.page';
@@ -13,10 +14,16 @@ import { ImageUrlPipe } from '../../shared/image-url.pipe';
 describe('ProfilePage', () => {
   let component: ProfilePage;
   let fixture: ComponentFixture<ProfilePage>;
+  let authService: jasmine.SpyObj<AuthService>;
+  let alertController: jasmine.SpyObj<AlertController>;
+  let navController: jasmine.SpyObj<NavController>;
 
   function configure(userIdParam: string | null, currentUserId: number | null, user: User) {
     TestBed.resetTestingModule();
     const paramMap = userIdParam === null ? new Map() : new Map([['userId', userIdParam]]);
+    authService = jasmine.createSpyObj('AuthService', ['logout'], { currentUserId });
+    alertController = jasmine.createSpyObj('AlertController', ['create']);
+    navController = jasmine.createSpyObj('NavController', ['navigateRoot']);
     TestBed.configureTestingModule({
       declarations: [ ProfilePage ],
       imports: [ImageUrlPipe, RouterTestingModule],
@@ -32,7 +39,9 @@ describe('ProfilePage', () => {
             ,deleteUser: jasmine.createSpy('deleteUser').and.returnValue(of(undefined))
           }
         },
-        { provide: AuthService, useValue: { currentUserId } },
+        { provide: AuthService, useValue: authService },
+        { provide: AlertController, useValue: alertController },
+        { provide: NavController, useValue: navController },
         { provide: ActivatedRoute, useValue: { paramMap: of(paramMap) } }
       ],
       schemas: [CUSTOM_ELEMENTS_SCHEMA],
@@ -71,6 +80,25 @@ describe('ProfilePage', () => {
     expect(content).not.toContain('Update location');
   });
 
+  it('shows a logout action on the signed-in user profile', () => {
+    expect(fixture.nativeElement.textContent).toContain('Log out');
+  });
+
+  it('confirms logout, clears authentication, and navigates to sign in', async () => {
+    const present = jasmine.createSpy('present');
+    alertController.create.and.callFake(async options => {
+      const logoutButton = options.buttons?.[1] as any;
+      logoutButton.handler();
+      return { present } as any;
+    });
+
+    await component.confirmLogout();
+
+    expect(present).toHaveBeenCalled();
+    expect(authService.logout).toHaveBeenCalled();
+    expect(navController.navigateRoot).toHaveBeenCalledWith('/auth');
+  });
+
   it('treats the profile as your own when no userId param is present', () => {
     expect(component.isOwnProfile).toBe(true);
     expect(TestBed.inject(UserService).getCurrentUser).toHaveBeenCalled();
@@ -84,6 +112,7 @@ describe('ProfilePage', () => {
     fixture.detectChanges();
 
     expect(component.isOwnProfile).toBe(false);
+    expect(fixture.nativeElement.textContent).not.toContain('Log out');
 
     component.toggleFollow();
 

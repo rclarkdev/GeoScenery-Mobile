@@ -32,6 +32,10 @@
             ],
             "styles": [
               {
+                "input": "node_modules/leaflet/dist/leaflet.css",
+                "inject": true
+              },
+              {
                 "input": "src/theme/variables.scss",
                 "inject": true
               },
@@ -90,7 +94,10 @@
         "serve": {
           "builder": "@angular-devkit/build-angular:dev-server",
           "options": {
-            "browserTarget": "app:build"
+            "browserTarget": "app:build",
+            "headers": {
+              "Cache-Control": "no-store"
+            }
           },
           "configurations": {
             "production": {
