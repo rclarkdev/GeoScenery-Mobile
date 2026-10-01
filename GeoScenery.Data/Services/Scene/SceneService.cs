@@ -28,6 +28,8 @@ public sealed class SceneService : ISceneService
             .AsNoTracking()
             .Include(scene => scene.Tags)
             .Include(scene => scene.Ratings)
+            .Where(scene => !scene.IsHidden
+                && (scene.OwnerUserId == null || scene.OwnerUser == null || !scene.OwnerUser.IsSuspended))
             .AsQueryable();
 
         if (normalizedTags.Count > 0)
@@ -62,7 +64,8 @@ public sealed class SceneService : ISceneService
             .AsNoTracking()
             .Include(scene => scene.Tags)
             .Include(scene => scene.Ratings)
-            .FirstOrDefaultAsync(scene => scene.Id == id, cancellationToken);
+            .FirstOrDefaultAsync(scene => scene.Id == id && !scene.IsHidden
+                && (scene.OwnerUserId == null || scene.OwnerUser == null || !scene.OwnerUser.IsSuspended), cancellationToken);
     }
 
     public async Task<IReadOnlyList<Scene>> GetByOwnerAsync(long ownerUserId, CancellationToken cancellationToken = default)

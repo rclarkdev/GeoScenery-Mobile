@@ -48,6 +48,13 @@ public class ContentReport
 
     public DateTimeOffset? ResolvedAt { get; set; }
 
+    public long? ReviewedByUserId { get; set; }
+
+    [MaxLength(200)]
+    public string? ReviewedByDisplayName { get; set; }
+
+    public DateTimeOffset? ReviewedAt { get; set; }
+
     [MaxLength(1000)]
     public string? ResolutionNotes { get; set; }
 

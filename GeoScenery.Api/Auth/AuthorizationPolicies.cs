@@ -41,7 +41,7 @@ public sealed class PermissionAuthorizationHandler(MyProjectDbContext db)
         }
 
         var roleNames = await db.UserRoles.AsNoTracking()
-            .Where(userRole => userRole.UserId == userId)
+            .Where(userRole => userRole.UserId == userId && !userRole.User.IsSuspended)
             .Select(userRole => userRole.RoleName)
             .ToListAsync();
         if (roleNames.Any(role => AppPermissions.ForRole(role).Contains(requirement.Permission)))

@@ -24,6 +24,7 @@ public class MyProjectDbContext : DbContext
     public DbSet<Role> Roles => Set<Role>();
     public DbSet<UserRole> UserRoles => Set<UserRole>();
     public DbSet<ContentReport> ContentReports => Set<ContentReport>();
+    public DbSet<AdminActionAudit> AdminActionAudits => Set<AdminActionAudit>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -44,6 +45,12 @@ public class MyProjectDbContext : DbContext
         modelBuilder.Entity<User>()
             .Property(user => user.IsEmailVerified)
             .HasDefaultValue(true);
+        modelBuilder.Entity<User>()
+            .Property(user => user.IsSuspended)
+            .HasDefaultValue(false);
+        modelBuilder.Entity<Scene>()
+            .Property(scene => scene.IsHidden)
+            .HasDefaultValue(false);
 
         modelBuilder.Entity<UserRole>().HasData(new UserRole
         {
@@ -92,6 +99,32 @@ public class MyProjectDbContext : DbContext
 
         modelBuilder.Entity<ContentReport>()
             .HasIndex(report => report.CreatedAt);
+
+        modelBuilder.Entity<ContentReport>()
+            .HasIndex(report => new { report.Status, report.Id });
+
+        modelBuilder.Entity<ContentReport>()
+            .HasIndex(report => new { report.ReporterId, report.TargetType, report.TargetId })
+            .IsUnique()
+            .HasFilter("[Status] IN ('Pending', 'Reviewed')");
+
+        modelBuilder.Entity<ContentReport>()
+            .HasOne<User>()
+            .WithMany()
+            .HasForeignKey(report => report.ReviewedByUserId)
+            // SQL Server rejects two SET NULL paths from Users to ContentReports
+            // (ReporterId and ReviewedByUserId). UserService clears reviewer ids
+            // in the same transaction before deleting an account.
+            .OnDelete(DeleteBehavior.NoAction);
+
+        modelBuilder.Entity<AdminActionAudit>()
+            .HasIndex(audit => audit.CreatedAt);
+
+        modelBuilder.Entity<AdminActionAudit>()
+            .HasIndex(audit => new { audit.TargetType, audit.TargetId });
+
+        modelBuilder.Entity<AdminActionAudit>()
+            .HasIndex(audit => audit.ActorUserId);
 
         modelBuilder.Entity<User>()
             .HasIndex(user => user.Email)

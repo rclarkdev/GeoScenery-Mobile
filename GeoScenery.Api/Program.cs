@@ -211,6 +211,7 @@ app.UseStaticFiles(new StaticFileOptions
     RequestPath = "/uploads"
 });
 app.UseAuthentication();
+app.UseMiddleware<SuspendedAccountMiddleware>();
 app.UseRateLimiter();
 app.UseAuthorization();
 

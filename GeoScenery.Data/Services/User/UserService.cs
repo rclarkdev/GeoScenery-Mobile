@@ -74,7 +74,10 @@ public sealed class UserService : IUserService
 
     public async Task<bool> DeleteAsync(long id, CancellationToken cancellationToken = default)
     {
-        await using var transaction = await _dbContext.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
+        var ownsTransaction = _dbContext.Database.CurrentTransaction is null;
+        await using var transaction = ownsTransaction
+            ? await _dbContext.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken)
+            : null;
         var user = await _dbContext.Users.FindAsync([id], cancellationToken);
         if (user is null)
         {
@@ -83,8 +86,9 @@ public sealed class UserService : IUserService
 
         var isAdmin = await _dbContext.UserRoles.AnyAsync(
             userRole => userRole.UserId == id && userRole.RoleName == AppRoles.Admin, cancellationToken);
-        if (isAdmin && await _dbContext.UserRoles.CountAsync(
-                userRole => userRole.RoleName == AppRoles.Admin, cancellationToken) <= 1)
+        if (isAdmin && !await _dbContext.UserRoles.AnyAsync(userRole =>
+            userRole.RoleName == AppRoles.Admin && userRole.UserId != id && !userRole.User.IsSuspended,
+            cancellationToken))
         {
             return false;
         }
@@ -110,9 +114,19 @@ public sealed class UserService : IUserService
             report.ResolutionNotes ??= "Account deleted by an administrator or account owner.";
             report.ResolvedAt = DateTimeOffset.UtcNow;
         }
+        var reviewedReports = await _dbContext.ContentReports
+            .Where(report => report.ReviewedByUserId == id)
+            .ToListAsync(cancellationToken);
+        foreach (var report in reviewedReports)
+        {
+            report.ReviewedByUserId = null;
+        }
         _dbContext.Users.Remove(user);
         await _dbContext.SaveChangesAsync(cancellationToken);
-        await transaction.CommitAsync(cancellationToken);
+        if (transaction is not null)
+        {
+            await transaction.CommitAsync(cancellationToken);
+        }
         return true;
     }
 }

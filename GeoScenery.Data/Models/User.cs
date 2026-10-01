@@ -14,6 +14,13 @@ public class User
 
     public bool IsEmailVerified { get; set; } = true;
 
+    public bool IsSuspended { get; set; }
+
+    public DateTimeOffset? SuspendedAt { get; set; }
+
+    [MaxLength(1000)]
+    public string? SuspensionReason { get; set; }
+
     [Required]
     public string PasswordHash { get; set; } = string.Empty;
 

@@ -1,5 +1,4 @@
 using Microsoft.Data.SqlClient;
-using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 
 namespace GeoScenery.Data.Services;
@@ -12,7 +11,9 @@ namespace GeoScenery.Data.Services;
 ///
 /// SQL Server: 2601 (duplicate key in unique index), 2627 (unique constraint).
 /// SQLite:     SQLITE_CONSTRAINT (19) with extended code 2067
-///             (SQLITE_CONSTRAINT_UNIQUE), as used by the in-memory test database.
+///             (SQLITE_CONSTRAINT_UNIQUE), as used by the test database. SQLite
+///             is identified by exception type name to avoid shipping its native
+///             test provider as a production dependency.
 /// </summary>
 public static class UniqueConstraintGuard
 {
@@ -35,10 +36,16 @@ public static class UniqueConstraintGuard
                 case SqlException sql when sql.Number is SqlServerDuplicateKeyError or SqlServerUniqueConstraintError:
                     return true;
 
-                case SqliteException sqlite
-                    when sqlite.SqliteErrorCode == SqliteConstraintError
-                        && sqlite.SqliteExtendedErrorCode == SqliteUniqueExtendedError:
-                    return true;
+            }
+
+            var exceptionType = current.GetType();
+            if (string.Equals(exceptionType.FullName, "Microsoft.Data.Sqlite.SqliteException", StringComparison.Ordinal)
+                && exceptionType.GetProperty("SqliteErrorCode")?.GetValue(current) is int sqliteErrorCode
+                && sqliteErrorCode == SqliteConstraintError
+                && exceptionType.GetProperty("SqliteExtendedErrorCode")?.GetValue(current) is int sqliteExtendedErrorCode
+                && sqliteExtendedErrorCode == SqliteUniqueExtendedError)
+            {
+                return true;
             }
         }
 

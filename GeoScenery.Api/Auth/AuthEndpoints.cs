@@ -97,7 +97,7 @@ public static class AuthEndpoints
             }
 
             attemptTracker.Reset(normalizedEmail);
-            if (!user.IsEmailVerified)
+            if (!user.IsEmailVerified || user.IsSuspended)
             {
                 return TypedResults.Forbid();
             }

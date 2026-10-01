@@ -18,8 +18,8 @@
         <p class="intro">Review community reports and manage member accounts.</p>
       </div>
       <div class="admin-counts" *ngIf="!isLoading">
-        <span><strong>{{ users.length }}</strong> users</span>
-        <span><strong>{{ reports.length }}</strong> reports in view</span>
+        <span><strong>{{ userTotalCount }}</strong> users</span>
+        <span><strong>{{ reportTotalCount }}</strong> reports</span>
       </div>
     </header>
 
@@ -34,6 +34,14 @@
       <ion-segment-button value="users">
         <ion-icon name="people-outline"></ion-icon>
         <ion-label>Users</ion-label>
+      </ion-segment-button>
+      <ion-segment-button value="scenes">
+        <ion-icon name="images-outline"></ion-icon>
+        <ion-label>Scenes</ion-label>
+      </ion-segment-button>
+      <ion-segment-button value="audit">
+        <ion-icon name="reader-outline"></ion-icon>
+        <ion-label>Audit</ion-label>
       </ion-segment-button>
     </ion-segment>
 
@@ -57,6 +65,16 @@
           <ion-select-option value="All">All reports</ion-select-option>
         </ion-select>
       </div>
+      <div class="filters-row">
+        <ion-select aria-label="Filter report target" interface="popover" [ngModel]="reportTargetFilter"
+          (ngModelChange)="setReportTargetFilter($event)">
+          <ion-select-option value="All">All content</ion-select-option>
+          <ion-select-option value="Profile">Profiles</ion-select-option>
+          <ion-select-option value="Scene">Scenes</ion-select-option>
+        </ion-select>
+        <ion-searchbar [ngModel]="reportSearch" (ionChange)="setReportSearch($event.detail.value || '')"
+          debounce="300" placeholder="Search reports" aria-label="Search reports"></ion-searchbar>
+      </div>
 
       <div class="empty-state" *ngIf="reports.length === 0">
         <ion-icon name="checkmark-circle-outline"></ion-icon>
@@ -76,6 +94,8 @@
           <p class="report-description">{{ report.description }}</p>
           <p class="report-meta">Reported by {{ report.reporterDisplayName }} · {{ report.reporterEmail }}</p>
           <p class="report-meta">{{ report.createdAt | date:'medium' }}</p>
+          <p class="report-meta" *ngIf="report.reviewedAt">Reviewed by {{ report.reviewedByDisplayName || 'Admin' }} · {{ report.reviewedAt | date:'medium' }}</p>
+          <ion-note color="medium" *ngIf="!report.targetExists">Reported target has already been removed.</ion-note>
           <p class="resolution" *ngIf="report.resolutionNotes">Resolution: {{ report.resolutionNotes }}</p>
 
           <div class="report-actions" *ngIf="report.status === 'Pending' || report.status === 'Reviewed'">
@@ -87,13 +107,27 @@
               [disabled]="busyKey === 'report-' + report.id">
               Dismiss
             </ion-button>
+            <ion-button size="small" fill="outline" color="success" (click)="updateStatus(report, 'Actioned')"
+              [disabled]="busyKey === 'report-' + report.id">
+              Mark actioned
+            </ion-button>
             <ion-button size="small" color="danger" (click)="removeReportedContent(report)"
-              [disabled]="busyKey === 'remove-content-' + report.id">
+              [disabled]="!report.targetExists || busyKey === 'remove-content-' + report.id">
               {{ busyKey === 'remove-content-' + report.id ? 'Removing…' : 'Remove reported content' }}
+            </ion-button>
+            <ion-button size="small" fill="outline" (click)="toggleReportedVisibility(report)"
+              [disabled]="!report.targetExists || busyKey === 'visibility-' + report.id">
+              {{ report.targetType === 'Scene' ? (report.targetIsHidden ? 'Restore visibility' : 'Hide temporarily')
+                : (report.targetIsSuspended ? 'Restore account' : 'Suspend account') }}
             </ion-button>
           </div>
         </ion-card-content>
       </ion-card>
+      <div class="pagination" *ngIf="reportTotalCount > pageSize">
+        <ion-button fill="outline" size="small" [disabled]="reportPage <= 1" (click)="changePage('reports', -1)">Previous</ion-button>
+        <span>Page {{ reportPage }} · {{ reportTotalCount }} reports</span>
+        <ion-button fill="outline" size="small" [disabled]="!canGoNext('reports')" (click)="changePage('reports', 1)">Next</ion-button>
+      </div>
     </section>
 
     <section *ngIf="!isLoading && section === 'users'" aria-label="User management">
@@ -103,14 +137,15 @@
           <p>Manage administrator access or remove an account.</p>
         </div>
       </div>
-      <ion-searchbar [(ngModel)]="userSearch" placeholder="Search name or email" aria-label="Search users"></ion-searchbar>
+      <ion-searchbar [ngModel]="userSearch" (ionChange)="setUserSearch($event.detail.value || '')"
+        debounce="300" placeholder="Search name or email" aria-label="Search users"></ion-searchbar>
 
-      <div class="empty-state" *ngIf="filteredUsers.length === 0">
+      <div class="empty-state" *ngIf="users.length === 0">
         <ion-icon name="person-outline"></ion-icon>
         <h3>No matching users</h3>
       </div>
 
-      <ion-card class="user-card" *ngFor="let user of filteredUsers">
+      <ion-card class="user-card" *ngFor="let user of users">
         <ion-card-content>
           <div class="user-summary">
             <div class="avatar-mark" aria-hidden="true">{{ user.displayName.charAt(0) | uppercase }}</div>
@@ -118,6 +153,7 @@
               <h3>{{ user.displayName }}</h3>
               <p>{{ user.email }}</p>
               <ion-badge *ngFor="let role of user.roles" [color]="role === 'Admin' ? 'primary' : 'medium'">{{ role }}</ion-badge>
+              <ion-badge *ngIf="user.isSuspended" color="danger">Suspended</ion-badge>
             </div>
           </div>
           <div class="user-actions">
@@ -129,9 +165,142 @@
               [disabled]="busyKey === 'delete-user-' + user.id || isCurrentUser(user)">
               {{ busyKey === 'delete-user-' + user.id ? 'Deleting…' : 'Delete account' }}
             </ion-button>
+            <ion-button size="small" fill="outline" (click)="toggleSuspension(user)"
+              [disabled]="busyKey === 'suspension-' + user.id || isCurrentUser(user) || isOnlyActiveAdmin(user)">
+              {{ user.isSuspended ? 'Restore account' : 'Suspend account' }}
+            </ion-button>
           </div>
         </ion-card-content>
       </ion-card>
+      <div class="pagination" *ngIf="userTotalCount > pageSize">
+        <ion-button fill="outline" size="small" [disabled]="userPage <= 1" (click)="changePage('users', -1)">Previous</ion-button>
+        <span>Page {{ userPage }} · {{ userTotalCount }} users</span>
+        <ion-button fill="outline" size="small" [disabled]="!canGoNext('users')" (click)="changePage('users', 1)">Next</ion-button>
+      </div>
+    </section>
+
+    <section *ngIf="!isLoading && section === 'scenes'" aria-label="Scene moderation">
+      <div class="section-heading">
+        <div><h2>Scene moderation</h2><p>Hide scenes temporarily or permanently delete content.</p></div>
+        <ion-select aria-label="Filter scene visibility" interface="popover" [ngModel]="sceneVisibilityFilter"
+          (ngModelChange)="setSceneVisibilityFilter($event)">
+          <ion-select-option value="All">All scenes</ion-select-option>
+          <ion-select-option value="Visible">Visible</ion-select-option>
+          <ion-select-option value="Hidden">Hidden</ion-select-option>
+        </ion-select>
+      </div>
+      <ion-searchbar [ngModel]="sceneSearch" (ionChange)="setSceneSearch($event.detail.value || '')"
+        debounce="300" placeholder="Search scenes" aria-label="Search scenes"></ion-searchbar>
+      <div class="empty-state" *ngIf="scenes.length === 0"><h3>No scenes in this view</h3></div>
+      <ion-card class="user-card" *ngFor="let scene of scenes">
+        <ion-card-content>
+          <div class="user-identity">
+            <h3>{{ scene.title }}</h3>
+            <p>Scene #{{ scene.id }} · owner #{{ scene.ownerUserId || 'none' }}</p>
+            <ion-badge [color]="scene.isHidden ? 'warning' : 'success'">{{ scene.isHidden ? 'Hidden' : 'Visible' }}</ion-badge>
+            <p *ngIf="scene.hiddenReason">Reason: {{ scene.hiddenReason }}</p>
+          </div>
+          <div class="user-actions">
+            <ion-button size="small" fill="outline" (click)="toggleSceneVisibility(scene)" [disabled]="busyKey === 'scene-' + scene.id">
+              {{ scene.isHidden ? 'Restore visibility' : 'Hide temporarily' }}
+            </ion-button>
+            <ion-button size="small" fill="clear" color="danger" (click)="deleteScene(scene)" [disabled]="busyKey === 'scene-delete-' + scene.id">
+              Delete permanently
+            </ion-button>
+          </div>
+        </ion-card-content>
+      </ion-card>
+      <div class="pagination" *ngIf="sceneTotalCount > pageSize">
+        <ion-button fill="outline" size="small" [disabled]="scenePage <= 1" (click)="changePage('scenes', -1)">Previous</ion-button>
+        <span>Page {{ scenePage }} · {{ sceneTotalCount }} scenes</span>
+        <ion-button fill="outline" size="small" [disabled]="!canGoNext('scenes')" (click)="changePage('scenes', 1)">Next</ion-button>
+      </div>
+    </section>
+
+    <section *ngIf="!isLoading && section === 'audit'" aria-label="Admin action audit history">
+      <div class="section-heading"><div><h2>Admin action history</h2><p>Append-only record of privileged changes.</p></div></div>
+      <div class="empty-state" *ngIf="audits.length === 0"><h3>No admin actions recorded</h3></div>
+      <ion-card class="report-card" *ngFor="let audit of audits">
+        <ion-card-header>
+          <div class="report-topline"><ion-card-subtitle>{{ audit.actionType }}</ion-card-subtitle><small>{{ audit.createdAt | date:'medium' }}</small></div>
+          <ion-card-title>{{ audit.targetType }} {{ audit.targetId ? '#' + audit.targetId : '' }}</ion-card-title>
+        </ion-card-header>
+        <ion-card-content>
+          <p class="report-meta">By {{ audit.actorDisplayName }} · Admin #{{ audit.actorUserId }}</p>
+          <p *ngIf="audit.reason">{{ audit.reason }}</p>
+          <details *ngIf="audit.beforeStateJson || audit.afterStateJson">
+            <summary>State change details</summary>
+            <pre>{{ audit.beforeStateJson }} → {{ audit.afterStateJson }}</pre>
+          </details>
+        </ion-card-content>
+      </ion-card>
+      <div class="pagination" *ngIf="auditTotalCount > pageSize">
+        <ion-button fill="outline" size="small" [disabled]="auditPage <= 1" (click)="changePage('audit', -1)">Previous</ion-button>
+        <span>Page {{ auditPage }} · {{ auditTotalCount }} actions</span>
+        <ion-button fill="outline" size="small" [disabled]="!canGoNext('audit')" (click)="changePage('audit', 1)">Next</ion-button>
+      </div>
+    </section>
+
+    <section *ngIf="!isLoading && section === 'scenes'" aria-label="Scene moderation">
+      <div class="section-heading">
+        <div><h2>Scene moderation</h2><p>Hide scenes temporarily or permanently delete content.</p></div>
+        <ion-select aria-label="Filter scene visibility" interface="popover" [ngModel]="sceneVisibilityFilter"
+          (ngModelChange)="setSceneVisibilityFilter($event)">
+          <ion-select-option value="All">All scenes</ion-select-option>
+          <ion-select-option value="Visible">Visible</ion-select-option>
+          <ion-select-option value="Hidden">Hidden</ion-select-option>
+        </ion-select>
+      </div>
+      <ion-searchbar [ngModel]="sceneSearch" (ionChange)="setSceneSearch($event.detail.value || '')"
+        debounce="300" placeholder="Search scenes" aria-label="Search scenes"></ion-searchbar>
+      <div class="empty-state" *ngIf="scenes.length === 0"><h3>No scenes in this view</h3></div>
+      <ion-card class="user-card" *ngFor="let scene of scenes">
+        <ion-card-content>
+          <div class="user-identity">
+            <h3>{{ scene.title }}</h3>
+            <p>Scene #{{ scene.id }} · owner #{{ scene.ownerUserId || 'none' }}</p>
+            <ion-badge [color]="scene.isHidden ? 'warning' : 'success'">{{ scene.isHidden ? 'Hidden' : 'Visible' }}</ion-badge>
+            <p *ngIf="scene.hiddenReason">Reason: {{ scene.hiddenReason }}</p>
+          </div>
+          <div class="user-actions">
+            <ion-button size="small" fill="outline" (click)="toggleSceneVisibility(scene)" [disabled]="busyKey === 'scene-' + scene.id">
+              {{ scene.isHidden ? 'Restore visibility' : 'Hide temporarily' }}
+            </ion-button>
+            <ion-button size="small" fill="clear" color="danger" (click)="deleteScene(scene)" [disabled]="busyKey === 'scene-delete-' + scene.id">
+              Delete permanently
+            </ion-button>
+          </div>
+        </ion-card-content>
+      </ion-card>
+      <div class="pagination" *ngIf="sceneTotalCount > pageSize">
+        <ion-button fill="outline" size="small" [disabled]="scenePage <= 1" (click)="changePage('scenes', -1)">Previous</ion-button>
+        <span>Page {{ scenePage }} · {{ sceneTotalCount }} scenes</span>
+        <ion-button fill="outline" size="small" [disabled]="!canGoNext('scenes')" (click)="changePage('scenes', 1)">Next</ion-button>
+      </div>
+    </section>
+
+    <section *ngIf="!isLoading && section === 'audit'" aria-label="Admin action audit history">
+      <div class="section-heading"><div><h2>Admin action history</h2><p>Append-only record of privileged changes.</p></div></div>
+      <div class="empty-state" *ngIf="audits.length === 0"><h3>No admin actions recorded</h3></div>
+      <ion-card class="report-card" *ngFor="let audit of audits">
+        <ion-card-header>
+          <div class="report-topline"><ion-card-subtitle>{{ audit.actionType }}</ion-card-subtitle><small>{{ audit.createdAt | date:'medium' }}</small></div>
+          <ion-card-title>{{ audit.targetType }} {{ audit.targetId ? '#' + audit.targetId : '' }}</ion-card-title>
+        </ion-card-header>
+        <ion-card-content>
+          <p class="report-meta">By {{ audit.actorDisplayName }} · Admin #{{ audit.actorUserId }}</p>
+          <p *ngIf="audit.reason">{{ audit.reason }}</p>
+          <details *ngIf="audit.beforeStateJson || audit.afterStateJson">
+            <summary>State change details</summary>
+            <pre>{{ audit.beforeStateJson }} → {{ audit.afterStateJson }}</pre>
+          </details>
+        </ion-card-content>
+      </ion-card>
+      <div class="pagination" *ngIf="auditTotalCount > pageSize">
+        <ion-button fill="outline" size="small" [disabled]="auditPage <= 1" (click)="changePage('audit', -1)">Previous</ion-button>
+        <span>Page {{ auditPage }} · {{ auditTotalCount }} actions</span>
+        <ion-button fill="outline" size="small" [disabled]="!canGoNext('audit')" (click)="changePage('audit', 1)">Next</ion-button>
+      </div>
     </section>
   </main>
 </ion-content>

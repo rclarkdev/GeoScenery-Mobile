@@ -16,7 +16,7 @@ public static class ReportEndpoints
         var userReports = endpoints.MapGroup("/api/users")
             .RequireAuthorization()
             .RequireRateLimiting("content-report");
-        userReports.MapPost("/{targetId:long}/reports", async Task<Results<Created<ContentReportResponse>, NotFound, BadRequest<string>>>
+        userReports.MapPost("/{targetId:long}/reports", async Task<Results<Created<ContentReportResponse>, NotFound, BadRequest<string>, Conflict<string>>>
             (long targetId, CreateContentReportRequest request, ClaimsPrincipal principal, MyProjectDbContext db,
                 IEmailSender emailSender, HttpContext context, CancellationToken cancellationToken) =>
         {
@@ -42,6 +42,10 @@ public static class ReportEndpoints
 
             var report = await CreateReportAsync(reporterId, ContentReportTargets.Profile, targetId, target,
                 request, db, emailSender, context, cancellationToken);
+            if (report is null)
+            {
+                return TypedResults.Conflict("You already have an open report for this profile.");
+            }
             return TypedResults.Created($"/api/reports/{report.Id}",
                 new ContentReportResponse(report.Id, report.TargetType, report.TargetId, report.CreatedAt));
         })
@@ -50,7 +54,7 @@ public static class ReportEndpoints
         var sceneReports = endpoints.MapGroup("/api/scenes")
             .RequireAuthorization()
             .RequireRateLimiting("content-report");
-        sceneReports.MapPost("/{targetId:long}/reports", async Task<Results<Created<ContentReportResponse>, NotFound, BadRequest<string>>>
+        sceneReports.MapPost("/{targetId:long}/reports", async Task<Results<Created<ContentReportResponse>, NotFound, BadRequest<string>, Conflict<string>>>
             (long targetId, CreateContentReportRequest request, ClaimsPrincipal principal, MyProjectDbContext db,
                 IEmailSender emailSender, HttpContext context, CancellationToken cancellationToken) =>
         {
@@ -76,6 +80,10 @@ public static class ReportEndpoints
 
             var report = await CreateReportAsync(reporterId, ContentReportTargets.Scene, targetId, target.Title,
                 request, db, emailSender, context, cancellationToken);
+            if (report is null)
+            {
+                return TypedResults.Conflict("You already have an open report for this scene.");
+            }
             return TypedResults.Created($"/api/reports/{report.Id}",
                 new ContentReportResponse(report.Id, report.TargetType, report.TargetId, report.CreatedAt));
         })
@@ -84,11 +92,20 @@ public static class ReportEndpoints
         return endpoints;
     }
 
-    private static async Task<ContentReport> CreateReportAsync(long reporterId, string targetType, long targetId,
+    private static async Task<ContentReport?> CreateReportAsync(long reporterId, string targetType, long targetId,
         string targetLabel, CreateContentReportRequest request, MyProjectDbContext db, IEmailSender emailSender,
         HttpContext context, CancellationToken cancellationToken)
     {
         var description = request.Description.Trim();
+
+        await using var transaction = await db.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable, cancellationToken);
+        var hasOpenDuplicate = await db.ContentReports.AnyAsync(report => report.ReporterId == reporterId
+            && report.TargetType == targetType && report.TargetId == targetId
+            && (report.Status == ContentReportStatuses.Pending || report.Status == ContentReportStatuses.Reviewed), cancellationToken);
+        if (hasOpenDuplicate)
+        {
+            return null;
+        }
 
         var reporter = await db.Users.AsNoTracking()
             .Where(user => user.Id == reporterId)
@@ -107,6 +124,7 @@ public static class ReportEndpoints
         };
         db.ContentReports.Add(report);
         await db.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
 
         var adminEmails = await db.UserRoles.AsNoTracking()
             .Where(userRole => userRole.RoleName == AppRoles.Admin)

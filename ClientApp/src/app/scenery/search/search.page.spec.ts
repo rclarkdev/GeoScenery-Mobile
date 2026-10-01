@@ -2,12 +2,11 @@ import { CUSTOM_ELEMENTS_SCHEMA } from '@angular/core';
 import { ComponentFixture, TestBed, waitForAsync } from '@angular/core/testing';
 import { ReactiveFormsModule } from '@angular/forms';
 import { IonicModule } from '@ionic/angular';
-import { Geolocation } from '@capacitor/geolocation';
 import { of } from 'rxjs';
 
 import { User } from '../../auth/user.model';
 import { UserService } from '../../auth/user.service';
-import { SearchPage } from './search.page';
+import { GEOLOCATION, SearchPage } from './search.page';
 import { SceneryService } from '../scenery.service';
 import { Scene } from '../scene.model';
 
@@ -16,6 +15,7 @@ describe('SearchPage', () => {
   let fixture: ComponentFixture<SearchPage>;
   let sceneryService: jasmine.SpyObj<SceneryService>;
   let userService: jasmine.SpyObj<UserService>;
+  let geolocation: jasmine.SpyObj<Pick<typeof import('@capacitor/geolocation').Geolocation, 'getCurrentPosition'>>;
 
   beforeEach(waitForAsync(() => {
     sceneryService = jasmine.createSpyObj('SceneryService', ['getScenery', 'searchScenery']);
@@ -23,13 +23,15 @@ describe('SearchPage', () => {
     sceneryService.searchScenery.and.returnValue(of([]));
     userService = jasmine.createSpyObj('UserService', ['getCurrentUser']);
     userService.getCurrentUser.and.returnValue(of(new User(1, 'Test user', 'test@example.com', undefined, 45, -93)));
+    geolocation = jasmine.createSpyObj('Geolocation', ['getCurrentPosition']);
 
     TestBed.configureTestingModule({
       declarations: [ SearchPage ],
       imports: [ReactiveFormsModule, IonicModule.forRoot()],
       providers: [
         { provide: SceneryService, useValue: sceneryService },
-        { provide: UserService, useValue: userService }
+        { provide: UserService, useValue: userService },
+        { provide: GEOLOCATION, useValue: geolocation }
       ],
       schemas: [CUSTOM_ELEMENTS_SCHEMA],
     })
@@ -164,10 +166,12 @@ describe('SearchPage', () => {
   });
 
   it('sets locationError when useCurrentLocation fails', async () => {
-    spyOn(Geolocation, 'getCurrentPosition').and.rejectWith(new Error('denied'));
+    geolocation.getCurrentPosition.and.rejectWith(new Error('denied'));
 
     await component.useCurrentLocation();
 
+    expect(geolocation.getCurrentPosition).toHaveBeenCalled();
     expect(component.locationError).toBe(true);
+    expect(component.isLocating).toBe(false);
   });
 });

@@ -1,4 +1,4 @@
-import { AfterViewInit, Component, ElementRef, OnDestroy, OnInit, ViewChild } from '@angular/core';
+import { AfterViewInit, Component, ElementRef, Inject, InjectionToken, OnDestroy, OnInit, ViewChild } from '@angular/core';
 import { FormBuilder, Validators } from '@angular/forms';
 import { Router } from '@angular/router';
 import { Geolocation } from '@capacitor/geolocation';
@@ -7,6 +7,11 @@ import { UserService } from '../../auth/user.service';
 import { SceneryService } from '../scenery.service';
 import { Scene } from '../scene.model';
 import { createScenePopupContent } from './scene-popup';
+
+export const GEOLOCATION = new InjectionToken<Pick<typeof Geolocation, 'getCurrentPosition'>>(
+  'GEOLOCATION',
+  { providedIn: 'root', factory: () => Geolocation }
+);
 
 @Component({
   selector: 'app-search',
@@ -68,7 +73,8 @@ export class SearchPage implements OnInit, AfterViewInit, OnDestroy {
     private formBuilder: FormBuilder,
     private router: Router,
     private sceneryService: SceneryService,
-    private userService: UserService
+    private userService: UserService,
+    @Inject(GEOLOCATION) private geolocation: Pick<typeof Geolocation, 'getCurrentPosition'>
   ) { }
 
   ngOnInit() {
@@ -145,7 +151,7 @@ export class SearchPage implements OnInit, AfterViewInit, OnDestroy {
     this.isLocating = true;
     this.locationError = false;
     try {
-      const position = await Geolocation.getCurrentPosition();
+      const position = await this.geolocation.getCurrentPosition();
       this.searchForm.patchValue({
         latitude: position.coords.latitude,
         longitude: position.coords.longitude

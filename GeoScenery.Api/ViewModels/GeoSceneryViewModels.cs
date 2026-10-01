@@ -123,7 +123,27 @@ public sealed record SendMessageRequest
 public sealed record UserSummaryResponse(long Id, string DisplayName, string? ProfileImageUrl);
 
 /// <summary>Administrative view of a user's account and assigned application roles.</summary>
-public sealed record AdminUserResponse(long Id, string DisplayName, string Email, IReadOnlyList<string> Roles);
+public sealed record AdminUserResponse(long Id, string DisplayName, string Email, IReadOnlyList<string> Roles,
+    bool IsSuspended, DateTimeOffset? SuspendedAt, string? SuspensionReason);
+
+public sealed record UpdateUserSuspensionRequest
+{
+    public bool IsSuspended { get; init; }
+
+    [MaxLength(1000)]
+    public string? Reason { get; init; }
+}
+
+public sealed record UpdateSceneVisibilityRequest
+{
+    public bool IsHidden { get; init; }
+
+    [MaxLength(1000)]
+    public string? Reason { get; init; }
+}
+
+public sealed record AdminSceneResponse(long Id, string Title, long? OwnerUserId,
+    bool IsHidden, DateTimeOffset? HiddenAt, string? HiddenReason);
 
 /// <summary>Report information visible to administrators.</summary>
 public sealed record AdminContentReportResponse(
@@ -136,9 +156,15 @@ public sealed record AdminContentReportResponse(
     string Description,
     string Status,
     DateTimeOffset CreatedAt,
+    long? ReviewedByUserId,
+    string? ReviewedByDisplayName,
+    DateTimeOffset? ReviewedAt,
     DateTimeOffset? ResolvedAt,
     string? ResolutionNotes,
-    string? ActionTaken);
+    string? ActionTaken,
+    bool TargetExists,
+    bool TargetIsHidden,
+    bool TargetIsSuspended);
 
 /// <summary>Updates the moderation status and optional resolution note.</summary>
 public sealed record UpdateContentReportStatusRequest
@@ -152,6 +178,21 @@ public sealed record UpdateContentReportStatusRequest
     [MaxLength(50)]
     public string? ActionTaken { get; init; }
 }
+
+public sealed record AdminActionAuditResponse(
+    long Id,
+    long? ActorUserId,
+    string ActorDisplayName,
+    string ActionType,
+    string TargetType,
+    long? TargetId,
+    string? Reason,
+    string? BeforeStateJson,
+    string? AfterStateJson,
+    string? CorrelationId,
+    DateTimeOffset CreatedAt);
+
+public sealed record PagedResponse<T>(IReadOnlyList<T> Items, int Page, int PageSize, int TotalCount);
 
 /// <summary>Replaces the roles assigned to a user.</summary>
 public sealed record UpdateUserRolesRequest

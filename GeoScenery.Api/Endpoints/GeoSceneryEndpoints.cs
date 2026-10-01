@@ -55,7 +55,12 @@ public static class GeoSceneryEndpoints
                 MyProjectDbContext db, CancellationToken cancellationToken) =>
         {
             var user = await service.GetByIdAsync(id, cancellationToken);
-            return user is null ? TypedResults.NotFound() : TypedResults.Ok(await ToResponseAsync(user, GetUserId(principal), followService, blockService, db, cancellationToken));
+            var viewerId = GetUserId(principal);
+            if (user?.IsSuspended == true && user.Id != viewerId)
+            {
+                return TypedResults.NotFound();
+            }
+            return user is null ? TypedResults.NotFound() : TypedResults.Ok(await ToResponseAsync(user, viewerId, followService, blockService, db, cancellationToken));
         })
         .WithName("GetUser");
 
@@ -192,7 +197,7 @@ public static class GeoSceneryEndpoints
             }
 
             var target = await userService.GetByIdAsync(id, cancellationToken);
-            if (target is null)
+            if (target is null || target.IsSuspended)
             {
                 return TypedResults.NotFound();
             }
@@ -257,7 +262,7 @@ public static class GeoSceneryEndpoints
             (long id, IUserService userService, IFollowService followService, CancellationToken cancellationToken) =>
         {
             var target = await userService.GetByIdAsync(id, cancellationToken);
-            if (target is null)
+            if (target is null || target.IsSuspended)
             {
                 return TypedResults.NotFound();
             }
@@ -271,7 +276,7 @@ public static class GeoSceneryEndpoints
             (long id, IUserService userService, IFollowService followService, CancellationToken cancellationToken) =>
         {
             var target = await userService.GetByIdAsync(id, cancellationToken);
-            if (target is null)
+            if (target is null || target.IsSuspended)
             {
                 return TypedResults.NotFound();
             }
@@ -312,7 +317,7 @@ public static class GeoSceneryEndpoints
         group.MapGet("/{userId:long}", async Task<Results<Ok<IReadOnlyList<MessageResponse>>, NotFound>>
             (long userId, ClaimsPrincipal principal, MyProjectDbContext db, CancellationToken cancellationToken) =>
         {
-            if (!await db.Users.AsNoTracking().AnyAsync(user => user.Id == userId, cancellationToken))
+            if (!await db.Users.AsNoTracking().AnyAsync(user => user.Id == userId && !user.IsSuspended, cancellationToken))
             {
                 return TypedResults.NotFound();
             }
@@ -340,7 +345,7 @@ public static class GeoSceneryEndpoints
                 return TypedResults.BadRequest("You cannot message yourself.");
             }
 
-            if (!await db.Users.AsNoTracking().AnyAsync(user => user.Id == userId, cancellationToken))
+            if (!await db.Users.AsNoTracking().AnyAsync(user => user.Id == userId && !user.IsSuspended, cancellationToken))
             {
                 return TypedResults.NotFound();
             }
@@ -524,10 +529,16 @@ public static class GeoSceneryEndpoints
         })
         .WithName("GetVisit");
 
-        group.MapPost("", async Task<Results<Ok<VisitResponse>, Created<VisitResponse>>>
-            (CreateVisitRequest request, ClaimsPrincipal principal, IVisitService service, CancellationToken cancellationToken) =>
+        group.MapPost("", async Task<Results<Ok<VisitResponse>, Created<VisitResponse>, NotFound>>
+            (CreateVisitRequest request, ClaimsPrincipal principal, IVisitService service, ISceneService sceneService,
+                CancellationToken cancellationToken) =>
         {
             var userId = GetUserId(principal);
+
+            if (await sceneService.GetByIdAsync(request.SceneId, cancellationToken) is null)
+            {
+                return TypedResults.NotFound();
+            }
 
             // A (user, scene) visit is unique: recording one again is idempotent
             // and returns the existing row with 200 instead of failing on the
@@ -549,8 +560,14 @@ public static class GeoSceneryEndpoints
         .WithName("CreateVisit");
 
         group.MapPut("/{id:long}", async Task<Results<Ok<VisitResponse>, NotFound>>
-            (long id, UpdateVisitRequest request, ClaimsPrincipal principal, IVisitService service, CancellationToken cancellationToken) =>
+            (long id, UpdateVisitRequest request, ClaimsPrincipal principal, IVisitService service,
+                ISceneService sceneService, CancellationToken cancellationToken) =>
         {
+            if (await sceneService.GetByIdAsync(request.SceneId, cancellationToken) is null)
+            {
+                return TypedResults.NotFound();
+            }
+
             var visit = await service.UpdateAsync(id, new Visit
             {
                 SceneId = request.SceneId,

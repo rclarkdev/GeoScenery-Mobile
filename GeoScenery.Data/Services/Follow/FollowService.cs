@@ -22,19 +22,21 @@ public sealed class FollowService : IFollowService
 
     public Task<int> GetFollowerCountAsync(long userId, CancellationToken cancellationToken = default)
     {
-        return _dbContext.Follows.AsNoTracking().CountAsync(follow => follow.FollowingId == userId, cancellationToken);
+        return _dbContext.Follows.AsNoTracking().CountAsync(
+            follow => follow.FollowingId == userId && !follow.Follower.IsSuspended, cancellationToken);
     }
 
     public Task<int> GetFollowingCountAsync(long userId, CancellationToken cancellationToken = default)
     {
-        return _dbContext.Follows.AsNoTracking().CountAsync(follow => follow.FollowerId == userId, cancellationToken);
+        return _dbContext.Follows.AsNoTracking().CountAsync(
+            follow => follow.FollowerId == userId && !follow.Following.IsSuspended, cancellationToken);
     }
 
     public async Task<IReadOnlyList<User>> GetFollowersAsync(long userId, CancellationToken cancellationToken = default)
     {
         return await _dbContext.Follows
             .AsNoTracking()
-            .Where(follow => follow.FollowingId == userId)
+            .Where(follow => follow.FollowingId == userId && !follow.Follower.IsSuspended)
             .OrderBy(follow => follow.Follower.DisplayName)
             .Select(follow => follow.Follower)
             .ToListAsync(cancellationToken);
@@ -44,7 +46,7 @@ public sealed class FollowService : IFollowService
     {
         return await _dbContext.Follows
             .AsNoTracking()
-            .Where(follow => follow.FollowerId == userId)
+            .Where(follow => follow.FollowerId == userId && !follow.Following.IsSuspended)
             .OrderBy(follow => follow.Following.DisplayName)
             .Select(follow => follow.Following)
             .ToListAsync(cancellationToken);

@@ -26,6 +26,13 @@ public class Scene
 
     public long? OwnerUserId { get; set; }
 
+    public bool IsHidden { get; set; }
+
+    public DateTimeOffset? HiddenAt { get; set; }
+
+    [MaxLength(1000)]
+    public string? HiddenReason { get; set; }
+
     public User? OwnerUser { get; set; }
 
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;

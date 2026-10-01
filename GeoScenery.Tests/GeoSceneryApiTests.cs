@@ -392,6 +392,404 @@ public sealed class GeoSceneryApiTests
     }
 
     [Test]
+    public async Task GivenAReportedScene_WhenAnAdminDeletesIt_ThenSceneReferencesAreCleanedAndReportsAreActioned()
+    {
+        var admin = await RegisterUserAsync("Admin", "admin@example.com");
+        Scene scene;
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<MyProjectDbContext>();
+            scene = new Scene { Title = "Reported scene", Description = "Under review", ImageUrl = "/uploads/report-delete.jpg", OwnerUserId = admin.UserId };
+            db.Scenes.Add(scene);
+            await db.SaveChangesAsync();
+        }
+        var reportResponse = await _client.PostAsJsonAsync($"/api/scenes/{scene.Id}/reports", new { description = "Inappropriate scene." });
+        var report = await reportResponse.Content.ReadFromJsonAsync<ContentReportResponse>();
+        var visitResponse = await _client.PostAsJsonAsync("/api/visits", new { sceneId = scene.Id });
+        _client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", admin.Token);
+
+        var deletion = await _client.DeleteAsync($"/api/admin/scenes/{scene.Id}");
+        using var scopeVerify = _factory.Services.CreateScope();
+        var dbVerify = scopeVerify.ServiceProvider.GetRequiredService<MyProjectDbContext>();
+        var reportAfter = await dbVerify.ContentReports.AsNoTracking().SingleAsync(item => item.Id == report!.Id);
+        var sceneExists = await dbVerify.Scenes.AnyAsync(item => item.Id == scene.Id);
+        var visitExists = await dbVerify.Visits.AnyAsync(item => item.SceneId == scene.Id);
+        var auditExists = await dbVerify.AdminActionAudits.AnyAsync(item => item.ActionType == "SceneDeleted" && item.TargetId == scene.Id);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(reportResponse.StatusCode, Is.EqualTo(HttpStatusCode.Created));
+            Assert.That(visitResponse.StatusCode, Is.EqualTo(HttpStatusCode.Created));
+            Assert.That(deletion.StatusCode, Is.EqualTo(HttpStatusCode.NoContent));
+            Assert.That(sceneExists, Is.False);
+            Assert.That(visitExists, Is.False);
+            Assert.That(reportAfter.Status, Is.EqualTo(ContentReportStatuses.Actioned));
+            Assert.That(reportAfter.ActionTaken, Is.EqualTo("SceneDeleted"));
+            Assert.That(reportAfter.ReviewedByUserId, Is.EqualTo(admin.UserId));
+            Assert.That(auditExists, Is.True);
+        });
+    }
+
+    [Test]
+    public async Task GivenAReviewedReport_WhenTransitioningBackToPending_ThenTheApiRejectsItAndKeepsReviewerAudit()
+    {
+        var admin = await RegisterUserAsync("Admin", "admin@example.com");
+        var target = await RegisterUserAsync("Target", "target@example.com");
+        var submitted = await _client.PostAsJsonAsync($"/api/users/{target.UserId}/reports", new { description = "Needs review." });
+        var receipt = await submitted.Content.ReadFromJsonAsync<ContentReportResponse>();
+        _client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", admin.Token);
+
+        var reviewedResponse = await _client.PutAsJsonAsync($"/api/admin/reports/{receipt!.Id}/status", new
+        {
+            status = "Reviewed",
+            resolutionNotes = "Reviewed by admin."
+        });
+        var reviewed = await reviewedResponse.Content.ReadFromJsonAsync<AdminContentReportResponse>();
+        var invalidTransition = await _client.PutAsJsonAsync($"/api/admin/reports/{receipt.Id}/status", new
+        {
+            status = "Pending",
+            resolutionNotes = "Reopen"
+        });
+        using var memberClient = _factory.CreateClient();
+        memberClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", CreateToken(1));
+        var auditDenied = await memberClient.GetAsync("/api/admin/audit");
+
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<MyProjectDbContext>();
+        var audit = await db.AdminActionAudits.AsNoTracking().SingleAsync(entry =>
+            entry.ActionType == "ReportStatusChanged" && entry.TargetId == receipt.Id);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(reviewedResponse.StatusCode, Is.EqualTo(HttpStatusCode.OK));
+            Assert.That(reviewed!.ReviewedByUserId, Is.EqualTo(admin.UserId));
+            Assert.That(reviewed.ReviewedByDisplayName, Is.EqualTo("Admin"));
+            Assert.That(reviewed.ReviewedAt, Is.Not.Null);
+            Assert.That(invalidTransition.StatusCode, Is.EqualTo(HttpStatusCode.BadRequest));
+            Assert.That(auditDenied.StatusCode, Is.EqualTo(HttpStatusCode.Forbidden));
+            Assert.That(audit.ActorUserId, Is.EqualTo(admin.UserId));
+            Assert.That(audit.BeforeStateJson, Does.Contain("Pending"));
+            Assert.That(audit.AfterStateJson, Does.Contain("Reviewed"));
+        });
+    }
+
+    [Test]
+    public async Task GivenAnAdmin_WhenSuspendingAndRestoringAUser_ThenExistingTokensAreBlockedAndAuditIsWritten()
+    {
+        var admin = await RegisterUserAsync("Admin", "admin@example.com");
+        var member = await RegisterUserAsync("Member", "member@example.com");
+        _client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", admin.Token);
+
+        var suspend = await _client.PutAsJsonAsync($"/api/admin/users/{member.UserId}/suspension", new
+        {
+            isSuspended = true,
+            reason = "Repeated abusive contact."
+        });
+        using var memberClient = _factory.CreateClient();
+        memberClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", member.Token);
+        var suspendedAccess = await memberClient.GetAsync("/api/users/me");
+        var restore = await _client.PutAsJsonAsync($"/api/admin/users/{member.UserId}/suspension", new { isSuspended = false });
+        var restoredAccess = await memberClient.GetAsync("/api/users/me");
+
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<MyProjectDbContext>();
+        var actions = await db.AdminActionAudits.AsNoTracking()
+            .Where(entry => entry.TargetType == "User" && entry.TargetId == member.UserId)
+            .Select(entry => entry.ActionType).ToListAsync();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(suspend.StatusCode, Is.EqualTo(HttpStatusCode.OK));
+            Assert.That(suspendedAccess.StatusCode, Is.EqualTo(HttpStatusCode.Forbidden));
+            Assert.That(restore.StatusCode, Is.EqualTo(HttpStatusCode.OK));
+            Assert.That(restoredAccess.StatusCode, Is.EqualTo(HttpStatusCode.OK));
+            Assert.That(actions, Does.Contain("AccountSuspended"));
+            Assert.That(actions, Does.Contain("AccountRestored"));
+        });
+    }
+
+    [Test]
+    public async Task GivenASuspendedUser_WhenAccessingSocialFeatures_ThenTheyAreHiddenAndCannotBeContacted()
+    {
+        var admin = await RegisterUserAsync("Admin", "admin@example.com");
+        _client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", admin.Token);
+        var target = await RegisterUserAsync("Suspended target", "suspended-target@example.com");
+        var grantAdmin = await _client.PutAsJsonAsync($"/api/admin/users/{target.UserId}/roles", new
+        {
+            roles = new[] { AppRoles.Member, AppRoles.Admin }
+        });
+        var followBeforeSuspension = await _client.PostAsync($"/api/users/{target.UserId}/follow", null);
+        var suspend = await _client.PutAsJsonAsync($"/api/admin/users/{target.UserId}/suspension", new
+        {
+            isSuspended = true,
+            reason = "Safety review."
+        });
+
+        using var targetClient = _factory.CreateClient();
+        targetClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", target.Token);
+        var suspendedAdminAccess = await targetClient.GetAsync("/api/admin/access");
+        var targetFollowers = await _client.GetAsync($"/api/users/{target.UserId}/followers");
+        var newFollow = await _client.PostAsync($"/api/users/{target.UserId}/follow", null);
+        var newMessage = await _client.PostAsJsonAsync($"/api/messages/{target.UserId}", new { body = "Hello" });
+        var adminFollowing = await _client.GetFromJsonAsync<List<UserSummaryResponse>>($"/api/users/{admin.UserId}/following");
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(grantAdmin.StatusCode, Is.EqualTo(HttpStatusCode.OK));
+            Assert.That(followBeforeSuspension.StatusCode, Is.EqualTo(HttpStatusCode.NoContent));
+            Assert.That(suspend.StatusCode, Is.EqualTo(HttpStatusCode.OK));
+            Assert.That(suspendedAdminAccess.StatusCode, Is.EqualTo(HttpStatusCode.Forbidden));
+            Assert.That(targetFollowers.StatusCode, Is.EqualTo(HttpStatusCode.NotFound));
+            Assert.That(newFollow.StatusCode, Is.EqualTo(HttpStatusCode.NotFound));
+            Assert.That(newMessage.StatusCode, Is.EqualTo(HttpStatusCode.NotFound));
+            Assert.That(adminFollowing!.Any(user => user.Id == target.UserId), Is.False);
+        });
+    }
+
+    [Test]
+    public async Task GivenAnAdmin_WhenHidingAndRestoringAScene_ThenPublicEndpointsAndAuditReflectTheState()
+    {
+        var admin = await RegisterUserAsync("Admin", "admin@example.com");
+        Scene scene;
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<MyProjectDbContext>();
+            scene = new Scene { Title = "Moderated", Description = "Scene", ImageUrl = "/uploads/moderated.jpg", OwnerUserId = admin.UserId };
+            db.Scenes.Add(scene);
+            await db.SaveChangesAsync();
+        }
+        _client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", admin.Token);
+
+        var hide = await _client.PutAsJsonAsync($"/api/admin/scenes/{scene.Id}/visibility", new
+        {
+            isHidden = true,
+            reason = "Pending a content review."
+        });
+        var hiddenDetail = await _client.GetAsync($"/api/scenes/{scene.Id}");
+        var hiddenSearch = await _client.GetFromJsonAsync<List<SceneResponse>>("/api/scenes");
+        var hiddenSceneIsListed = hiddenSearch!.Any(result => result.Id == scene.Id);
+        var restore = await _client.PutAsJsonAsync($"/api/admin/scenes/{scene.Id}/visibility", new { isHidden = false });
+        var visibleDetail = await _client.GetAsync($"/api/scenes/{scene.Id}");
+
+        using var scopeVerify = _factory.Services.CreateScope();
+        var dbVerify = scopeVerify.ServiceProvider.GetRequiredService<MyProjectDbContext>();
+        var actionTypes = await dbVerify.AdminActionAudits.AsNoTracking()
+            .Where(entry => entry.TargetType == "Scene" && entry.TargetId == scene.Id)
+            .Select(entry => entry.ActionType).ToListAsync();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(hide.StatusCode, Is.EqualTo(HttpStatusCode.NoContent));
+            Assert.That(hiddenDetail.StatusCode, Is.EqualTo(HttpStatusCode.NotFound));
+            Assert.That(hiddenSceneIsListed, Is.False, "Hidden scene must not appear in public search.");
+            Assert.That(restore.StatusCode, Is.EqualTo(HttpStatusCode.NoContent));
+            Assert.That(visibleDetail.StatusCode, Is.EqualTo(HttpStatusCode.OK));
+            Assert.That(actionTypes, Does.Contain("SceneHidden"));
+            Assert.That(actionTypes, Does.Contain("SceneRestored"));
+        });
+    }
+
+    [Test]
+    public async Task GivenAnAdmin_WhenSuspendingAndRestoringAUser_ThenExistingTokensAreDeniedAndAuditIsWritten()
+    {
+        var admin = await RegisterUserAsync("Admin", "admin@example.com");
+        var member = await RegisterUserAsync("Member", "member@example.com");
+        _client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", admin.Token);
+
+        var suspend = await _client.PutAsJsonAsync($"/api/admin/users/{member.UserId}/suspension", new
+        {
+            isSuspended = true,
+            reason = "Repeated abuse of the community."
+        });
+        using var memberClient = _factory.CreateClient();
+        memberClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", member.Token);
+        var blockedExistingSession = await memberClient.GetAsync("/api/users/me");
+        var blockedLogin = await memberClient.PostAsJsonAsync("/api/auth/login", new
+        {
+            email = "member@example.com",
+            password = "Password123!"
+        });
+        var restore = await _client.PutAsJsonAsync($"/api/admin/users/{member.UserId}/suspension", new { isSuspended = false });
+        var existingSessionAfterRestore = await memberClient.GetAsync("/api/users/me");
+
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<MyProjectDbContext>();
+        var actions = await db.AdminActionAudits.AsNoTracking()
+            .Where(entry => entry.TargetType == "User" && entry.TargetId == member.UserId)
+            .Select(entry => entry.ActionType).ToListAsync();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(suspend.StatusCode, Is.EqualTo(HttpStatusCode.OK));
+            Assert.That(blockedExistingSession.StatusCode, Is.EqualTo(HttpStatusCode.Forbidden));
+            Assert.That(blockedLogin.StatusCode, Is.EqualTo(HttpStatusCode.Forbidden));
+            Assert.That(restore.StatusCode, Is.EqualTo(HttpStatusCode.OK));
+            Assert.That(existingSessionAfterRestore.StatusCode, Is.EqualTo(HttpStatusCode.OK));
+            Assert.That(actions, Does.Contain("AccountSuspended"));
+            Assert.That(actions, Does.Contain("AccountRestored"));
+        });
+    }
+
+    [Test]
+    public async Task GivenAnAdmin_WhenAssigningEmptyOrUnknownRoles_ThenTheApiRejectsTheRequest()
+    {
+        var admin = await RegisterUserAsync("Admin", "admin@example.com");
+        var member = await RegisterUserAsync("Member", "member@example.com");
+        _client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", admin.Token);
+
+        var emptyRoles = await _client.PutAsJsonAsync($"/api/admin/users/{member.UserId}/roles", new { roles = Array.Empty<string>() });
+        var unknownRole = await _client.PutAsJsonAsync($"/api/admin/users/{member.UserId}/roles", new { roles = new[] { "Owner" } });
+        var missingUser = await _client.PutAsJsonAsync("/api/admin/users/987654321/roles", new { roles = new[] { "Member" } });
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(emptyRoles.StatusCode, Is.EqualTo(HttpStatusCode.BadRequest));
+            Assert.That(unknownRole.StatusCode, Is.EqualTo(HttpStatusCode.BadRequest));
+            Assert.That(missingUser.StatusCode, Is.EqualTo(HttpStatusCode.NotFound));
+        });
+    }
+
+    [Test]
+    public async Task GivenAnAdmin_WhenAssigningDuplicateRoles_ThenTheAssignmentIsCanonicalAndUnique()
+    {
+        var admin = await RegisterUserAsync("Admin", "admin@example.com");
+        var member = await RegisterUserAsync("Member", "member@example.com");
+        _client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", admin.Token);
+
+        var response = await _client.PutAsJsonAsync($"/api/admin/users/{member.UserId}/roles", new
+        {
+            roles = new[] { "member", "Member", "ADMIN", "Admin" }
+        });
+        var updated = await response.Content.ReadFromJsonAsync<AdminUserResponse>();
+
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK));
+        Assert.That(updated!.Roles, Is.EquivalentTo(new[] { AppRoles.Member, AppRoles.Admin }));
+    }
+
+    [Test]
+    public async Task GivenAnAdmin_WhenChangingTheirOwnAdminRole_ThenTheApiRejectsTheRequest()
+    {
+        var admin = await RegisterUserAsync("Admin", "admin@example.com");
+        _client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", admin.Token);
+
+        var response = await _client.PutAsJsonAsync($"/api/admin/users/{admin.UserId}/roles", new
+        {
+            roles = new[] { AppRoles.Member }
+        });
+
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.BadRequest));
+    }
+
+    [Test]
+    public async Task GivenARegularMember_WhenDeletingUsersOrScenesThroughAdminRoutes_ThenTheApiForbidsAccess()
+    {
+        var other = await RegisterUserAsync("Other", "other@example.com");
+        Scene scene;
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<MyProjectDbContext>();
+            scene = new Scene { Title = "Protected scene", Description = "Scene.", ImageUrl = "/uploads/protected.jpg", OwnerUserId = other.UserId };
+            db.Scenes.Add(scene);
+            await db.SaveChangesAsync();
+        }
+
+        _client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", CreateToken(1));
+        var deleteUser = await _client.DeleteAsync($"/api/admin/users/{other.UserId}");
+        var deleteScene = await _client.DeleteAsync($"/api/admin/scenes/{scene.Id}");
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(deleteUser.StatusCode, Is.EqualTo(HttpStatusCode.Forbidden));
+            Assert.That(deleteScene.StatusCode, Is.EqualTo(HttpStatusCode.Forbidden));
+        });
+    }
+
+    [Test]
+    public async Task GivenARegularMember_WhenChangingAnotherUsersRoles_ThenTheApiForbidsAccess()
+    {
+        var target = await RegisterUserAsync("Target", "target@example.com");
+        _client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", CreateToken(1));
+
+        var response = await _client.PutAsJsonAsync($"/api/admin/users/{target.UserId}/roles", new
+        {
+            roles = new[] { AppRoles.Admin }
+        });
+
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.Forbidden));
+    }
+
+    [Test]
+    public async Task GivenAnAdmin_WhenListingUsers_ThenTheApiPaginatesSearchResultsAndHandlesEmptyPages()
+    {
+        var admin = await RegisterUserAsync("Admin", "admin@example.com");
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<MyProjectDbContext>();
+            for (var i = 1; i <= 5; i++)
+            {
+                var user = new User
+                {
+                    DisplayName = $"Baseline User {i:00}",
+                    Email = $"baseline{i:00}@example.com",
+                    PasswordHash = "test-hash"
+                };
+                user.Roles.Add(new UserRole { User = user, RoleName = AppRoles.Member });
+                db.Users.Add(user);
+            }
+            await db.SaveChangesAsync();
+        }
+        _client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", admin.Token);
+
+        var pageResponse = await _client.GetAsync("/api/admin/users?page=2&pageSize=2&search=Baseline");
+        var page = await pageResponse.Content.ReadFromJsonAsync<PagedResponse<AdminUserResponse>>();
+        var emptyResponse = await _client.GetAsync("/api/admin/users?page=9&pageSize=2&search=Baseline");
+        var empty = await emptyResponse.Content.ReadFromJsonAsync<PagedResponse<AdminUserResponse>>();
+        var invalidResponse = await _client.GetAsync("/api/admin/users?page=0&pageSize=500");
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(pageResponse.StatusCode, Is.EqualTo(HttpStatusCode.OK));
+            Assert.That(page!.TotalCount, Is.EqualTo(5));
+            Assert.That(page.Page, Is.EqualTo(2));
+            Assert.That(page.Items, Has.Count.EqualTo(2));
+            Assert.That(emptyResponse.StatusCode, Is.EqualTo(HttpStatusCode.OK));
+            Assert.That(empty!.Items, Is.Empty);
+            Assert.That(empty.TotalCount, Is.EqualTo(5));
+            Assert.That(invalidResponse.StatusCode, Is.EqualTo(HttpStatusCode.BadRequest));
+        });
+    }
+
+    [Test]
+    public async Task GivenAnAdmin_WhenListingReports_ThenStatusTargetSearchAndPagingAreAppliedServerSide()
+    {
+        var admin = await RegisterUserAsync("Admin", "admin@example.com");
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<MyProjectDbContext>();
+            db.ContentReports.AddRange(
+                new ContentReport { TargetType = ContentReportTargets.Profile, TargetId = 10, TargetLabel = "Lake user", ReporterDisplayName = "Reporter", ReporterEmail = "r@example.com", Description = "Lake inappropriate", Status = ContentReportStatuses.Pending },
+                new ContentReport { TargetType = ContentReportTargets.Scene, TargetId = 20, TargetLabel = "Lake scene", ReporterDisplayName = "Reporter", ReporterEmail = "r@example.com", Description = "Scene issue", Status = ContentReportStatuses.Pending },
+                new ContentReport { TargetType = ContentReportTargets.Scene, TargetId = 21, TargetLabel = "Mountain scene", ReporterDisplayName = "Reporter", ReporterEmail = "r@example.com", Description = "Other issue", Status = ContentReportStatuses.Dismissed });
+            await db.SaveChangesAsync();
+        }
+        _client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", admin.Token);
+
+        var response = await _client.GetAsync("/api/admin/reports?status=Pending&targetType=Scene&search=Lake&page=1&pageSize=1");
+        var result = await response.Content.ReadFromJsonAsync<PagedResponse<AdminContentReportResponse>>();
+        var invalidTarget = await _client.GetAsync("/api/admin/reports?targetType=Message");
+        var invalidStatus = await _client.GetAsync("/api/admin/reports?status=Unknown");
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK));
+            Assert.That(result!.TotalCount, Is.EqualTo(1));
+            Assert.That(result.Items.Single().TargetLabel, Is.EqualTo("Lake scene"));
+            Assert.That(invalidTarget.StatusCode, Is.EqualTo(HttpStatusCode.BadRequest));
+            Assert.That(invalidStatus.StatusCode, Is.EqualTo(HttpStatusCode.BadRequest));
+        });
+    }
+
+    [Test]
     public async Task GivenAProfileReport_WhenAnAdminReviewsAndDeletesTheAccount_ThenTheReportIsResolvedAndRelatedRowsAreCleaned()
     {
         var admin = await RegisterUserAsync("Admin", "admin@example.com");
@@ -418,6 +816,19 @@ public sealed class GeoSceneryApiTests
                 Body = "A test message."
             });
             db.Visits.Add(new Visit { UserId = reportedUser.UserId, SceneId = scene.Id });
+            db.ContentReports.Add(new ContentReport
+            {
+                ReporterId = admin.UserId,
+                ReporterDisplayName = "Admin",
+                ReporterEmail = "admin@example.com",
+                TargetType = ContentReportTargets.Scene,
+                TargetId = scene.Id,
+                TargetLabel = scene.Title,
+                Description = "Reviewer reference cleanup test.",
+                Status = ContentReportStatuses.Reviewed,
+                ReviewedByUserId = reportedUser.UserId,
+                ReviewedByDisplayName = "Reported"
+            });
             await db.SaveChangesAsync();
         }
 
@@ -439,7 +850,7 @@ public sealed class GeoSceneryApiTests
                 .SingleAsync(entry => entry.CorrelationId == failureCorrelation);
             Assert.Fail($"Admin report list failed: {failureLog.PropertiesJson}");
         }
-        var listedReports = await listResponse.Content.ReadFromJsonAsync<List<AdminContentReportResponse>>();
+        var listedReports = await listResponse.Content.ReadFromJsonAsync<PagedResponse<AdminContentReportResponse>>();
         var reviewResponse = await _client.PutAsJsonAsync($"/api/admin/reports/{report.Id}/status", new
         {
             status = "Reviewed",
@@ -450,17 +861,20 @@ public sealed class GeoSceneryApiTests
         using var verifyScope = _factory.Services.CreateScope();
         var verifyDb = verifyScope.ServiceProvider.GetRequiredService<MyProjectDbContext>();
         var persistedReport = await verifyDb.ContentReports.AsNoTracking().SingleAsync(candidate => candidate.Id == report.Id);
+        var hasDeletedReviewerReferences = await verifyDb.ContentReports.AsNoTracking()
+            .AnyAsync(candidate => candidate.ReviewedByUserId == reportedUser.UserId);
         var userExists = await verifyDb.Users.AnyAsync(user => user.Id == reportedUser.UserId);
         var hasFollows = await verifyDb.Follows.AnyAsync(follow => follow.FollowerId == reportedUser.UserId || follow.FollowingId == reportedUser.UserId);
         var hasBlocks = await verifyDb.UserBlocks.AnyAsync(block => block.BlockerId == reportedUser.UserId || block.BlockedId == reportedUser.UserId);
         var hasMessages = await verifyDb.Messages.AnyAsync(message => message.SenderId == reportedUser.UserId || message.RecipientId == reportedUser.UserId);
+        var hasVisits = await verifyDb.Visits.AnyAsync(visit => visit.UserId == reportedUser.UserId);
         var remainingSceneOwnerId = (await verifyDb.Scenes.SingleAsync(candidate => candidate.Id == scene.Id)).OwnerUserId;
 
         Assert.Multiple(() =>
         {
             Assert.That(reportResponse.StatusCode, Is.EqualTo(HttpStatusCode.Created));
             Assert.That(listResponse.StatusCode, Is.EqualTo(HttpStatusCode.OK));
-            Assert.That(listedReports, Has.Some.Matches<AdminContentReportResponse>(candidate => candidate.Id == report.Id));
+            Assert.That(listedReports!.Items, Has.Some.Matches<AdminContentReportResponse>(candidate => candidate.Id == report.Id));
             Assert.That(reviewResponse.StatusCode, Is.EqualTo(HttpStatusCode.OK));
             Assert.That(deleteResponse.StatusCode, Is.EqualTo(HttpStatusCode.NoContent));
             Assert.That(persistedReport.Status, Is.EqualTo(ContentReportStatuses.Actioned));
@@ -468,7 +882,10 @@ public sealed class GeoSceneryApiTests
             Assert.That(hasFollows, Is.False);
             Assert.That(hasBlocks, Is.False);
             Assert.That(hasMessages, Is.False);
+            Assert.That(hasVisits, Is.False);
             Assert.That(remainingSceneOwnerId, Is.Null);
+            Assert.That(persistedReport.TargetLabel, Is.EqualTo("Reported"));
+            Assert.That(hasDeletedReviewerReferences, Is.False, "Deleting a reviewer must clear the non-cascading reviewer foreign key.");
         });
     }
 
@@ -536,6 +953,42 @@ public sealed class GeoSceneryApiTests
             Assert.That(_factory.ReportNotifications[0].Recipient, Is.EqualTo("admin@example.com"));
             Assert.That(_factory.ReportNotifications[0].Report.TargetLabel, Is.EqualTo("Reported overlook"));
             Assert.That(_factory.ReportNotifications[0].Report.Description, Is.EqualTo("The uploaded image is explicit."));
+        });
+    }
+
+    [Test]
+    public async Task GivenAnOpenReport_WhenTheSameReporterReportsTheSameTargetAgain_ThenTheDuplicateIsRejected()
+    {
+        var target = await RegisterUserAsync("Reported user", "duplicate-report-target@example.com");
+        var body = new { description = "Repeated complaint." };
+        var first = await _client.PostAsJsonAsync($"/api/users/{target.UserId}/reports", body);
+        var duplicate = await _client.PostAsJsonAsync($"/api/users/{target.UserId}/reports", body);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(first.StatusCode, Is.EqualTo(HttpStatusCode.Created));
+            Assert.That(duplicate.StatusCode, Is.EqualTo(HttpStatusCode.Conflict));
+            Assert.That(_factory.ReportNotifications, Has.Count.EqualTo(1));
+        });
+    }
+
+    [Test]
+    public async Task GivenAReviewedReport_WhenAnAdminTransitionsItToPending_ThenTheLifecycleRejectsTheTransition()
+    {
+        var admin = await RegisterUserAsync("Admin", "admin@example.com");
+        var target = await RegisterUserAsync("Target", "lifecycle-target@example.com");
+        var submitted = await _client.PostAsJsonAsync($"/api/users/{target.UserId}/reports", new { description = "Report." });
+        var report = await submitted.Content.ReadFromJsonAsync<ContentReportResponse>();
+        _client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", admin.Token);
+        var reviewed = await _client.PutAsJsonAsync($"/api/admin/reports/{report!.Id}/status", new { status = "Reviewed", resolutionNotes = "Checked." });
+        var invalid = await _client.PutAsJsonAsync($"/api/admin/reports/{report.Id}/status", new { status = "Pending", resolutionNotes = "Reopen." });
+        var missingReason = await _client.PutAsJsonAsync($"/api/admin/reports/{report.Id}/status", new { status = "Dismissed" });
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(reviewed.StatusCode, Is.EqualTo(HttpStatusCode.OK));
+            Assert.That(invalid.StatusCode, Is.EqualTo(HttpStatusCode.BadRequest));
+            Assert.That(missingReason.StatusCode, Is.EqualTo(HttpStatusCode.BadRequest));
         });
     }
 
