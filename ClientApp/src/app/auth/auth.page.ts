@@ -15,11 +15,17 @@ export class AuthPage {
   authError: string | null = null;
   recoverySent = false;
   developmentResetToken: string | null = null;
+  registrationComplete = false;
+  developmentVerificationToken: string | null = null;
+  verificationResent = false;
+  verificationError: string | null = null;
+  canResendVerification = false;
 
   readonly authForm = this.formBuilder.nonNullable.group({
     displayName: [''],
     email: ['', [Validators.required, Validators.email]],
-    password: ['', [Validators.required, Validators.minLength(8)]]
+    password: ['', [Validators.required, Validators.minLength(8)]],
+    confirmPassword: ['']
   });
 
   constructor(
@@ -33,6 +39,11 @@ export class AuthPage {
     this.authError = null;
     this.recoverySent = false;
     this.developmentResetToken = null;
+    this.registrationComplete = false;
+    this.developmentVerificationToken = null;
+    this.verificationResent = false;
+    this.verificationError = null;
+    this.canResendVerification = false;
     const displayName = this.authForm.controls.displayName;
     displayName.reset();
     if (this.isRegistering) {
@@ -41,6 +52,14 @@ export class AuthPage {
       displayName.removeValidators(Validators.required);
     }
     displayName.updateValueAndValidity();
+    const confirmPassword = this.authForm.controls.confirmPassword;
+    confirmPassword.reset();
+    if (this.isRegistering) {
+      confirmPassword.setValidators(Validators.required);
+    } else {
+      confirmPassword.clearValidators();
+    }
+    confirmPassword.updateValueAndValidity();
   }
 
   onSubmit(): void {
@@ -50,14 +69,58 @@ export class AuthPage {
     }
     this.isSubmitting = true;
     this.authError = null;
-    const operation = this.isRegistering
-      ? this.authService.register(this.authForm.getRawValue())
-      : this.authService.login(this.authForm.getRawValue());
-    operation.subscribe({
+    if (this.isRegistering) {
+      const { displayName, email, password, confirmPassword } = this.authForm.getRawValue();
+      if (password !== confirmPassword) {
+        this.isSubmitting = false;
+        this.authError = 'Passwords do not match.';
+        return;
+      }
+      this.authService.register({ displayName, email, password, confirmPassword }).subscribe({
+        next: response => {
+          this.isSubmitting = false;
+          this.registrationComplete = true;
+          this.developmentVerificationToken = response.developmentToken ?? null;
+        },
+        error: (error: HttpErrorResponse) => {
+          this.isSubmitting = false;
+          this.authError = this.getAuthError(error);
+        }
+      });
+      return;
+    }
+
+    this.authService.login({
+      email: this.authForm.controls.email.value,
+      password: this.authForm.controls.password.value
+    }).subscribe({
       next: () => this.navController.navigateRoot('/scenery/tabs/search'),
       error: (error: HttpErrorResponse) => {
         this.isSubmitting = false;
         this.authError = this.getAuthError(error);
+        this.canResendVerification = error.status === 403;
+      }
+    });
+  }
+
+  onResendVerification(): void {
+    const email = this.authForm.controls.email;
+    if (email.invalid || this.isSubmitting) {
+      email.markAsTouched();
+      return;
+    }
+
+    this.isSubmitting = true;
+    this.verificationError = null;
+    this.authService.resendVerification(email.value).subscribe({
+      next: response => {
+        this.isSubmitting = false;
+        this.verificationResent = true;
+        this.developmentVerificationToken = response.developmentToken ?? this.developmentVerificationToken;
+      },
+      error: () => {
+        this.isSubmitting = false;
+        this.verificationError = 'Unable to request a verification email right now. Please try again later.';
       }
     });
   }
@@ -97,9 +160,13 @@ export class AuthPage {
         return 'Too many sign-up attempts. Please try again later.';
       }
       if (error.status === 400) {
-        return 'Check your display name, email, and password, then try again.';
+        return 'Check your display name, email, password, and password confirmation, then try again.';
       }
       return 'Unable to create the account right now. Please try again.';
+    }
+
+    if (error.status === 403) {
+      return 'Please verify your email address before signing in. You can request a new verification email below.';
     }
 
     return error.status === 401

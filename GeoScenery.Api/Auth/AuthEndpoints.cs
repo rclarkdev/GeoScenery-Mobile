@@ -18,9 +18,16 @@ public static class AuthEndpoints
     {
         var group = endpoints.MapGroup("/api/auth");
 
-        group.MapPost("/register", async Task<Results<Ok<AuthResponse>, Conflict<string>>>
-            (RegisterRequest request, MyProjectDbContext db, IPasswordHasher<User> hasher, CancellationToken cancellationToken) =>
+        group.MapPost("/register", async Task<Results<Ok<RegistrationResponse>, Conflict<string>, BadRequest<string>>>
+            (RegisterRequest request, MyProjectDbContext db, IPasswordHasher<User> hasher, IEmailSender emailSender,
+                IConfiguration appConfiguration, IHostEnvironment environment, ILoggerFactory loggerFactory,
+                CancellationToken cancellationToken) =>
         {
+            if (!string.Equals(request.Password, request.ConfirmPassword, StringComparison.Ordinal))
+            {
+                return TypedResults.BadRequest("Passwords do not match.");
+            }
+
             var normalizedEmail = request.Email.Trim().ToLowerInvariant();
             if (await db.Users.AnyAsync(user => user.Email == normalizedEmail, cancellationToken))
             {
@@ -30,10 +37,12 @@ public static class AuthEndpoints
             var user = new User
             {
                 DisplayName = request.DisplayName.Trim(),
-                Email = normalizedEmail
+                Email = normalizedEmail,
+                IsEmailVerified = false
             };
             user.PasswordHash = hasher.HashPassword(user, request.Password);
             db.Users.Add(user);
+            user.Roles.Add(new UserRole { User = user, RoleName = AppRoles.Member });
             try
             {
                 await db.SaveChangesAsync(cancellationToken);
@@ -45,12 +54,17 @@ public static class AuthEndpoints
                 // same as the pre-check so the outcome is consistent.
                 return TypedResults.Conflict("An account with this email already exists.");
             }
-            return TypedResults.Ok(CreateResponse(user, configuration));
+            var rawToken = await CreateEmailVerificationTokenAsync(user, db, cancellationToken);
+            await SendVerificationEmailSafelyAsync(user, rawToken, db, emailSender, appConfiguration,
+                environment, loggerFactory, cancellationToken);
+            return TypedResults.Ok(new RegistrationResponse(
+                "Account created. Check your email for a verification link before signing in.",
+                environment.IsDevelopment() ? rawToken : null));
         })
         .WithName("Register")
         .RequireRateLimiting("auth-register");
 
-        group.MapPost("/login", async Task<Results<Ok<AuthResponse>, UnauthorizedHttpResult>>
+        group.MapPost("/login", async Task<Results<Ok<AuthResponse>, UnauthorizedHttpResult, ForbidHttpResult>>
             (LoginRequest request, MyProjectDbContext db, IPasswordHasher<User> hasher, ILoginAttemptTracker attemptTracker, CancellationToken cancellationToken) =>
         {
             var normalizedEmail = request.Email.Trim().ToLowerInvariant();
@@ -77,10 +91,70 @@ public static class AuthEndpoints
             }
 
             attemptTracker.Reset(normalizedEmail);
-            return TypedResults.Ok(CreateResponse(user, configuration));
+            if (!user.IsEmailVerified)
+            {
+                return TypedResults.Forbid();
+            }
+
+            await ApplyBootstrapAdminAsync(user, db, configuration, cancellationToken);
+            if (!await db.UserRoles.AnyAsync(userRole => userRole.UserId == user.Id, cancellationToken))
+            {
+                db.UserRoles.Add(new UserRole { UserId = user.Id, RoleName = AppRoles.Member });
+                await db.SaveChangesAsync(cancellationToken);
+            }
+
+            return TypedResults.Ok(await CreateResponseAsync(user, db, configuration, cancellationToken));
         })
         .WithName("Login")
         .RequireRateLimiting("auth-login");
+
+        group.MapPost("/verify-email", async Task<Results<NoContent, BadRequest<string>>>
+            (VerifyEmailRequest request, MyProjectDbContext db, IConfiguration appConfiguration,
+                CancellationToken cancellationToken) =>
+        {
+            var tokenHash = HashToken(request.Token);
+            var now = DateTimeOffset.UtcNow;
+            var verification = await db.EmailVerificationTokens
+                .Include(candidate => candidate.User)
+                .FirstOrDefaultAsync(candidate => candidate.TokenHash == tokenHash
+                    && candidate.UsedAt == null, cancellationToken);
+            if (verification is null || verification.ExpiresAt <= now)
+            {
+                return TypedResults.BadRequest("The verification link is invalid or has expired.");
+            }
+
+            verification.UsedAt = now;
+            verification.User.IsEmailVerified = true;
+            await db.SaveChangesAsync(cancellationToken);
+            await ApplyBootstrapAdminAsync(verification.User, db, appConfiguration, cancellationToken);
+            return TypedResults.NoContent();
+        })
+        .WithName("VerifyEmail");
+
+        group.MapPost("/resend-verification", async Task<Ok<EmailVerificationResponse>>
+            (ResendVerificationRequest request, MyProjectDbContext db, IEmailSender emailSender,
+                IConfiguration appConfiguration, IHostEnvironment environment, ILoggerFactory loggerFactory,
+                CancellationToken cancellationToken) =>
+        {
+            var normalizedEmail = request.Email.Trim().ToLowerInvariant();
+            var user = await db.Users.FirstOrDefaultAsync(candidate => candidate.Email == normalizedEmail, cancellationToken);
+            string? developmentToken = null;
+            if (user is not null && !user.IsEmailVerified)
+            {
+                developmentToken = await CreateEmailVerificationTokenAsync(user, db, cancellationToken);
+                await SendVerificationEmailSafelyAsync(user, developmentToken, db, emailSender, appConfiguration,
+                    environment, loggerFactory, cancellationToken);
+                if (!environment.IsDevelopment())
+                {
+                    developmentToken = null;
+                }
+            }
+
+            return TypedResults.Ok(new EmailVerificationResponse(
+                "If the account exists and needs verification, a verification email has been sent.", developmentToken));
+        })
+        .WithName("ResendEmailVerification")
+        .RequireRateLimiting("email-verification");
 
         group.MapPost("/forgot-password", async Task<Ok<PasswordResetResponse>>
             (ForgotPasswordRequest request, MyProjectDbContext db, IEmailSender emailSender, IHostEnvironment environment, CancellationToken cancellationToken) =>
@@ -123,6 +197,8 @@ public static class AuthEndpoints
             }
 
             token.User.PasswordHash = hasher.HashPassword(token.User, request.Password);
+            // Possession of a password-reset link proves access to the mailbox.
+            token.User.IsEmailVerified = true;
             token.UsedAt = DateTimeOffset.UtcNow;
             await db.SaveChangesAsync(cancellationToken);
             return TypedResults.NoContent();
@@ -131,25 +207,84 @@ public static class AuthEndpoints
         return endpoints;
     }
 
+    private static async Task<string> CreateEmailVerificationTokenAsync(User user, MyProjectDbContext db,
+        CancellationToken cancellationToken)
+    {
+        var rawToken = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
+        db.EmailVerificationTokens.RemoveRange(db.EmailVerificationTokens.Where(token => token.UserId == user.Id));
+        db.EmailVerificationTokens.Add(new EmailVerificationToken
+        {
+            UserId = user.Id,
+            TokenHash = HashToken(rawToken),
+            ExpiresAt = DateTimeOffset.UtcNow.AddHours(24)
+        });
+        await db.SaveChangesAsync(cancellationToken);
+        return rawToken;
+    }
+
+    private static async Task SendVerificationEmailSafelyAsync(User user, string rawToken, MyProjectDbContext db,
+        IEmailSender emailSender, IConfiguration appConfiguration, IHostEnvironment environment,
+        ILoggerFactory loggerFactory, CancellationToken cancellationToken)
+    {
+        var verificationBaseUrl = appConfiguration["Email:ClientVerificationUrl"]
+            ?? "http://localhost:8100/auth/verify-email";
+        var verificationUrl = $"{verificationBaseUrl}?token={Uri.EscapeDataString(rawToken)}";
+        try
+        {
+            await emailSender.SendEmailVerificationAsync(user.Email, verificationUrl, cancellationToken);
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            loggerFactory.CreateLogger("EmailVerification").LogError(exception,
+                "Could not send the email verification message to user {UserId}.", user.Id);
+            // Keep registration and resend responses generic; the user can request another link.
+        }
+    }
+
     private static string HashToken(string token)
     {
         return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(token)));
     }
 
-    private static AuthResponse CreateResponse(User user, IConfiguration configuration)
+    private static async Task ApplyBootstrapAdminAsync(User user, MyProjectDbContext db,
+        IConfiguration configuration, CancellationToken cancellationToken)
+    {
+        var bootstrapUserIdValue = configuration["Authorization:BootstrapAdminUserId"];
+        if (!long.TryParse(bootstrapUserIdValue, out var bootstrapUserId)
+            || user.Id != bootstrapUserId
+            || await db.UserRoles.AnyAsync(userRole => userRole.UserId == user.Id && userRole.RoleName == AppRoles.Admin, cancellationToken))
+        {
+            return;
+        }
+
+        db.UserRoles.Add(new UserRole { UserId = user.Id, RoleName = AppRoles.Admin });
+        await db.SaveChangesAsync(cancellationToken);
+    }
+
+    private static async Task<AuthResponse> CreateResponseAsync(User user, MyProjectDbContext db,
+        IConfiguration configuration, CancellationToken cancellationToken)
     {
         var key = configuration["Jwt:Key"]
             ?? "development-only-change-this-key-before-deployment-geoscenery";
         var issuer = configuration["Jwt:Issuer"] ?? "GeoScenery";
         var audience = configuration["Jwt:Audience"] ?? "GeoScenery.Client";
         var expirationHours = configuration.GetValue("Jwt:ExpirationHours", 8);
-        var claims = new[]
+        var claims = new List<Claim>
         {
             new Claim(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
             new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
             new Claim(ClaimTypes.Email, user.Email),
             new Claim(ClaimTypes.Name, user.DisplayName)
         };
+        var roles = await db.UserRoles.AsNoTracking()
+            .Where(userRole => userRole.UserId == user.Id)
+            .Select(userRole => userRole.RoleName)
+            .ToListAsync(cancellationToken);
+        foreach (var role in roles)
+        {
+            claims.Add(new Claim(ClaimTypes.Role, role));
+            claims.AddRange(AppPermissions.ForRole(role).Select(permission => new Claim("permission", permission)));
+        }
         var credentials = new SigningCredentials(new SymmetricSecurityKey(Encoding.UTF8.GetBytes(key)), SecurityAlgorithms.HmacSha256);
         var token = new JwtSecurityToken(issuer, audience, claims, expires: DateTime.UtcNow.AddHours(expirationHours), signingCredentials: credentials);
         return new AuthResponse(user.Id, user.DisplayName, user.Email, new JwtSecurityTokenHandler().WriteToken(token));

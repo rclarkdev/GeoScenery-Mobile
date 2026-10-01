@@ -122,6 +122,16 @@ public sealed record SendMessageRequest
 /// <summary>Represents a user in a follower/following list.</summary>
 public sealed record UserSummaryResponse(long Id, string DisplayName, string? ProfileImageUrl);
 
+/// <summary>Administrative view of a user's account and assigned application roles.</summary>
+public sealed record AdminUserResponse(long Id, string DisplayName, string Email, IReadOnlyList<string> Roles);
+
+/// <summary>Replaces the roles assigned to a user.</summary>
+public sealed record UpdateUserRolesRequest
+{
+    [Required, MinLength(1)]
+    public required IReadOnlyList<string> Roles { get; init; }
+}
+
 /// <summary>Payload for creating a user.</summary>
 public sealed record CreateUserRequest
 {
@@ -204,3 +214,13 @@ public sealed record UpdateVisitRequest
 
     public DateTimeOffset VisitedAt { get; init; }
 }
+
+/// <summary>Payload submitted when reporting a profile or scene.</summary>
+public sealed record CreateContentReportRequest
+{
+    [Required, MaxLength(2000)]
+    public required string Description { get; init; }
+}
+
+/// <summary>Confirmation returned after a content report has been recorded.</summary>
+public sealed record ContentReportResponse(long Id, string TargetType, long TargetId, DateTimeOffset CreatedAt);

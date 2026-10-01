@@ -33,4 +33,17 @@ describe('AuthPage', () => {
   it('should create', () => {
     expect(component).toBeTruthy();
   });
+
+  it('requires matching password confirmation before registration', () => {
+    component.toggleMode();
+    component.authForm.controls.displayName.setValue('Ava');
+    component.authForm.controls.email.setValue('ava@example.com');
+    component.authForm.controls.password.setValue('Password123!');
+    component.authForm.controls.confirmPassword.setValue('Different123!');
+
+    component.onSubmit();
+
+    expect(component.authError).toBe('Passwords do not match.');
+    expect(component.isSubmitting).toBeFalse();
+  });
 });

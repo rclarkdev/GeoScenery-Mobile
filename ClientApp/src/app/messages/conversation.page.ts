@@ -18,6 +18,7 @@ export class ConversationPage implements OnInit {
   isLoading = true;
   isSending = false;
   hasError = false;
+  sendError: string | null = null;
   private recipientId: number | null = null;
 
   constructor(
@@ -45,12 +46,12 @@ export class ConversationPage implements OnInit {
 
   sendMessage(): void {
     const body = this.draft.trim();
-    if (!this.recipient || !this.recipient.canMessage || !this.recipientId || !body || this.isSending) {
+    if (!this.recipient || !this.recipientId || !body || this.isSending) {
       return;
     }
 
     this.isSending = true;
-    this.hasError = false;
+    this.sendError = null;
     this.messageService.sendMessage(this.recipientId, { body }).subscribe({
       next: message => {
         this.messages = [...this.messages, message];
@@ -58,7 +59,7 @@ export class ConversationPage implements OnInit {
         this.isSending = false;
       },
       error: () => {
-        this.hasError = true;
+        this.sendError = 'Unable to send this message. Check your connection and messaging permissions, then try again.';
         this.isSending = false;
       }
     });

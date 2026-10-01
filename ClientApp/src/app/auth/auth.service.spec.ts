@@ -34,12 +34,29 @@ describe('AuthService', () => {
   });
 
   it('posts registration details to the registration endpoint', () => {
-    service.register({ displayName: 'Ava', email: 'ava@example.com', password: 'Password123!' }).subscribe();
+    service.register({ displayName: 'Ava', email: 'ava@example.com', password: 'Password123!', confirmPassword: 'Password123!' }).subscribe();
     const request = http.expectOne(`${authUrl}/register`);
 
     expect(request.request.method).toBe('POST');
     expect(request.request.body.email).toBe('ava@example.com');
-    request.flush({ userId: 1, displayName: 'Ava', email: 'ava@example.com', token: createToken(Date.now() + 60000) });
+    expect(request.request.body.confirmPassword).toBe('Password123!');
+    request.flush({ message: 'Check your email.' });
+  });
+
+  it('posts a verification token to the verify endpoint', () => {
+    service.verifyEmail('verification-token').subscribe();
+    const request = http.expectOne(`${authUrl}/verify-email`);
+    expect(request.request.method).toBe('POST');
+    expect(request.request.body).toEqual({ token: 'verification-token' });
+    request.flush(null);
+  });
+
+  it('requests a replacement verification link by email', () => {
+    service.resendVerification('ava@example.com').subscribe();
+    const request = http.expectOne(`${authUrl}/resend-verification`);
+    expect(request.request.method).toBe('POST');
+    expect(request.request.body).toEqual({ email: 'ava@example.com' });
+    request.flush({ message: 'If the account exists, a verification email has been sent.' });
   });
 
   it('rejects an expired token', () => {

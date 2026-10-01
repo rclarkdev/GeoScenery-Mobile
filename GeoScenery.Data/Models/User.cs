@@ -12,6 +12,8 @@ public class User
     [Required, MaxLength(320)]
     public string Email { get; set; } = string.Empty;
 
+    public bool IsEmailVerified { get; set; } = true;
+
     [Required]
     public string PasswordHash { get; set; } = string.Empty;
 
@@ -56,4 +58,6 @@ public class User
 
     /// <summary>Block rows targeting this user.</summary>
     public ICollection<UserBlock> BlockedBy { get; set; } = new List<UserBlock>();
+
+    public ICollection<UserRole> Roles { get; set; } = new List<UserRole>();
 }

@@ -7,6 +7,7 @@ import { IonicModule } from '@ionic/angular';
 
 import { AuthPage } from './auth.page';
 import { ResetPasswordPage } from './reset-password.page';
+import { VerifyEmailPage } from './verify-email.page';
 
 const routes: Routes = [
   {
@@ -16,6 +17,10 @@ const routes: Routes = [
   {
     path: 'reset-password',
     component: ResetPasswordPage
+  },
+  {
+    path: 'verify-email',
+    component: VerifyEmailPage
   }
 ];
 
@@ -26,6 +31,6 @@ const routes: Routes = [
     IonicModule,
     RouterModule.forChild(routes)
   ],
-  declarations: [AuthPage, ResetPasswordPage]
+  declarations: [AuthPage, ResetPasswordPage, VerifyEmailPage]
 })
 export class AuthPageModule {}

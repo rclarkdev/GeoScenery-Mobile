@@ -37,19 +37,19 @@
     </section>
 
     <ion-spinner *ngIf="isLoading" class="loading" aria-label="Loading conversation"></ion-spinner>
+
   </main>
+
 </ion-content>
 
-<ion-footer *ngIf="!isLoading && !hasError">
-  <div class="composer" *ngIf="recipient?.canMessage; else lockedComposer">
-    <ion-textarea [(ngModel)]="draft" [disabled]="isSending" placeholder="Write a message..."
-      aria-label="Message" [autoGrow]="true" rows="1" maxlength="2000"
-      (keydown)="handleComposerKeydown($event)"></ion-textarea>
-    <ion-button (click)="sendMessage()" [disabled]="!draft.trim() || isSending" aria-label="Send message" title="Send message">
-      <ion-icon slot="icon-only" name="send-outline"></ion-icon>
-    </ion-button>
-  </div>
-  <ng-template #lockedComposer>
-    <p class="locked-composer"><ion-icon name="lock-closed-outline"></ion-icon> Messaging is available when this user follows you or an existing conversation is open.</p>
-  </ng-template>
-</ion-footer>
+<div class="conversation-composer-dock" *ngIf="!isLoading && !hasError">
+    <div class="composer">
+      <ion-textarea [(ngModel)]="draft" [disabled]="isSending" placeholder="Write a message..."
+        aria-label="Message" [autoGrow]="true" rows="1" maxlength="2000"
+        (keydown)="handleComposerKeydown($event)"></ion-textarea>
+      <ion-button (click)="sendMessage()" [disabled]="!draft.trim() || isSending" aria-label="Send message" title="Send message">
+        <ion-icon slot="icon-only" name="send-outline"></ion-icon>
+      </ion-button>
+    </div>
+    <p class="send-error" *ngIf="sendError" role="alert">{{ sendError }}</p>
+</div>

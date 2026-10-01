@@ -10,6 +10,7 @@ import { UserService } from '../../auth/user.service';
 import { AuthService } from '../../auth/auth.service';
 import { User } from '../../auth/user.model';
 import { ImageUrlPipe } from '../../shared/image-url.pipe';
+import { ContentReportService } from '../../shared/content-report.service';
 
 describe('ProfilePage', () => {
   let component: ProfilePage;
@@ -17,6 +18,7 @@ describe('ProfilePage', () => {
   let authService: jasmine.SpyObj<AuthService>;
   let alertController: jasmine.SpyObj<AlertController>;
   let navController: jasmine.SpyObj<NavController>;
+  let contentReportService: jasmine.SpyObj<ContentReportService>;
 
   function configure(userIdParam: string | null, currentUserId: number | null, user: User) {
     TestBed.resetTestingModule();
@@ -24,6 +26,8 @@ describe('ProfilePage', () => {
     authService = jasmine.createSpyObj('AuthService', ['logout'], { currentUserId });
     alertController = jasmine.createSpyObj('AlertController', ['create']);
     navController = jasmine.createSpyObj('NavController', ['navigateRoot']);
+    contentReportService = jasmine.createSpyObj('ContentReportService', ['reportProfile', 'reportScene']);
+    contentReportService.reportProfile.and.returnValue(of({ id: 1, targetType: 'Profile', targetId: user.id, createdAt: '' }));
     TestBed.configureTestingModule({
       declarations: [ ProfilePage ],
       imports: [ImageUrlPipe, RouterTestingModule],
@@ -42,6 +46,7 @@ describe('ProfilePage', () => {
           }
         },
         { provide: AuthService, useValue: authService },
+        { provide: ContentReportService, useValue: contentReportService },
         { provide: AlertController, useValue: alertController },
         { provide: NavController, useValue: navController },
         { provide: ActivatedRoute, useValue: { paramMap: of(paramMap) } }
@@ -84,6 +89,29 @@ describe('ProfilePage', () => {
 
   it('shows a logout action on the signed-in user profile', () => {
     expect(fixture.nativeElement.textContent).toContain('Log out');
+    expect(fixture.nativeElement.textContent).not.toContain('Report profile');
+  });
+
+  it('prompts for a description and submits a profile report', async () => {
+    const otherUser = new User(2, 'Other user', null);
+    configure('2', 1, otherUser);
+    fixture = TestBed.createComponent(ProfilePage);
+    component = fixture.componentInstance;
+    fixture.detectChanges();
+    alertController.create.and.resolveTo({
+      present: jasmine.createSpy('present').and.resolveTo(undefined),
+      onDidDismiss: jasmine.createSpy('onDidDismiss').and.resolveTo({
+        role: 'confirm',
+        data: { values: { description: 'This profile contains abusive content.' } }
+      })
+    } as any);
+
+    await component.reportProfile();
+
+    expect(contentReportService.reportProfile).toHaveBeenCalledWith(2, {
+      description: 'This profile contains abusive content.'
+    });
+    expect(component.reportFeedback).toContain('Report submitted');
   });
 
   it('confirms logout, clears authentication, and navigates to sign in', async () => {
@@ -222,6 +250,9 @@ describe('ProfilePage', () => {
       providers: [
         { provide: UserService, useValue: userService },
         { provide: AuthService, useValue: { currentUserId: 1 } },
+        { provide: ContentReportService, useValue: jasmine.createSpyObj('ContentReportService', ['reportProfile', 'reportScene']) },
+        { provide: AlertController, useValue: jasmine.createSpyObj('AlertController', ['create']) },
+        { provide: NavController, useValue: jasmine.createSpyObj('NavController', ['navigateRoot']) },
         { provide: ActivatedRoute, useValue: { paramMap: of(new Map([['userId', '2']])) } }
       ],
       schemas: [CUSTOM_ELEMENTS_SCHEMA],

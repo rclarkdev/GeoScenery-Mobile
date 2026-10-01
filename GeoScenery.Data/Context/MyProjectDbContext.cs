@@ -19,18 +19,69 @@ public class MyProjectDbContext : DbContext
     public DbSet<SceneTag> SceneTags => Set<SceneTag>();
     public DbSet<SceneRating> SceneRatings => Set<SceneRating>();
     public DbSet<PasswordResetToken> PasswordResetTokens => Set<PasswordResetToken>();
+    public DbSet<EmailVerificationToken> EmailVerificationTokens => Set<EmailVerificationToken>();
     public DbSet<AppLogEntry> AppLogEntries => Set<AppLogEntry>();
+    public DbSet<Role> Roles => Set<Role>();
+    public DbSet<UserRole> UserRoles => Set<UserRole>();
+    public DbSet<ContentReport> ContentReports => Set<ContentReport>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        modelBuilder.Entity<Role>().HasData(
+            new Role { Name = AppRoles.Member },
+            new Role { Name = AppRoles.Admin });
+
         modelBuilder.Entity<User>().HasData(new User
         {
             Id = 1,
             DisplayName = "Master",
             Email = "vjryanaye@gmail.com",
             PasswordHash = "!",
+            IsEmailVerified = true,
             CreatedAt = new DateTimeOffset(2026, 9, 22, 0, 0, 0, TimeSpan.Zero)
         });
+
+        modelBuilder.Entity<User>()
+            .Property(user => user.IsEmailVerified)
+            .HasDefaultValue(true);
+
+        modelBuilder.Entity<UserRole>().HasData(new UserRole
+        {
+            UserId = 1,
+            RoleName = AppRoles.Admin
+        });
+
+        modelBuilder.Entity<UserRole>()
+            .HasKey(userRole => new { userRole.UserId, userRole.RoleName });
+
+        modelBuilder.Entity<UserRole>()
+            .HasOne(userRole => userRole.User)
+            .WithMany(user => user.Roles)
+            .HasForeignKey(userRole => userRole.UserId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<UserRole>()
+            .HasOne(userRole => userRole.Role)
+            .WithMany(role => role.UserRoles)
+            .HasForeignKey(userRole => userRole.RoleName)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<ContentReport>()
+            .ToTable(table => table.HasCheckConstraint(
+                "CK_ContentReports_TargetType",
+                "TargetType IN ('Profile', 'Scene')"));
+
+        modelBuilder.Entity<ContentReport>()
+            .HasOne(report => report.Reporter)
+            .WithMany()
+            .HasForeignKey(report => report.ReporterId)
+            .OnDelete(DeleteBehavior.SetNull);
+
+        modelBuilder.Entity<ContentReport>()
+            .HasIndex(report => new { report.TargetType, report.TargetId });
+
+        modelBuilder.Entity<ContentReport>()
+            .HasIndex(report => report.CreatedAt);
 
         modelBuilder.Entity<User>()
             .HasIndex(user => user.Email)
@@ -39,6 +90,16 @@ public class MyProjectDbContext : DbContext
         modelBuilder.Entity<PasswordResetToken>()
             .HasIndex(token => token.TokenHash)
             .IsUnique();
+
+        modelBuilder.Entity<EmailVerificationToken>()
+            .HasIndex(token => token.TokenHash)
+            .IsUnique();
+
+        modelBuilder.Entity<EmailVerificationToken>()
+            .HasOne(token => token.User)
+            .WithMany()
+            .HasForeignKey(token => token.UserId)
+            .OnDelete(DeleteBehavior.Cascade);
 
         modelBuilder.Entity<PasswordResetToken>()
             .HasOne(token => token.User)

@@ -1,0 +1,21 @@
+<ion-header>
+  <ion-toolbar>
+    <ion-title>Verify email</ion-title>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content class="ion-padding">
+  <div *ngIf="isVerifying" role="status">
+    <ion-spinner name="crescent"></ion-spinner>
+    <p>Verifying your email address...</p>
+  </div>
+  <section *ngIf="!isVerifying && verified" role="status">
+    <h1>Email verified</h1>
+    <p>Your email address is verified. You can now sign in to GeoScenery.</p>
+  </section>
+  <section *ngIf="!isVerifying && !verified" role="alert">
+    <h1>Verification link unavailable</h1>
+    <p>This link may have expired or already been used. Sign in and request another verification email.</p>
+  </section>
+  <ion-button expand="block" (click)="backToSignIn()">Back to sign in</ion-button>
+</ion-content>

@@ -51,9 +51,20 @@ public sealed class GeoSceneryApiTests
         {
             displayName,
             email,
+            password = "Password123!",
+            confirmPassword = "Password123!"
+        });
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK), await response.Content.ReadAsStringAsync());
+        var verificationToken = _factory.LastVerificationUrl!.Split("token=", StringSplitOptions.None)[1];
+        var verifyResponse = await _client.PostAsJsonAsync("/api/auth/verify-email", new { token = Uri.UnescapeDataString(verificationToken) });
+        Assert.That(verifyResponse.StatusCode, Is.EqualTo(HttpStatusCode.NoContent));
+
+        var loginResponse = await _client.PostAsJsonAsync("/api/auth/login", new
+        {
+            email,
             password = "Password123!"
         });
-        return (await response.Content.ReadFromJsonAsync<AuthResponseModel>())!;
+        return (await loginResponse.Content.ReadFromJsonAsync<AuthResponseModel>())!;
     }
 
     private async Task<SceneResponse> CreateSceneAsync(string title = "Observation Point", string[]? tags = null, double? latitude = null, double? longitude = null)
@@ -118,6 +129,278 @@ public sealed class GeoSceneryApiTests
         var response = await _client.GetAsync("/health/ready");
 
         Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK));
+    }
+
+    [Test]
+    public async Task GivenANewAccount_WhenEmailIsNotVerified_ThenLoginIsForbiddenUntilTheOneTimeLinkIsUsed()
+    {
+        var registration = await _client.PostAsJsonAsync("/api/auth/register", new
+        {
+            displayName = "Unverified user",
+            email = "unverified@example.com",
+            password = "Password123!",
+            confirmPassword = "Password123!"
+        });
+        var loginBeforeVerification = await _client.PostAsJsonAsync("/api/auth/login", new
+        {
+            email = "unverified@example.com",
+            password = "Password123!"
+        });
+        var verificationToken = _factory.LastVerificationUrl!.Split("token=", StringSplitOptions.None)[1];
+        var verify = await _client.PostAsJsonAsync("/api/auth/verify-email", new
+        {
+            token = Uri.UnescapeDataString(verificationToken)
+        });
+        var loginAfterVerification = await _client.PostAsJsonAsync("/api/auth/login", new
+        {
+            email = "unverified@example.com",
+            password = "Password123!"
+        });
+        var reuseToken = await _client.PostAsJsonAsync("/api/auth/verify-email", new
+        {
+            token = Uri.UnescapeDataString(verificationToken)
+        });
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(registration.StatusCode, Is.EqualTo(HttpStatusCode.OK));
+            Assert.That(loginBeforeVerification.StatusCode, Is.EqualTo(HttpStatusCode.Forbidden));
+            Assert.That(verify.StatusCode, Is.EqualTo(HttpStatusCode.NoContent));
+            Assert.That(loginAfterVerification.StatusCode, Is.EqualTo(HttpStatusCode.OK));
+            Assert.That(reuseToken.StatusCode, Is.EqualTo(HttpStatusCode.BadRequest));
+        });
+    }
+
+    [Test]
+    public async Task GivenMismatchedRegistrationPasswords_WhenRegistering_ThenTheAccountIsRejected()
+    {
+        var response = await _client.PostAsJsonAsync("/api/auth/register", new
+        {
+            displayName = "Mismatch",
+            email = "mismatch@example.com",
+            password = "Password123!",
+            confirmPassword = "Different123!"
+        });
+
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.BadRequest));
+        Assert.That(_factory.LastVerificationUrl, Is.Null);
+    }
+
+    [Test]
+    public async Task GivenARegisteredUser_WhenRequestingPasswordRecovery_ThenTheEmailLinkCanResetThePassword()
+    {
+        await RegisterUserAsync("Password recovery", "recovery@example.com");
+
+        var forgotResponse = await _client.PostAsJsonAsync("/api/auth/forgot-password", new
+        {
+            email = "recovery@example.com"
+        });
+        var token = Uri.UnescapeDataString(_factory.LastResetUrl!.Split("token=", StringSplitOptions.None)[1]);
+        var resetResponse = await _client.PostAsJsonAsync("/api/auth/reset-password", new
+        {
+            token,
+            password = "NewPassword123!"
+        });
+        var loginResponse = await _client.PostAsJsonAsync("/api/auth/login", new
+        {
+            email = "recovery@example.com",
+            password = "NewPassword123!"
+        });
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(forgotResponse.StatusCode, Is.EqualTo(HttpStatusCode.OK));
+            Assert.That(resetResponse.StatusCode, Is.EqualTo(HttpStatusCode.NoContent));
+            Assert.That(loginResponse.StatusCode, Is.EqualTo(HttpStatusCode.OK));
+        });
+    }
+
+    [Test]
+    public async Task GivenAnUnverifiedAccount_WhenPasswordIsResetThroughItsEmailLink_ThenTheAccountCanLogIn()
+    {
+        await _client.PostAsJsonAsync("/api/auth/register", new
+        {
+            displayName = "Unverified recovery",
+            email = "unverified-recovery@example.com",
+            password = "Password123!",
+            confirmPassword = "Password123!"
+        });
+        await _client.PostAsJsonAsync("/api/auth/forgot-password", new { email = "unverified-recovery@example.com" });
+        var token = Uri.UnescapeDataString(_factory.LastResetUrl!.Split("token=", StringSplitOptions.None)[1]);
+
+        var resetResponse = await _client.PostAsJsonAsync("/api/auth/reset-password", new
+        {
+            token,
+            password = "NewPassword123!"
+        });
+        var loginResponse = await _client.PostAsJsonAsync("/api/auth/login", new
+        {
+            email = "unverified-recovery@example.com",
+            password = "NewPassword123!"
+        });
+
+        Assert.That(resetResponse.StatusCode, Is.EqualTo(HttpStatusCode.NoContent));
+        Assert.That(loginResponse.StatusCode, Is.EqualTo(HttpStatusCode.OK));
+    }
+
+    [Test]
+    public async Task GivenARegularMember_WhenListingAdminUsers_ThenTheApiForbidsAccess()
+    {
+        var response = await _client.GetAsync("/api/admin/users");
+
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.Forbidden));
+    }
+
+    [Test]
+    public async Task GivenTheConfiguredBootstrapAdmin_WhenAssigningRoles_ThenTheUserGetsAdminPermission()
+    {
+        var admin = await RegisterUserAsync("Admin", "admin@example.com");
+        var member = await RegisterUserAsync("Member", "member@example.com");
+        _client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", admin.Token);
+
+        var updateResponse = await _client.PutAsJsonAsync($"/api/admin/users/{member.UserId}/roles", new
+        {
+            roles = new[] { "Member", "Admin" }
+        });
+        var updatedUser = await updateResponse.Content.ReadFromJsonAsync<AdminUserResponse>();
+        var adminClaims = new JwtSecurityTokenHandler().ReadJwtToken(admin.Token).Claims;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(updateResponse.StatusCode, Is.EqualTo(HttpStatusCode.OK));
+            Assert.That(updatedUser!.Roles, Does.Contain("Admin"));
+            Assert.That(adminClaims, Has.Some.Matches<Claim>(claim => claim.Type == "permission" && claim.Value == "users.roles.manage"));
+        });
+
+        var memberLogin = await _client.PostAsJsonAsync("/api/auth/login", new
+        {
+            email = "member@example.com",
+            password = "Password123!"
+        });
+        var memberAuth = await memberLogin.Content.ReadFromJsonAsync<AuthResponseModel>();
+        _client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", memberAuth!.Token);
+        var adminUsersResponse = await _client.GetAsync("/api/admin/users");
+
+        Assert.That(adminUsersResponse.StatusCode, Is.EqualTo(HttpStatusCode.OK));
+
+        _client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", admin.Token);
+        var demoteResponse = await _client.PutAsJsonAsync($"/api/admin/users/{member.UserId}/roles", new
+        {
+            roles = new[] { "Member" }
+        });
+        _client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", memberAuth.Token);
+        var revokedAccessResponse = await _client.GetAsync("/api/admin/users");
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(demoteResponse.StatusCode, Is.EqualTo(HttpStatusCode.OK));
+            Assert.That(revokedAccessResponse.StatusCode, Is.EqualTo(HttpStatusCode.Forbidden));
+        });
+    }
+
+    [Test]
+    public async Task GivenTheOnlyAdmin_WhenRemovingTheirAdminRole_ThenTheApiRejectsTheChange()
+    {
+        var admin = await RegisterUserAsync("Admin", "admin@example.com");
+        _client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", admin.Token);
+
+        var response = await _client.PutAsJsonAsync($"/api/admin/users/{admin.UserId}/roles", new
+        {
+            roles = new[] { "Member" }
+        });
+
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.BadRequest));
+    }
+
+    [Test]
+    public async Task GivenAProfileReport_WhenSubmittedWithADescription_ThenItIsStoredAndAdminsAreEmailed()
+    {
+        var admin = await RegisterUserAsync("Admin", "admin@example.com");
+        var target = await RegisterUserAsync("Reported user", "reported@example.com");
+
+        var response = await _client.PostAsJsonAsync($"/api/users/{target.UserId}/reports", new
+        {
+            description = "This profile contains targeted harassment."
+        });
+        var report = await response.Content.ReadFromJsonAsync<ContentReportResponse>();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.Created));
+            Assert.That(report!.TargetType, Is.EqualTo(ContentReportTargets.Profile));
+            Assert.That(report.TargetId, Is.EqualTo(target.UserId));
+            Assert.That(_factory.ReportNotifications, Has.Count.EqualTo(1));
+            Assert.That(_factory.ReportNotifications[0].Recipient, Is.EqualTo("admin@example.com"));
+            Assert.That(_factory.ReportNotifications[0].Report.Description, Is.EqualTo("This profile contains targeted harassment."));
+            Assert.That(_factory.ReportNotifications[0].Report.ReporterEmail, Is.EqualTo("test@example.com"));
+        });
+
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<MyProjectDbContext>();
+        Assert.That(await db.ContentReports.CountAsync(), Is.EqualTo(1));
+        Assert.That(admin.UserId, Is.EqualTo(2));
+    }
+
+    [Test]
+    public async Task GivenASceneReport_WhenSubmittedWithADescription_ThenAdminsAreEmailedTheSceneDetails()
+    {
+        var admin = await RegisterUserAsync("Admin", "admin@example.com");
+        Scene scene;
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<MyProjectDbContext>();
+            scene = new Scene
+            {
+                Title = "Reported overlook",
+                Description = "A scene to report.",
+                ImageUrl = "/uploads/reported.jpg",
+                Rating = 0,
+                OwnerUserId = admin.UserId
+            };
+            db.Scenes.Add(scene);
+            await db.SaveChangesAsync();
+        }
+
+        var response = await _client.PostAsJsonAsync($"/api/scenes/{scene.Id}/reports", new
+        {
+            description = "The uploaded image is explicit."
+        });
+        var report = await response.Content.ReadFromJsonAsync<ContentReportResponse>();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.Created));
+            Assert.That(report!.TargetType, Is.EqualTo(ContentReportTargets.Scene));
+            Assert.That(report.TargetId, Is.EqualTo(scene.Id));
+            Assert.That(_factory.ReportNotifications, Has.Count.EqualTo(1));
+            Assert.That(_factory.ReportNotifications[0].Recipient, Is.EqualTo("admin@example.com"));
+            Assert.That(_factory.ReportNotifications[0].Report.TargetLabel, Is.EqualTo("Reported overlook"));
+            Assert.That(_factory.ReportNotifications[0].Report.Description, Is.EqualTo("The uploaded image is explicit."));
+        });
+    }
+
+    [Test]
+    public async Task GivenAnEmptyDescription_WhenReportingAProfile_ThenTheApiRejectsTheReport()
+    {
+        var target = await RegisterUserAsync("Reported user", "reported@example.com");
+
+        var response = await _client.PostAsJsonAsync($"/api/users/{target.UserId}/reports", new
+        {
+            description = "   "
+        });
+
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.BadRequest));
+        Assert.That(_factory.ReportNotifications, Is.Empty);
+    }
+
+    [Test]
+    public async Task GivenTheDefaultMasterAccount_WhenTheDatabaseIsCreated_ThenItHasTheAdminRole()
+    {
+        using var database = new TestDatabase();
+        var role = await database.Context.UserRoles.AsNoTracking()
+            .SingleAsync(userRole => userRole.UserId == 1);
+
+        Assert.That(role.RoleName, Is.EqualTo(AppRoles.Admin));
     }
 
     [Test]
@@ -479,29 +762,27 @@ public sealed class GeoSceneryApiTests
         {
             displayName = "Ava",
             email = "ava@example.com",
-            password = "Password123!"
+            password = "Password123!",
+            confirmPassword = "Password123!"
         });
 
         Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK));
-        var user = await response.Content.ReadFromJsonAsync<AuthResponseModel>();
-        Assert.That(user?.Email, Is.EqualTo("ava@example.com"));
+        var registration = await response.Content.ReadFromJsonAsync<RegistrationResponse>();
+        Assert.That(registration?.Message, Does.Contain("verification link"));
+        Assert.That(_factory.LastVerificationUrl, Does.Contain("token="));
     }
 
     [Test]
     public async Task GivenAnAlreadyRegisteredEmail_WhenRegisteringAgain_ThenTheApiReturnsConflict()
     {
-        await _client.PostAsJsonAsync("/api/auth/register", new
-        {
-            displayName = "Ava",
-            email = "duplicate@example.com",
-            password = "Password123!"
-        });
+        await RegisterUserAsync("Ava", "duplicate@example.com");
 
         var response = await _client.PostAsJsonAsync("/api/auth/register", new
         {
             displayName = "Someone else",
             email = "duplicate@example.com",
-            password = "Password123!"
+            password = "Password123!",
+            confirmPassword = "Password123!"
         });
 
         Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.Conflict));
@@ -510,12 +791,7 @@ public sealed class GeoSceneryApiTests
     [Test]
     public async Task GivenValidCredentials_WhenLoggingIn_ThenTheApiReturnsAToken()
     {
-        await _client.PostAsJsonAsync("/api/auth/register", new
-        {
-            displayName = "Ava",
-            email = "login@example.com",
-            password = "Password123!"
-        });
+        await RegisterUserAsync("Ava", "login@example.com");
 
         var response = await _client.PostAsJsonAsync("/api/auth/login", new
         {
@@ -531,12 +807,7 @@ public sealed class GeoSceneryApiTests
     [Test]
     public async Task GivenAnIncorrectPassword_WhenLoggingIn_ThenTheApiReturnsUnauthorized()
     {
-        await _client.PostAsJsonAsync("/api/auth/register", new
-        {
-            displayName = "Ava",
-            email = "wrongpass@example.com",
-            password = "Password123!"
-        });
+        await RegisterUserAsync("Ava", "wrongpass@example.com");
 
         var response = await _client.PostAsJsonAsync("/api/auth/login", new
         {
@@ -554,7 +825,8 @@ public sealed class GeoSceneryApiTests
         {
             displayName = "Ava",
             email = "shortpass@example.com",
-            password = "short"
+            password = "short",
+            confirmPassword = "short"
         });
 
         Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.BadRequest));
@@ -567,7 +839,8 @@ public sealed class GeoSceneryApiTests
         {
             displayName = "Ava",
             email = "not-an-email",
-            password = "Password123!"
+            password = "Password123!",
+            confirmPassword = "Password123!"
         });
 
         Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.BadRequest));
@@ -603,7 +876,9 @@ public sealed class GeoSceneryApiTests
     {
         await RegisterUserAsync("Throttled", "throttled@example.com");
 
-        for (var i = 0; i < 20; i++)
+        // RegisterUserAsync verifies the email then performs one successful login;
+        // that consumes one request from this IP's 20-request login budget.
+        for (var i = 0; i < 19; i++)
         {
             var attempt = await _client.PostAsJsonAsync("/api/auth/login", new
             {
@@ -651,7 +926,8 @@ public sealed class GeoSceneryApiTests
         {
             displayName = "Below Limit",
             email = "below@example.com",
-            password = "Password123!"
+            password = "Password123!",
+            confirmPassword = "Password123!"
         });
 
         Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK));
@@ -666,7 +942,8 @@ public sealed class GeoSceneryApiTests
             {
                 displayName = $"Spam {i}",
                 email = $"spam{i}@example.com",
-                password = "Password123!"
+                password = "Password123!",
+                confirmPassword = "Password123!"
             });
             Assert.That(attempt.StatusCode, Is.EqualTo(HttpStatusCode.OK));
         }
@@ -675,7 +952,8 @@ public sealed class GeoSceneryApiTests
         {
             displayName = "Spam",
             email = "spam-over@example.com",
-            password = "Password123!"
+            password = "Password123!",
+            confirmPassword = "Password123!"
         });
         Assert.That(exceeded.StatusCode, Is.EqualTo(HttpStatusCode.TooManyRequests));
     }

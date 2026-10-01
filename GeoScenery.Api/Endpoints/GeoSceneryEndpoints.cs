@@ -19,6 +19,8 @@ public static class GeoSceneryEndpoints
         MapSceneEndpoints(api.MapGroup("/scenes"));
         MapVisitEndpoints(api.MapGroup("/visits").RequireAuthorization());
         MapMessageEndpoints(api.MapGroup("/messages").RequireAuthorization());
+        endpoints.MapAdminEndpoints();
+        endpoints.MapReportEndpoints();
         return endpoints;
     }
 

@@ -19,6 +19,17 @@ export interface AuthRequest {
   email: string;
   password: string;
   displayName?: string;
+  confirmPassword?: string;
+}
+
+export interface RegistrationResponse {
+  message: string;
+  developmentToken?: string;
+}
+
+export interface EmailVerificationResponse {
+  message: string;
+  developmentToken?: string;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -36,8 +47,16 @@ export class AuthService {
     return this.http.post<AuthResponse>(`${this.authUrl}/login`, request).pipe(tap(response => this.store(response)));
   }
 
-  register(request: AuthRequest): Observable<AuthResponse> {
-    return this.http.post<AuthResponse>(`${this.authUrl}/register`, request).pipe(tap(response => this.store(response)));
+  register(request: AuthRequest): Observable<RegistrationResponse> {
+    return this.http.post<RegistrationResponse>(`${this.authUrl}/register`, request);
+  }
+
+  verifyEmail(token: string): Observable<void> {
+    return this.http.post<void>(`${this.authUrl}/verify-email`, { token });
+  }
+
+  resendVerification(email: string): Observable<EmailVerificationResponse> {
+    return this.http.post<EmailVerificationResponse>(`${this.authUrl}/resend-verification`, { email });
   }
 
   requestPasswordReset(email: string): Observable<PasswordResetResponse> {

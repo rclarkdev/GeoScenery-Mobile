@@ -3,7 +3,7 @@ import { ComponentFixture, TestBed, waitForAsync } from '@angular/core/testing';
 import { ActivatedRoute } from '@angular/router';
 import { HttpClientTestingModule } from '@angular/common/http/testing';
 import { RouterTestingModule } from '@angular/router/testing';
-import { NavController } from '@ionic/angular';
+import { AlertController, NavController } from '@ionic/angular';
 import { of, throwError } from 'rxjs';
 
 import { SceneDetailPage } from './scene-detail.page';
@@ -14,11 +14,14 @@ import { User } from '../../../auth/user.model';
 import { UserService } from '../../../auth/user.service';
 import { VisitsService } from '../../../visits/visits.service';
 import { ImageUrlPipe } from '../../../shared/image-url.pipe';
+import { ContentReportService } from '../../../shared/content-report.service';
 
 describe('SceneDetailPage', () => {
   let component: SceneDetailPage;
   let fixture: ComponentFixture<SceneDetailPage>;
   let sceneryService: jasmine.SpyObj<SceneryService>;
+  let alertController: jasmine.SpyObj<AlertController>;
+  let contentReportService: jasmine.SpyObj<ContentReportService>;
 
   function configure(scene: Scene, currentUserId: number | null) {
     TestBed.resetTestingModule();
@@ -26,6 +29,9 @@ describe('SceneDetailPage', () => {
     sceneryService.getScene.and.returnValue(of(scene));
     sceneryService.rateScene.and.returnValue(of(scene));
     sceneryService.removeRating.and.returnValue(of(undefined));
+    alertController = jasmine.createSpyObj('AlertController', ['create']);
+    contentReportService = jasmine.createSpyObj('ContentReportService', ['reportProfile', 'reportScene']);
+    contentReportService.reportScene.and.returnValue(of({ id: 1, targetType: 'Scene', targetId: scene.id, createdAt: '' }));
 
     TestBed.configureTestingModule({
       declarations: [ SceneDetailPage ],
@@ -36,6 +42,8 @@ describe('SceneDetailPage', () => {
         { provide: AuthService, useValue: { currentUserId } },
         { provide: UserService, useValue: { getUser: jasmine.createSpy('getUser').and.returnValue(of(new User(2, 'Scene owner', null))) } },
         { provide: VisitsService, useValue: { recordVisit: jasmine.createSpy('recordVisit').and.returnValue(of({})) } },
+        { provide: AlertController, useValue: alertController },
+        { provide: ContentReportService, useValue: contentReportService },
         { provide: NavController, useValue: { navigateBack: jasmine.createSpy('navigateBack') } }
       ],
       schemas: [CUSTOM_ELEMENTS_SCHEMA],
@@ -71,6 +79,24 @@ describe('SceneDetailPage', () => {
 
   it('is not the owner when the current user does not own the scene', () => {
     expect(component.isOwnScene).toBe(false);
+    expect(fixture.nativeElement.textContent).toContain('Report scene');
+  });
+
+  it('prompts for a description and submits a scene report', async () => {
+    alertController.create.and.resolveTo({
+      present: jasmine.createSpy('present').and.resolveTo(undefined),
+      onDidDismiss: jasmine.createSpy('onDidDismiss').and.resolveTo({
+        role: 'confirm',
+        data: { values: { description: 'This scene image is inappropriate.' } }
+      })
+    } as any);
+
+    await component.reportScene();
+
+    expect(contentReportService.reportScene).toHaveBeenCalledWith(1, {
+      description: 'This scene image is inappropriate.'
+    });
+    expect(component.reportFeedback).toContain('Report submitted');
   });
 
   it('links the scene owner to their public profile', () => {

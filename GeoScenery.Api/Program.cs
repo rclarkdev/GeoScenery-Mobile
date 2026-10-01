@@ -9,6 +9,7 @@ using GeoScenery.Api.Storage;
 using GeoScenery.Data.Context;
 using GeoScenery.Data.Services;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.RateLimiting;
@@ -66,7 +67,12 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             ValidateIssuerSigningKey = true
         };
     });
-builder.Services.AddAuthorization();
+builder.Services.AddAuthorization(options =>
+{
+    options.AddPolicy(AuthorizationPolicies.ManageUserRoles, policy =>
+    policy.AddRequirements(new PermissionRequirement(AppPermissions.ManageUserRoles)));
+});
+builder.Services.AddScoped<IAuthorizationHandler, PermissionAuthorizationHandler>();
 builder.Services.AddRateLimiter(options =>
 {
     // Password-reset budget: partitioned so one abusive client cannot exhaust the
@@ -115,6 +121,26 @@ builder.Services.AddRateLimiter(options =>
             {
                 PermitLimit = 10,
                 Window = TimeSpan.FromMinutes(15),
+                QueueLimit = 0
+            }));
+
+    options.AddPolicy("content-report", context =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: GetRateLimitPartitionKey(context),
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 5,
+                Window = TimeSpan.FromHours(1),
+                QueueLimit = 0
+            }));
+
+    options.AddPolicy("email-verification", context =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 5,
+                Window = TimeSpan.FromHours(1),
                 QueueLimit = 0
             }));
 
@@ -187,8 +213,8 @@ app.UseStaticFiles(new StaticFileOptions
     FileProvider = new PhysicalFileProvider(storageRoot),
     RequestPath = "/uploads"
 });
-app.UseRateLimiter();
 app.UseAuthentication();
+app.UseRateLimiter();
 app.UseAuthorization();
 app.UseMiddleware<SqlRequestLoggingMiddleware>();
 app.MapHealthEndpoints();

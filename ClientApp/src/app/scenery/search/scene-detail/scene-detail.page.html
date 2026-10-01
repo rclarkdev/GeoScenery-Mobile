@@ -96,5 +96,15 @@
         <ion-note class="action-note" color="danger" *ngIf="visitError">Unable to record this visit.</ion-note>
       </section>
     </ng-template>
+
+    <section class="scene-section report-section" *ngIf="!isOwnScene" aria-label="Report scene">
+      <ion-button fill="clear" color="danger" [disabled]="isReporting" (click)="reportScene()">
+        <ion-icon slot="start" name="flag-outline"></ion-icon>
+        {{ isReporting ? 'Submitting report...' : 'Report scene' }}
+      </ion-button>
+      <ion-note [color]="reportFeedbackIsError ? 'danger' : 'success'" role="status" *ngIf="reportFeedback">
+        {{ reportFeedback }}
+      </ion-note>
+    </section>
   </main>
 </ion-content>

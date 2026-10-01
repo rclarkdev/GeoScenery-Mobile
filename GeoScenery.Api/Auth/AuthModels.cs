@@ -12,6 +12,9 @@ public sealed record RegisterRequest
 
     [Required, MinLength(8), MaxLength(128)]
     public required string Password { get; init; }
+
+    [Required, Compare(nameof(Password))]
+    public required string ConfirmPassword { get; init; }
 }
 
 public sealed record LoginRequest
@@ -24,6 +27,22 @@ public sealed record LoginRequest
 }
 
 public sealed record AuthResponse(long UserId, string DisplayName, string Email, string Token);
+
+public sealed record RegistrationResponse(string Message, string? DevelopmentToken = null);
+
+public sealed record EmailVerificationResponse(string Message, string? DevelopmentToken = null);
+
+public sealed record ResendVerificationRequest
+{
+    [Required, EmailAddress, MaxLength(320)]
+    public required string Email { get; init; }
+}
+
+public sealed record VerifyEmailRequest
+{
+    [Required]
+    public required string Token { get; init; }
+}
 
 public sealed record ForgotPasswordRequest
 {

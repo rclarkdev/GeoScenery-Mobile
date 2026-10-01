@@ -14,11 +14,14 @@ public sealed class GeoSceneryApiFactory : WebApplicationFactory<Program>
 {
     private readonly SqliteConnection _connection = new("Data Source=:memory:");
     public string? LastResetUrl { get; private set; }
+    public string? LastVerificationUrl { get; private set; }
+    public List<(string Recipient, ContentReportNotification Report)> ReportNotifications { get; } = [];
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         _connection.Open();
         builder.UseEnvironment("Testing");
+        builder.UseSetting("Authorization:BootstrapAdminUserId", "2");
         // Enable forwarded header handling in the test host so tests can simulate
         // distinct client IPs via X-Forwarded-For when exercising partitioned
         // rate limits. Requests that do not set the header behave as before.
@@ -58,6 +61,8 @@ public sealed class GeoSceneryApiFactory : WebApplicationFactory<Program>
             testUser.DisplayName = "Test User";
             testUser.Email = "test@example.com";
             testUser.PasswordHash = "test-password-hash";
+            context.UserRoles.RemoveRange(context.UserRoles.Where(userRole => userRole.UserId == testUser.Id));
+            context.UserRoles.Add(new UserRole { UserId = testUser.Id, RoleName = AppRoles.Member });
             context.SaveChanges();
         });
     }
@@ -67,6 +72,19 @@ public sealed class GeoSceneryApiFactory : WebApplicationFactory<Program>
         public Task SendPasswordResetAsync(string recipient, string resetUrl, CancellationToken cancellationToken = default)
         {
             factory.LastResetUrl = resetUrl;
+            return Task.CompletedTask;
+        }
+
+        public Task SendEmailVerificationAsync(string recipient, string verificationUrl, CancellationToken cancellationToken = default)
+        {
+            factory.LastVerificationUrl = verificationUrl;
+            return Task.CompletedTask;
+        }
+
+        public Task SendContentReportNotificationAsync(string recipient, ContentReportNotification report,
+            CancellationToken cancellationToken = default)
+        {
+            factory.ReportNotifications.Add((recipient, report));
             return Task.CompletedTask;
         }
     }

@@ -42,6 +42,15 @@
           Block
         </ion-button>
       </div>
+      <ion-button *ngIf="!isOwnProfile" class="identity-action" fill="clear" color="danger"
+        [disabled]="isReporting" (click)="reportProfile()">
+        <ion-icon slot="start" name="flag-outline"></ion-icon>
+        {{ isReporting ? 'Submitting report...' : 'Report profile' }}
+      </ion-button>
+      <ion-note class="relationship-status" [color]="reportFeedbackIsError ? 'danger' : 'success'"
+        role="status" *ngIf="reportFeedback">
+        {{ reportFeedback }}
+      </ion-note>
       <ion-note class="relationship-status" color="medium"
         *ngIf="!isOwnProfile && user.hasBlockedCurrentUser && !user.isBlockedByCurrentUser">
         You can't follow this profile.

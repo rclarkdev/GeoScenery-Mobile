@@ -4,6 +4,7 @@ import { AlertController, NavController } from '@ionic/angular';
 import { AuthService } from '../../auth/auth.service';
 import { User } from '../../auth/user.model';
 import { UserService } from '../../auth/user.service';
+import { ContentReportService } from '../../shared/content-report.service';
 
 @Component({
   selector: 'app-profile',
@@ -16,12 +17,16 @@ export class ProfilePage implements OnInit {
   isFollowChanging = false;
   isBlockChanging = false;
   relationshipError = false;
+  isReporting = false;
+  reportFeedback: string | null = null;
+  reportFeedbackIsError = false;
   private viewedUserId: number | null = null;
 
   constructor(
     private route: ActivatedRoute,
     private authService: AuthService,
     private userService: UserService,
+    private contentReportService: ContentReportService,
     private alertController: AlertController,
     private navController: NavController
   ) { }
@@ -85,6 +90,55 @@ export class ProfilePage implements OnInit {
       ]
     });
     await alert.present();
+  }
+
+  async reportProfile(): Promise<void> {
+    const reportedUser = this.user;
+    if (!reportedUser || this.isOwnProfile || this.isReporting) {
+      return;
+    }
+
+    const alert = await this.alertController.create({
+      header: `Report ${reportedUser.displayName}'s profile`,
+      message: 'Describe the inappropriate content or behavior. Your report will be sent to the site administrators.',
+      inputs: [{
+        name: 'description',
+        type: 'textarea',
+        placeholder: 'Describe the violation...',
+        attributes: { maxlength: 2000, rows: 5 }
+      }],
+      buttons: [
+        { text: 'Cancel', role: 'cancel' },
+        { text: 'Submit report', role: 'confirm' }
+      ]
+    });
+    await alert.present();
+    const result = await alert.onDidDismiss();
+    if (result.role !== 'confirm') {
+      return;
+    }
+
+    const description = String(result.data?.values?.description ?? '').trim();
+    if (!description) {
+      this.reportFeedback = 'Enter a description of the violation before submitting.';
+      this.reportFeedbackIsError = true;
+      return;
+    }
+
+    this.isReporting = true;
+    this.reportFeedback = null;
+    this.contentReportService.reportProfile(reportedUser.id, { description }).subscribe({
+      next: () => {
+        this.isReporting = false;
+        this.reportFeedback = 'Report submitted. Thank you for helping keep GeoScenery safe.';
+        this.reportFeedbackIsError = false;
+      },
+      error: () => {
+        this.isReporting = false;
+        this.reportFeedback = 'Unable to submit your report. Please try again.';
+        this.reportFeedbackIsError = true;
+      }
+    });
   }
 
   unblockUser(): void {

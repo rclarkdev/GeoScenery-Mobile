@@ -5,7 +5,7 @@
 </ion-header>
 
 <ion-content class="ion-padding">
-  <form [formGroup]="authForm" (ngSubmit)="onSubmit()">
+  <form *ngIf="!registrationComplete" [formGroup]="authForm" (ngSubmit)="onSubmit()">
     <ion-item *ngIf="isRegistering">
       <ion-input label="Display name" labelPlacement="stacked" formControlName="displayName"></ion-input>
     </ion-item>
@@ -18,6 +18,13 @@
     <ion-item>
       <ion-input label="Password" labelPlacement="stacked" type="password" formControlName="password"></ion-input>
     </ion-item>
+    <ion-item *ngIf="isRegistering">
+      <ion-input label="Confirm password" labelPlacement="stacked" type="password" formControlName="confirmPassword"></ion-input>
+    </ion-item>
+    <ion-note color="danger" *ngIf="isRegistering && authForm.controls.confirmPassword.touched
+      && authForm.controls.password.value !== authForm.controls.confirmPassword.value">
+      Passwords must match.
+    </ion-note>
     <ion-note color="danger" *ngIf="authError">{{ authError }}</ion-note>
       <ion-note color="success" *ngIf="recoverySent">If an account exists, a reset link has been sent.</ion-note>
     <ion-note color="medium" *ngIf="developmentResetToken">
@@ -27,12 +34,34 @@
       {{ isSubmitting ? 'Please wait...' : (isRegistering ? 'Create account' : 'Sign in') }}
     </ion-button>
   </form>
-  <ion-button *ngIf="!isRegistering" expand="block" fill="clear" (click)="onForgotPassword()">
+  <section *ngIf="registrationComplete" class="auth-status" role="status">
+    <h2>Check your email</h2>
+    <p>We sent a verification link to {{ authForm.controls.email.value }}. Verify your email address before signing in.</p>
+    <ion-note color="medium" *ngIf="developmentVerificationToken">
+      Development verification token: {{ developmentVerificationToken }}
+    </ion-note>
+    <ion-note color="danger" *ngIf="verificationError" role="alert">{{ verificationError }}</ion-note>
+    <ion-note color="success" *ngIf="verificationResent">If the account exists and needs verification, another email has been sent.</ion-note>
+    <ion-button expand="block" fill="outline" [disabled]="isSubmitting" (click)="onResendVerification()">
+      {{ isSubmitting ? 'Please wait...' : 'Resend verification email' }}
+    </ion-button>
+  </section>
+  <ion-button *ngIf="!isRegistering && !registrationComplete" expand="block" fill="clear" (click)="onForgotPassword()">
     Forgot password?
   </ion-button>
-  <ion-button expand="block" fill="clear" (click)="toggleMode()">
+  <ion-button *ngIf="!registrationComplete" expand="block" fill="clear" (click)="toggleMode()">
     {{ isRegistering ? 'Already have an account? Sign in' : 'Need an account? Register' }}
   </ion-button>
+  <ion-button *ngIf="canResendVerification && !registrationComplete" expand="block" fill="outline"
+    [disabled]="isSubmitting" (click)="onResendVerification()">
+    Resend verification email
+  </ion-button>
+  <ion-note color="success" *ngIf="verificationResent && !registrationComplete" role="status">
+    If the account exists and needs verification, another email has been sent.
+  </ion-note>
+  <ion-note color="danger" *ngIf="verificationError && !registrationComplete" role="alert">
+    {{ verificationError }}
+  </ion-note>
   <ion-button expand="block" fill="clear" routerLink="/about">
     About GeoScenery
   </ion-button>
