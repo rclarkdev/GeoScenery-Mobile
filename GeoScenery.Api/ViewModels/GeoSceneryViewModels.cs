@@ -125,6 +125,34 @@ public sealed record UserSummaryResponse(long Id, string DisplayName, string? Pr
 /// <summary>Administrative view of a user's account and assigned application roles.</summary>
 public sealed record AdminUserResponse(long Id, string DisplayName, string Email, IReadOnlyList<string> Roles);
 
+/// <summary>Report information visible to administrators.</summary>
+public sealed record AdminContentReportResponse(
+    long Id,
+    string TargetType,
+    long TargetId,
+    string TargetLabel,
+    string ReporterDisplayName,
+    string ReporterEmail,
+    string Description,
+    string Status,
+    DateTimeOffset CreatedAt,
+    DateTimeOffset? ResolvedAt,
+    string? ResolutionNotes,
+    string? ActionTaken);
+
+/// <summary>Updates the moderation status and optional resolution note.</summary>
+public sealed record UpdateContentReportStatusRequest
+{
+    [Required, MaxLength(20)]
+    public required string Status { get; init; }
+
+    [MaxLength(1000)]
+    public string? ResolutionNotes { get; init; }
+
+    [MaxLength(50)]
+    public string? ActionTaken { get; init; }
+}
+
 /// <summary>Replaces the roles assigned to a user.</summary>
 public sealed record UpdateUserRolesRequest
 {

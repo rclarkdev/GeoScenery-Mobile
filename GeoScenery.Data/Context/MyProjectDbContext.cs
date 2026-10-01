@@ -67,9 +67,19 @@ public class MyProjectDbContext : DbContext
             .OnDelete(DeleteBehavior.Cascade);
 
         modelBuilder.Entity<ContentReport>()
-            .ToTable(table => table.HasCheckConstraint(
-                "CK_ContentReports_TargetType",
-                "TargetType IN ('Profile', 'Scene')"));
+            .ToTable(table =>
+            {
+                table.HasCheckConstraint(
+                    "CK_ContentReports_TargetType",
+                    "TargetType IN ('Profile', 'Scene')");
+                table.HasCheckConstraint(
+                    "CK_ContentReports_Status",
+                    "Status IN ('Pending', 'Reviewed', 'Dismissed', 'Actioned')");
+            });
+
+        modelBuilder.Entity<ContentReport>()
+            .Property(report => report.Status)
+            .HasDefaultValue(ContentReportStatuses.Pending);
 
         modelBuilder.Entity<ContentReport>()
             .HasOne(report => report.Reporter)

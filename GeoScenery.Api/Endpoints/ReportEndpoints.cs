@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using GeoScenery.Api.Auth;
+using GeoScenery.Api.Logging;
 using GeoScenery.Api.ViewModels;
 using GeoScenery.Data.Context;
 using GeoScenery.Data.Models;
@@ -17,7 +18,7 @@ public static class ReportEndpoints
             .RequireRateLimiting("content-report");
         userReports.MapPost("/{targetId:long}/reports", async Task<Results<Created<ContentReportResponse>, NotFound, BadRequest<string>>>
             (long targetId, CreateContentReportRequest request, ClaimsPrincipal principal, MyProjectDbContext db,
-                IEmailSender emailSender, ILoggerFactory loggerFactory, CancellationToken cancellationToken) =>
+                IEmailSender emailSender, HttpContext context, CancellationToken cancellationToken) =>
         {
             var reporterId = GetUserId(principal);
             if (string.IsNullOrWhiteSpace(request.Description))
@@ -40,7 +41,7 @@ public static class ReportEndpoints
             }
 
             var report = await CreateReportAsync(reporterId, ContentReportTargets.Profile, targetId, target,
-                request, db, emailSender, loggerFactory, cancellationToken);
+                request, db, emailSender, context, cancellationToken);
             return TypedResults.Created($"/api/reports/{report.Id}",
                 new ContentReportResponse(report.Id, report.TargetType, report.TargetId, report.CreatedAt));
         })
@@ -51,7 +52,7 @@ public static class ReportEndpoints
             .RequireRateLimiting("content-report");
         sceneReports.MapPost("/{targetId:long}/reports", async Task<Results<Created<ContentReportResponse>, NotFound, BadRequest<string>>>
             (long targetId, CreateContentReportRequest request, ClaimsPrincipal principal, MyProjectDbContext db,
-                IEmailSender emailSender, ILoggerFactory loggerFactory, CancellationToken cancellationToken) =>
+                IEmailSender emailSender, HttpContext context, CancellationToken cancellationToken) =>
         {
             var reporterId = GetUserId(principal);
             if (string.IsNullOrWhiteSpace(request.Description))
@@ -74,7 +75,7 @@ public static class ReportEndpoints
             }
 
             var report = await CreateReportAsync(reporterId, ContentReportTargets.Scene, targetId, target.Title,
-                request, db, emailSender, loggerFactory, cancellationToken);
+                request, db, emailSender, context, cancellationToken);
             return TypedResults.Created($"/api/reports/{report.Id}",
                 new ContentReportResponse(report.Id, report.TargetType, report.TargetId, report.CreatedAt));
         })
@@ -85,7 +86,7 @@ public static class ReportEndpoints
 
     private static async Task<ContentReport> CreateReportAsync(long reporterId, string targetType, long targetId,
         string targetLabel, CreateContentReportRequest request, MyProjectDbContext db, IEmailSender emailSender,
-        ILoggerFactory loggerFactory, CancellationToken cancellationToken)
+        HttpContext context, CancellationToken cancellationToken)
     {
         var description = request.Description.Trim();
 
@@ -112,26 +113,59 @@ public static class ReportEndpoints
             .Select(userRole => userRole.User.Email)
             .Distinct()
             .ToListAsync(cancellationToken);
-        var logger = loggerFactory.CreateLogger("ContentReports");
         if (adminEmails.Count == 0)
         {
-            logger.LogError("Content report {ReportId} was saved but no administrator is assigned to receive it.", report.Id);
+            RequestAuditContext.Set(context, "operation", "content-report");
+            RequestAuditContext.Set(context, "reportId", report.Id);
+            RequestAuditContext.Set(context, "notificationOutcome", "no-admin-recipients");
+            RequestAuditContext.Set(context, "operationOutcome", "PartialFailure");
             return report;
         }
 
         var notification = new ContentReportNotification(report.Id, report.TargetType, report.TargetId,
             report.TargetLabel, report.ReporterDisplayName, report.ReporterEmail, report.Description, report.CreatedAt);
+        var sentNotifications = 0;
+        var skippedNotifications = 0;
+        var failedNotifications = 0;
+        string? notificationFailureType = null;
         foreach (var adminEmail in adminEmails)
         {
             try
             {
-                await emailSender.SendContentReportNotificationAsync(adminEmail, notification, cancellationToken);
+                var outcome = await emailSender.SendContentReportNotificationAsync(adminEmail, notification, cancellationToken);
+                if (outcome == EmailDeliveryOutcome.Sent)
+                {
+                    sentNotifications++;
+                }
+                else if (outcome == EmailDeliveryOutcome.SkippedDevelopment)
+                {
+                    skippedNotifications++;
+                }
+                else
+                {
+                    failedNotifications++;
+                }
             }
             catch (Exception exception) when (exception is not OperationCanceledException)
             {
-                logger.LogError(exception, "Unable to send content report {ReportId} notification to an administrator.", report.Id);
+                failedNotifications++;
+                notificationFailureType ??= exception.GetType().Name;
+                RequestAuditContext.Set(context, "notificationFailureStackTrace", exception.StackTrace);
             }
         }
+
+        RequestAuditContext.Set(context, "operation", "content-report");
+        RequestAuditContext.Set(context, "reportId", report.Id);
+        RequestAuditContext.Set(context, "notificationRecipients", adminEmails.Count);
+        RequestAuditContext.Set(context, "notificationsSent", sentNotifications);
+        RequestAuditContext.Set(context, "notificationsSkippedDevelopment", skippedNotifications);
+        RequestAuditContext.Set(context, "notificationFailures", failedNotifications);
+        RequestAuditContext.Set(context, "notificationFailureType", notificationFailureType);
+        RequestAuditContext.Set(context, "notificationOutcome", failedNotifications > 0 ? "failed-or-partial"
+            : skippedNotifications == adminEmails.Count ? "skipped-development"
+            : skippedNotifications > 0 ? "sent-with-development-skips" : "sent");
+        RequestAuditContext.Set(context, "operationOutcome", failedNotifications == 0 ? "Success"
+            : sentNotifications == 0 && skippedNotifications == 0 ? "Failure" : "PartialFailure");
 
         return report;
     }

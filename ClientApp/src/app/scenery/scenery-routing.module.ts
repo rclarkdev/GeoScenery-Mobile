@@ -50,6 +50,10 @@ const routes: Routes = [
                 loadChildren: () => import('../messages/messages.module').then(m => m.MessagesModule)
             },
             {
+                path: 'admin',
+                loadChildren: () => import('../admin/admin.module').then(m => m.AdminModule)
+            },
+            {
                 path: '',
                 redirectTo: '/scenery/tabs/search',
                 pathMatch: 'full'

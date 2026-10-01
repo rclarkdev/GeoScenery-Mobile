@@ -202,11 +202,8 @@ if (builder.Configuration.GetValue("ForwardedHeaders:Enabled", false))
     });
 }
 
-if (app.Environment.IsDevelopment())
-{
-    app.MapOpenApi();
-}
-
+app.UseMiddleware<SqlRequestLoggingMiddleware>();
+app.UseMiddleware<ApiExceptionHandlingMiddleware>();
 app.UseCors("ClientApp");
 app.UseStaticFiles(new StaticFileOptions
 {
@@ -216,7 +213,12 @@ app.UseStaticFiles(new StaticFileOptions
 app.UseAuthentication();
 app.UseRateLimiter();
 app.UseAuthorization();
-app.UseMiddleware<SqlRequestLoggingMiddleware>();
+
+if (app.Environment.IsDevelopment())
+{
+    app.MapOpenApi();
+}
+
 app.MapHealthEndpoints();
 app.MapAuthEndpoints(builder.Configuration);
 app.MapGeoSceneryEndpoints();

@@ -5,8 +5,10 @@ using System.Security.Claims;
 using System.Text;
 using GeoScenery.Api.ViewModels;
 using GeoScenery.Api.Auth;
+using GeoScenery.Api.Logging;
 using GeoScenery.Data.Context;
 using GeoScenery.Data.Models;
+using Microsoft.AspNetCore.Http;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.EntityFrameworkCore;
@@ -117,10 +119,76 @@ public sealed class GeoSceneryApiTests
         var response = await _client.GetAsync("/api/scenes");
 
         Assert.That(response.Headers.TryGetValues("X-Correlation-ID", out var values), Is.True);
-        Assert.That(values!.Single(), Is.Not.Empty);
+        var correlationId = values!.Single();
+        Assert.That(correlationId, Is.Not.Empty);
         using var scope = _factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<MyProjectDbContext>();
-        Assert.That(await db.AppLogEntries.AnyAsync(log => log.EventName == "HttpRequest" && log.RequestPath == "/api/scenes"), Is.True);
+        var entries = await db.AppLogEntries.AsNoTracking()
+            .Where(log => log.CorrelationId == correlationId && log.EventName == "HttpRequest")
+            .ToListAsync();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(entries, Has.Count.EqualTo(1), "Each request should produce exactly one database log row.");
+            Assert.That(entries[0].RequestPath, Is.EqualTo("/api/scenes"));
+            Assert.That(entries[0].StatusCode, Is.EqualTo((int)HttpStatusCode.OK));
+            Assert.That(entries[0].DurationMilliseconds, Is.Not.Null);
+            Assert.That(entries[0].PropertiesJson, Does.Contain("Success"));
+        });
+    }
+
+    [Test]
+    public async Task GivenAnApiRequestFails_WhenItReturnsNotFound_ThenOneFailureEntryIsStored()
+    {
+        var response = await _client.GetAsync("/api/scenes/987654321");
+        var correlationId = response.Headers.GetValues("X-Correlation-ID").Single();
+
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<MyProjectDbContext>();
+        var entries = await db.AppLogEntries.AsNoTracking()
+            .Where(log => log.CorrelationId == correlationId)
+            .ToListAsync();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.NotFound));
+            Assert.That(entries, Has.Count.EqualTo(1));
+            Assert.That(entries[0].Level, Is.EqualTo("Warning"));
+            Assert.That(entries[0].StatusCode, Is.EqualTo((int)HttpStatusCode.NotFound));
+            Assert.That(entries[0].PropertiesJson, Does.Contain("Rejected"));
+        });
+    }
+
+    [Test]
+    public async Task GivenAuditPropertiesContainSecrets_WhenPersisted_ThenSecretsAndQueryStringsAreRedacted()
+    {
+        using var scope = _factory.Services.CreateScope();
+        var auditLog = scope.ServiceProvider.GetRequiredService<ISqlAuditLog>();
+        var context = new DefaultHttpContext();
+        context.Request.Method = "GET";
+        context.Request.Path = "/auth/reset-password";
+        context.Request.QueryString = new QueryString("?token=query-secret");
+        context.Response.Headers["X-Correlation-ID"] = "redaction-test";
+
+        await auditLog.WriteAsync(context, "Information", "RedactionTest", "Audit test.", properties:
+            new Dictionary<string, object?>
+            {
+                ["outcome"] = "Success",
+                ["resetToken"] = "body-secret"
+            });
+
+        using var verificationScope = _factory.Services.CreateScope();
+        var db = verificationScope.ServiceProvider.GetRequiredService<MyProjectDbContext>();
+        var entry = await db.AppLogEntries.AsNoTracking()
+            .SingleAsync(log => log.CorrelationId == "redaction-test");
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(entry.RequestPath, Is.EqualTo("/auth/reset-password"));
+            Assert.That(entry.PropertiesJson, Does.Contain("[REDACTED]"));
+            Assert.That(entry.PropertiesJson, Does.Not.Contain("query-secret"));
+            Assert.That(entry.PropertiesJson, Does.Not.Contain("body-secret"));
+        });
     }
 
     [Test]
@@ -313,6 +381,98 @@ public sealed class GeoSceneryApiTests
     }
 
     [Test]
+    public async Task GivenTheOnlyAdmin_WhenDeletingThatAccount_ThenTheApiRejectsTheChange()
+    {
+        var admin = await RegisterUserAsync("Admin", "admin@example.com");
+        _client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", admin.Token);
+
+        var response = await _client.DeleteAsync($"/api/admin/users/{admin.UserId}");
+
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.BadRequest));
+    }
+
+    [Test]
+    public async Task GivenAProfileReport_WhenAnAdminReviewsAndDeletesTheAccount_ThenTheReportIsResolvedAndRelatedRowsAreCleaned()
+    {
+        var admin = await RegisterUserAsync("Admin", "admin@example.com");
+        var reportedUser = await RegisterUserAsync("Reported", "reported@example.com");
+        Scene scene;
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<MyProjectDbContext>();
+            scene = new Scene
+            {
+                Title = "Reported user scene",
+                Description = "Owned by account to remove.",
+                ImageUrl = "/uploads/admin-delete.jpg",
+                OwnerUserId = reportedUser.UserId
+            };
+            db.Scenes.Add(scene);
+            await db.SaveChangesAsync();
+            db.Follows.Add(new Follow { FollowerId = 1, FollowingId = reportedUser.UserId });
+            db.UserBlocks.Add(new UserBlock { BlockerId = reportedUser.UserId, BlockedId = 1 });
+            db.Messages.Add(new Message
+            {
+                SenderId = reportedUser.UserId,
+                RecipientId = 1,
+                Body = "A test message."
+            });
+            db.Visits.Add(new Visit { UserId = reportedUser.UserId, SceneId = scene.Id });
+            await db.SaveChangesAsync();
+        }
+
+        var reportResponse = await _client.PostAsJsonAsync($"/api/users/{reportedUser.UserId}/reports", new
+        {
+            description = "This profile is inappropriate."
+        });
+        var report = await reportResponse.Content.ReadFromJsonAsync<ContentReportResponse>()
+            ?? throw new InvalidOperationException("The profile report was not returned.");
+
+        _client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", admin.Token);
+        var listResponse = await _client.GetAsync("/api/admin/reports?status=Pending");
+        if (listResponse.StatusCode != HttpStatusCode.OK)
+        {
+            var failureCorrelation = listResponse.Headers.GetValues("X-Correlation-ID").Single();
+            using var failureScope = _factory.Services.CreateScope();
+            var failureDb = failureScope.ServiceProvider.GetRequiredService<MyProjectDbContext>();
+            var failureLog = await failureDb.AppLogEntries.AsNoTracking()
+                .SingleAsync(entry => entry.CorrelationId == failureCorrelation);
+            Assert.Fail($"Admin report list failed: {failureLog.PropertiesJson}");
+        }
+        var listedReports = await listResponse.Content.ReadFromJsonAsync<List<AdminContentReportResponse>>();
+        var reviewResponse = await _client.PutAsJsonAsync($"/api/admin/reports/{report.Id}/status", new
+        {
+            status = "Reviewed",
+            resolutionNotes = "Reviewed before action."
+        });
+        var deleteResponse = await _client.DeleteAsync($"/api/admin/users/{reportedUser.UserId}");
+
+        using var verifyScope = _factory.Services.CreateScope();
+        var verifyDb = verifyScope.ServiceProvider.GetRequiredService<MyProjectDbContext>();
+        var persistedReport = await verifyDb.ContentReports.AsNoTracking().SingleAsync(candidate => candidate.Id == report.Id);
+        var userExists = await verifyDb.Users.AnyAsync(user => user.Id == reportedUser.UserId);
+        var hasFollows = await verifyDb.Follows.AnyAsync(follow => follow.FollowerId == reportedUser.UserId || follow.FollowingId == reportedUser.UserId);
+        var hasBlocks = await verifyDb.UserBlocks.AnyAsync(block => block.BlockerId == reportedUser.UserId || block.BlockedId == reportedUser.UserId);
+        var hasMessages = await verifyDb.Messages.AnyAsync(message => message.SenderId == reportedUser.UserId || message.RecipientId == reportedUser.UserId);
+        var remainingSceneOwnerId = (await verifyDb.Scenes.SingleAsync(candidate => candidate.Id == scene.Id)).OwnerUserId;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(reportResponse.StatusCode, Is.EqualTo(HttpStatusCode.Created));
+            Assert.That(listResponse.StatusCode, Is.EqualTo(HttpStatusCode.OK));
+            Assert.That(listedReports, Has.Some.Matches<AdminContentReportResponse>(candidate => candidate.Id == report.Id));
+            Assert.That(reviewResponse.StatusCode, Is.EqualTo(HttpStatusCode.OK));
+            Assert.That(deleteResponse.StatusCode, Is.EqualTo(HttpStatusCode.NoContent));
+            Assert.That(persistedReport.Status, Is.EqualTo(ContentReportStatuses.Actioned));
+            Assert.That(userExists, Is.False);
+            Assert.That(hasFollows, Is.False);
+            Assert.That(hasBlocks, Is.False);
+            Assert.That(hasMessages, Is.False);
+            Assert.That(remainingSceneOwnerId, Is.Null);
+        });
+    }
+
+    [Test]
     public async Task GivenAProfileReport_WhenSubmittedWithADescription_ThenItIsStoredAndAdminsAreEmailed()
     {
         var admin = await RegisterUserAsync("Admin", "admin@example.com");
@@ -376,6 +536,34 @@ public sealed class GeoSceneryApiTests
             Assert.That(_factory.ReportNotifications[0].Recipient, Is.EqualTo("admin@example.com"));
             Assert.That(_factory.ReportNotifications[0].Report.TargetLabel, Is.EqualTo("Reported overlook"));
             Assert.That(_factory.ReportNotifications[0].Report.Description, Is.EqualTo("The uploaded image is explicit."));
+        });
+    }
+
+    [Test]
+    public async Task GivenReportEmailFails_WhenSubmittingAReport_ThenTheSingleRequestLogRecordsTheSideEffectFailure()
+    {
+        await RegisterUserAsync("Admin", "admin@example.com");
+        var target = await RegisterUserAsync("Reported user", "reported@example.com");
+        _factory.FailReportNotifications = true;
+
+        var response = await _client.PostAsJsonAsync($"/api/users/{target.UserId}/reports", new
+        {
+            description = "Please review this profile."
+        });
+        var correlationId = response.Headers.GetValues("X-Correlation-ID").Single();
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<MyProjectDbContext>();
+        var entries = await db.AppLogEntries.AsNoTracking()
+            .Where(log => log.CorrelationId == correlationId)
+            .ToListAsync();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.Created));
+            Assert.That(entries, Has.Count.EqualTo(1));
+            Assert.That(entries[0].Level, Is.EqualTo("Warning"));
+            Assert.That(entries[0].PropertiesJson, Does.Contain("failed-or-partial"));
+            Assert.That(entries[0].PropertiesJson, Does.Contain("InvalidOperationException"));
         });
     }
 
@@ -786,6 +974,14 @@ public sealed class GeoSceneryApiTests
         });
 
         Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.Conflict));
+        var correlationId = response.Headers.GetValues("X-Correlation-ID").Single();
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<MyProjectDbContext>();
+        var auditEntries = await db.AppLogEntries.AsNoTracking()
+            .Where(log => log.CorrelationId == correlationId)
+            .ToListAsync();
+        Assert.That(auditEntries, Has.Count.EqualTo(1));
+        Assert.That(auditEntries[0].StatusCode, Is.EqualTo((int)HttpStatusCode.Conflict));
     }
 
     [Test]
@@ -1297,6 +1493,7 @@ public sealed class GeoSceneryApiTests
     [Test]
     public async Task GivenYourOwnAccount_WhenDeletingIt_ThenTheApiReturnsNoContent()
     {
+        await RegisterUserAsync("Bootstrap administrator", "bootstrap-admin@example.com");
         var user = await RegisterUserAsync("Deletable", "deletable@example.com");
         _client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", CreateToken(user.UserId));
 

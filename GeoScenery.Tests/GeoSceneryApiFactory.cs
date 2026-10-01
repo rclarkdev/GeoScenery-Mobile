@@ -15,6 +15,7 @@ public sealed class GeoSceneryApiFactory : WebApplicationFactory<Program>
     private readonly SqliteConnection _connection = new("Data Source=:memory:");
     public string? LastResetUrl { get; private set; }
     public string? LastVerificationUrl { get; private set; }
+    public bool FailReportNotifications { get; set; }
     public List<(string Recipient, ContentReportNotification Report)> ReportNotifications { get; } = [];
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
@@ -69,23 +70,28 @@ public sealed class GeoSceneryApiFactory : WebApplicationFactory<Program>
 
     private sealed class CapturingEmailSender(GeoSceneryApiFactory factory) : IEmailSender
     {
-        public Task SendPasswordResetAsync(string recipient, string resetUrl, CancellationToken cancellationToken = default)
+        public Task<EmailDeliveryOutcome> SendPasswordResetAsync(string recipient, string resetUrl, CancellationToken cancellationToken = default)
         {
             factory.LastResetUrl = resetUrl;
-            return Task.CompletedTask;
+            return Task.FromResult(EmailDeliveryOutcome.Sent);
         }
 
-        public Task SendEmailVerificationAsync(string recipient, string verificationUrl, CancellationToken cancellationToken = default)
+        public Task<EmailDeliveryOutcome> SendEmailVerificationAsync(string recipient, string verificationUrl, CancellationToken cancellationToken = default)
         {
             factory.LastVerificationUrl = verificationUrl;
-            return Task.CompletedTask;
+            return Task.FromResult(EmailDeliveryOutcome.Sent);
         }
 
-        public Task SendContentReportNotificationAsync(string recipient, ContentReportNotification report,
+        public Task<EmailDeliveryOutcome> SendContentReportNotificationAsync(string recipient, ContentReportNotification report,
             CancellationToken cancellationToken = default)
         {
             factory.ReportNotifications.Add((recipient, report));
-            return Task.CompletedTask;
+            if (factory.FailReportNotifications)
+            {
+                throw new InvalidOperationException("SMTP unavailable");
+            }
+
+            return Task.FromResult(EmailDeliveryOutcome.Sent);
         }
     }
 

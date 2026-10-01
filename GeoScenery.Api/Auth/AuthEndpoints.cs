@@ -2,6 +2,7 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Cryptography;
 using System.Security.Claims;
 using System.Text;
+using GeoScenery.Api.Logging;
 using GeoScenery.Data.Context;
 using GeoScenery.Data.Models;
 using GeoScenery.Data.Services;
@@ -20,7 +21,7 @@ public static class AuthEndpoints
 
         group.MapPost("/register", async Task<Results<Ok<RegistrationResponse>, Conflict<string>, BadRequest<string>>>
             (RegisterRequest request, MyProjectDbContext db, IPasswordHasher<User> hasher, IEmailSender emailSender,
-                IConfiguration appConfiguration, IHostEnvironment environment, ILoggerFactory loggerFactory,
+                IConfiguration appConfiguration, IHostEnvironment environment, HttpContext context,
                 CancellationToken cancellationToken) =>
         {
             if (!string.Equals(request.Password, request.ConfirmPassword, StringComparison.Ordinal))
@@ -55,8 +56,13 @@ public static class AuthEndpoints
                 return TypedResults.Conflict("An account with this email already exists.");
             }
             var rawToken = await CreateEmailVerificationTokenAsync(user, db, cancellationToken);
-            await SendVerificationEmailSafelyAsync(user, rawToken, db, emailSender, appConfiguration,
-                environment, loggerFactory, cancellationToken);
+            var verificationEmailOutcome = await SendVerificationEmailSafelyAsync(user, rawToken, emailSender,
+                appConfiguration, context, cancellationToken);
+            RequestAuditContext.Set(context, "operation", "account-registration");
+            RequestAuditContext.Set(context, "accountId", user.Id);
+            RequestAuditContext.Set(context, "verificationEmailOutcome", verificationEmailOutcome.ToString());
+            RequestAuditContext.Set(context, "operationOutcome", verificationEmailOutcome == EmailDeliveryOutcome.Failed
+                ? "PartialFailure" : "Success");
             return TypedResults.Ok(new RegistrationResponse(
                 "Account created. Check your email for a verification link before signing in.",
                 environment.IsDevelopment() ? rawToken : null));
@@ -110,7 +116,7 @@ public static class AuthEndpoints
 
         group.MapPost("/verify-email", async Task<Results<NoContent, BadRequest<string>>>
             (VerifyEmailRequest request, MyProjectDbContext db, IConfiguration appConfiguration,
-                CancellationToken cancellationToken) =>
+                HttpContext context, CancellationToken cancellationToken) =>
         {
             var tokenHash = HashToken(request.Token);
             var now = DateTimeOffset.UtcNow;
@@ -127,27 +133,42 @@ public static class AuthEndpoints
             verification.User.IsEmailVerified = true;
             await db.SaveChangesAsync(cancellationToken);
             await ApplyBootstrapAdminAsync(verification.User, db, appConfiguration, cancellationToken);
+            RequestAuditContext.Set(context, "operation", "email-verification");
+            RequestAuditContext.Set(context, "accountId", verification.UserId);
+            RequestAuditContext.Set(context, "operationOutcome", "Success");
             return TypedResults.NoContent();
         })
         .WithName("VerifyEmail");
 
         group.MapPost("/resend-verification", async Task<Ok<EmailVerificationResponse>>
             (ResendVerificationRequest request, MyProjectDbContext db, IEmailSender emailSender,
-                IConfiguration appConfiguration, IHostEnvironment environment, ILoggerFactory loggerFactory,
+                IConfiguration appConfiguration, IHostEnvironment environment, HttpContext context,
                 CancellationToken cancellationToken) =>
         {
             var normalizedEmail = request.Email.Trim().ToLowerInvariant();
             var user = await db.Users.FirstOrDefaultAsync(candidate => candidate.Email == normalizedEmail, cancellationToken);
             string? developmentToken = null;
+            var attempted = false;
+            var outcome = EmailDeliveryOutcome.Failed;
             if (user is not null && !user.IsEmailVerified)
             {
+                attempted = true;
                 developmentToken = await CreateEmailVerificationTokenAsync(user, db, cancellationToken);
-                await SendVerificationEmailSafelyAsync(user, developmentToken, db, emailSender, appConfiguration,
-                    environment, loggerFactory, cancellationToken);
+                outcome = await SendVerificationEmailSafelyAsync(user, developmentToken, emailSender,
+                    appConfiguration, context, cancellationToken);
                 if (!environment.IsDevelopment())
                 {
                     developmentToken = null;
                 }
+            }
+
+            RequestAuditContext.Set(context, "operation", "verification-resend");
+            RequestAuditContext.Set(context, "verificationEmailAttempted", attempted);
+            if (attempted)
+            {
+                RequestAuditContext.Set(context, "verificationEmailOutcome", outcome.ToString());
+                RequestAuditContext.Set(context, "operationOutcome", outcome == EmailDeliveryOutcome.Failed
+                    ? "PartialFailure" : "Success");
             }
 
             return TypedResults.Ok(new EmailVerificationResponse(
@@ -157,12 +178,15 @@ public static class AuthEndpoints
         .RequireRateLimiting("email-verification");
 
         group.MapPost("/forgot-password", async Task<Ok<PasswordResetResponse>>
-            (ForgotPasswordRequest request, MyProjectDbContext db, IEmailSender emailSender, IHostEnvironment environment, CancellationToken cancellationToken) =>
+            (ForgotPasswordRequest request, MyProjectDbContext db, IEmailSender emailSender, IHostEnvironment environment,
+                HttpContext context, CancellationToken cancellationToken) =>
         {
+            RequestAuditContext.Set(context, "operation", "password-reset-request");
             var normalizedEmail = request.Email.Trim().ToLowerInvariant();
             var user = await db.Users.FirstOrDefaultAsync(candidate => candidate.Email == normalizedEmail, cancellationToken);
             if (user is null)
             {
+                RequestAuditContext.Set(context, "operationOutcome", "Success");
                 return TypedResults.Ok(new PasswordResetResponse("If an account exists, a reset link has been sent."));
             }
 
@@ -177,13 +201,28 @@ public static class AuthEndpoints
             await db.SaveChangesAsync(cancellationToken);
 
             var resetUrl = $"{configuration["Email:ClientResetUrl"] ?? "http://localhost:8100/auth/reset-password"}?token={Uri.EscapeDataString(rawToken)}";
-            await emailSender.SendPasswordResetAsync(user.Email, resetUrl, cancellationToken);
+            try
+            {
+                var outcome = await emailSender.SendPasswordResetAsync(user.Email, resetUrl, cancellationToken);
+                RequestAuditContext.Set(context, "passwordResetEmailOutcome", outcome.ToString());
+                RequestAuditContext.Set(context, "operationOutcome", outcome == EmailDeliveryOutcome.Failed
+                    ? "PartialFailure" : "Success");
+            }
+            catch (Exception exception) when (exception is not OperationCanceledException)
+            {
+                RequestAuditContext.Set(context, "passwordResetEmailOutcome", "Failed");
+                RequestAuditContext.Set(context, "passwordResetEmailErrorType", exception.GetType().Name);
+                RequestAuditContext.Set(context, "passwordResetEmailStackTrace", exception.StackTrace);
+                RequestAuditContext.Set(context, "operationOutcome", "PartialFailure");
+                // Keep this response generic so SMTP errors cannot reveal account existence.
+            }
             var developmentToken = environment.IsDevelopment() ? rawToken : null;
             return TypedResults.Ok(new PasswordResetResponse("If an account exists, a reset link has been sent.", developmentToken));
         }).RequireRateLimiting("password-reset");
 
         group.MapPost("/reset-password", async Task<Results<NoContent, BadRequest<string>>>
-            (ResetPasswordRequest request, MyProjectDbContext db, IPasswordHasher<User> hasher, CancellationToken cancellationToken) =>
+            (ResetPasswordRequest request, MyProjectDbContext db, IPasswordHasher<User> hasher,
+                HttpContext context, CancellationToken cancellationToken) =>
         {
             var tokenHash = HashToken(request.Token);
             var now = DateTimeOffset.UtcNow;
@@ -201,6 +240,9 @@ public static class AuthEndpoints
             token.User.IsEmailVerified = true;
             token.UsedAt = DateTimeOffset.UtcNow;
             await db.SaveChangesAsync(cancellationToken);
+            RequestAuditContext.Set(context, "operation", "password-reset");
+            RequestAuditContext.Set(context, "accountId", token.UserId);
+            RequestAuditContext.Set(context, "operationOutcome", "Success");
             return TypedResults.NoContent();
         });
 
@@ -222,22 +264,23 @@ public static class AuthEndpoints
         return rawToken;
     }
 
-    private static async Task SendVerificationEmailSafelyAsync(User user, string rawToken, MyProjectDbContext db,
-        IEmailSender emailSender, IConfiguration appConfiguration, IHostEnvironment environment,
-        ILoggerFactory loggerFactory, CancellationToken cancellationToken)
+    private static async Task<EmailDeliveryOutcome> SendVerificationEmailSafelyAsync(User user, string rawToken,
+        IEmailSender emailSender, IConfiguration appConfiguration, HttpContext context,
+        CancellationToken cancellationToken)
     {
         var verificationBaseUrl = appConfiguration["Email:ClientVerificationUrl"]
             ?? "http://localhost:8100/auth/verify-email";
         var verificationUrl = $"{verificationBaseUrl}?token={Uri.EscapeDataString(rawToken)}";
         try
         {
-            await emailSender.SendEmailVerificationAsync(user.Email, verificationUrl, cancellationToken);
+            return await emailSender.SendEmailVerificationAsync(user.Email, verificationUrl, cancellationToken);
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
-            loggerFactory.CreateLogger("EmailVerification").LogError(exception,
-                "Could not send the email verification message to user {UserId}.", user.Id);
+            RequestAuditContext.Set(context, "verificationEmailErrorType", exception.GetType().Name);
+            RequestAuditContext.Set(context, "verificationEmailStackTrace", exception.StackTrace);
             // Keep registration and resend responses generic; the user can request another link.
+            return EmailDeliveryOutcome.Failed;
         }
     }
 

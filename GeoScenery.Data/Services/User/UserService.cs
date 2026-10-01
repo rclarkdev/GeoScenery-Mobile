@@ -1,6 +1,7 @@
 ﻿using GeoScenery.Data.Context;
 using GeoScenery.Data.Models;
 using Microsoft.EntityFrameworkCore;
+using System.Data;
 
 namespace GeoScenery.Data.Services;
 
@@ -73,18 +74,45 @@ public sealed class UserService : IUserService
 
     public async Task<bool> DeleteAsync(long id, CancellationToken cancellationToken = default)
     {
+        await using var transaction = await _dbContext.Database.BeginTransactionAsync(IsolationLevel.Serializable, cancellationToken);
         var user = await _dbContext.Users.FindAsync([id], cancellationToken);
         if (user is null)
         {
             return false;
         }
 
+        var isAdmin = await _dbContext.UserRoles.AnyAsync(
+            userRole => userRole.UserId == id && userRole.RoleName == AppRoles.Admin, cancellationToken);
+        if (isAdmin && await _dbContext.UserRoles.CountAsync(
+                userRole => userRole.RoleName == AppRoles.Admin, cancellationToken) <= 1)
+        {
+            return false;
+        }
+
         _dbContext.Follows.RemoveRange(
             _dbContext.Follows.Where(follow => follow.FollowerId == id || follow.FollowingId == id));
+        _dbContext.UserBlocks.RemoveRange(
+            _dbContext.UserBlocks.Where(block => block.BlockerId == id || block.BlockedId == id));
+        _dbContext.Messages.RemoveRange(
+            _dbContext.Messages.Where(message => message.SenderId == id || message.RecipientId == id));
         _dbContext.SceneRatings.RemoveRange(
             _dbContext.SceneRatings.Where(rating => rating.UserId == id));
+        var reportsAboutUser = await _dbContext.ContentReports
+            .Where(report => report.TargetType == ContentReportTargets.Profile
+                && report.TargetId == id
+                && report.Status != ContentReportStatuses.Dismissed
+                && report.Status != ContentReportStatuses.Actioned)
+            .ToListAsync(cancellationToken);
+        foreach (var report in reportsAboutUser)
+        {
+            report.Status = ContentReportStatuses.Actioned;
+            report.ActionTaken = "AccountDeleted";
+            report.ResolutionNotes ??= "Account deleted by an administrator or account owner.";
+            report.ResolvedAt = DateTimeOffset.UtcNow;
+        }
         _dbContext.Users.Remove(user);
         await _dbContext.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
         return true;
     }
 }

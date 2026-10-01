@@ -3,9 +3,9 @@ using System.Net.Mail;
 
 namespace GeoScenery.Api.Auth;
 
-public sealed class SmtpEmailSender(IConfiguration configuration, IHostEnvironment environment, ILogger<SmtpEmailSender> logger) : IEmailSender
+public sealed class SmtpEmailSender(IConfiguration configuration, IHostEnvironment environment) : IEmailSender
 {
-    public async Task SendEmailVerificationAsync(string recipient, string verificationUrl, CancellationToken cancellationToken = default)
+    public async Task<EmailDeliveryOutcome> SendEmailVerificationAsync(string recipient, string verificationUrl, CancellationToken cancellationToken = default)
     {
         var section = configuration.GetSection("Email");
         var host = section["SmtpHost"];
@@ -13,8 +13,7 @@ public sealed class SmtpEmailSender(IConfiguration configuration, IHostEnvironme
         {
             if (environment.IsDevelopment())
             {
-                logger.LogInformation("Email verification link for {Recipient}: {VerificationUrl}", recipient, verificationUrl);
-                return;
+                return EmailDeliveryOutcome.SkippedDevelopment;
             }
 
             throw new InvalidOperationException("Email:SmtpHost must be configured outside Development.");
@@ -29,9 +28,10 @@ public sealed class SmtpEmailSender(IConfiguration configuration, IHostEnvironme
         };
         cancellationToken.ThrowIfCancellationRequested();
         await client.SendMailAsync(message, cancellationToken);
+        return EmailDeliveryOutcome.Sent;
     }
 
-    public async Task SendPasswordResetAsync(string recipient, string resetUrl, CancellationToken cancellationToken = default)
+    public async Task<EmailDeliveryOutcome> SendPasswordResetAsync(string recipient, string resetUrl, CancellationToken cancellationToken = default)
     {
         var section = configuration.GetSection("Email");
         var host = section["SmtpHost"];
@@ -39,8 +39,7 @@ public sealed class SmtpEmailSender(IConfiguration configuration, IHostEnvironme
         {
             if (environment.IsDevelopment())
             {
-                logger.LogInformation("Password reset link for {Recipient}: {ResetUrl}", recipient, resetUrl);
-                return;
+                return EmailDeliveryOutcome.SkippedDevelopment;
             }
 
             throw new InvalidOperationException("Email:SmtpHost must be configured outside Development.");
@@ -56,6 +55,7 @@ public sealed class SmtpEmailSender(IConfiguration configuration, IHostEnvironme
         };
         cancellationToken.ThrowIfCancellationRequested();
         await client.SendMailAsync(message, cancellationToken);
+        return EmailDeliveryOutcome.Sent;
     }
 
     private static SmtpClient CreateClient(IConfigurationSection section, string host)
@@ -73,7 +73,7 @@ public sealed class SmtpEmailSender(IConfiguration configuration, IHostEnvironme
         return client;
     }
 
-    public async Task SendContentReportNotificationAsync(string recipient, ContentReportNotification report,
+    public async Task<EmailDeliveryOutcome> SendContentReportNotificationAsync(string recipient, ContentReportNotification report,
         CancellationToken cancellationToken = default)
     {
         var section = configuration.GetSection("Email");
@@ -91,23 +91,13 @@ public sealed class SmtpEmailSender(IConfiguration configuration, IHostEnvironme
         {
             if (environment.IsDevelopment())
             {
-                logger.LogInformation("Content report notification for {Recipient}: {Subject}\n{ReportBody}", recipient, subject, body);
-                return;
+                return EmailDeliveryOutcome.SkippedDevelopment;
             }
 
             throw new InvalidOperationException("Email:SmtpHost must be configured outside Development.");
         }
 
-        using var client = new SmtpClient(host, section.GetValue("SmtpPort", 587))
-        {
-            EnableSsl = section.GetValue("EnableSsl", true)
-        };
-        var username = section["Username"];
-        var password = section["Password"];
-        if (!string.IsNullOrWhiteSpace(username))
-        {
-            client.Credentials = new NetworkCredential(username, password);
-        }
+        using var client = CreateClient(section, host);
 
         using var message = new MailMessage(section["From"] ?? "no-reply@geoscenery.local", recipient)
         {
@@ -117,5 +107,6 @@ public sealed class SmtpEmailSender(IConfiguration configuration, IHostEnvironme
         };
         cancellationToken.ThrowIfCancellationRequested();
         await client.SendMailAsync(message, cancellationToken);
+        return EmailDeliveryOutcome.Sent;
     }
 }

@@ -16,5 +16,9 @@
       <ion-label>Profile</ion-label>
       <ion-icon name="person-circle-outline"></ion-icon>
     </ion-tab-button>
+    <ion-tab-button *ngIf="showAdminTab" tab="admin">
+      <ion-label>Admin</ion-label>
+      <ion-icon name="shield-checkmark-outline"></ion-icon>
+    </ion-tab-button>
   </ion-tab-bar>
 </ion-tabs>

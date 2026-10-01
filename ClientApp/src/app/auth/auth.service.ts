@@ -82,6 +82,28 @@ export class AuthService {
     }
   }
 
+  get roles(): string[] {
+    const token = this.token;
+    if (!token) {
+      return [];
+    }
+
+    try {
+      const payload = JSON.parse(this.decodeBase64Url(token.split('.')[1])) as Record<string, unknown>;
+      const roleClaim = payload.role ?? payload['http://schemas.microsoft.com/ws/2008/06/identity/claims/role'];
+      if (typeof roleClaim === 'string') {
+        return [roleClaim];
+      }
+      return Array.isArray(roleClaim) ? roleClaim.filter((role): role is string => typeof role === 'string') : [];
+    } catch {
+      return [];
+    }
+  }
+
+  get isAdmin(): boolean {
+    return this.isAuthenticated && this.roles.includes('Admin');
+  }
+
   get isAuthenticated(): boolean {
     const token = this.token;
     if (!token) {

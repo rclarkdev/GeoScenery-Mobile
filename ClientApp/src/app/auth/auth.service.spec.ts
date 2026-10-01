@@ -71,6 +71,18 @@ describe('AuthService', () => {
     expect(service.isAuthenticated).toBeFalse();
   });
 
+  it('detects the Admin role from a valid server-issued JWT', () => {
+    service.login({ email: 'admin@example.com', password: 'Password123!' }).subscribe();
+    http.expectOne(`${authUrl}/login`).flush({
+      userId: 1,
+      displayName: 'Admin',
+      email: 'admin@example.com',
+      token: createToken(Date.now() + 60000, ['Admin'])
+    });
+
+    expect(service.isAdmin).toBeTrue();
+  });
+
   it('rejects a malformed token', () => {
     service.login({ email: 'ava@example.com', password: 'Password123!' }).subscribe();
     http.expectOne(`${authUrl}/login`).flush({
@@ -128,8 +140,8 @@ describe('AuthService', () => {
     expect(localStorage.getItem('geoscenery.auth.user')).toBeNull();
   });
 
-  function createToken(expiresAt: number): string {
-    const payload = btoa(JSON.stringify({ exp: Math.floor(expiresAt / 1000) }))
+  function createToken(expiresAt: number, roles: string[] = []): string {
+    const payload = btoa(JSON.stringify({ exp: Math.floor(expiresAt / 1000), role: roles }))
       .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
     return `header.${payload}.signature`;
   }
