@@ -9,6 +9,7 @@ export interface SceneRequest {
   description: string;
   imageUrl: string;
   rating: number;
+  isPublic: boolean;
   latitude?: number | null;
   longitude?: number | null;
   tags?: string[] | null;
@@ -36,6 +37,10 @@ export class SceneryService {
 
   getMyScenes(): Observable<Scene[]> {
     return this.http.get<Scene[]>(`${environment.apiUrl}/api/users/me/scenes`);
+  }
+
+  getUserPublicScenes(userId: number): Observable<Scene[]> {
+    return this.http.get<Scene[]>(`${environment.apiUrl}/api/users/${userId}/scenes`);
   }
 
   searchScenery(searchParams: SceneSearchParams): Observable<Scene[]> {
@@ -71,8 +76,8 @@ export class SceneryService {
     return this.http.delete<void>(`${this.scenesUrl}/${id}`);
   }
 
-  rateScene(id: number, rating: number): Observable<Scene> {
-    return this.http.post<Scene>(`${this.scenesUrl}/${id}/rating`, { rating });
+  rateScene(id: number, rating: number, description?: string): Observable<Scene> {
+    return this.http.post<Scene>(`${this.scenesUrl}/${id}/rating`, { rating, description });
   }
 
   removeRating(id: number): Observable<void> {

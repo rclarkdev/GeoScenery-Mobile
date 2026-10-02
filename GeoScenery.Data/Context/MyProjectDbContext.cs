@@ -37,7 +37,8 @@ public class MyProjectDbContext : DbContext
             Id = 1,
             DisplayName = "Master",
             Email = "vjryanaye@gmail.com",
-            PasswordHash = "!",
+            // ASP.NET Core PasswordHasher v3 hash for the initial password "password".
+            PasswordHash = "AQAAAAIAAYagAAAAEAABAgMEBQYHCAkKCwwNDg/73hTTOMxvghBX8/SnisILxwGxHjepOzeQw1EOAZRz8w==",
             IsEmailVerified = true,
             CreatedAt = new DateTimeOffset(2026, 9, 22, 0, 0, 0, TimeSpan.Zero)
         });
@@ -51,6 +52,9 @@ public class MyProjectDbContext : DbContext
         modelBuilder.Entity<Scene>()
             .Property(scene => scene.IsHidden)
             .HasDefaultValue(false);
+        modelBuilder.Entity<Scene>()
+            .Property(scene => scene.IsPublic)
+            .HasDefaultValue(true);
 
         modelBuilder.Entity<UserRole>().HasData(new UserRole
         {

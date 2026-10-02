@@ -22,7 +22,7 @@ describe('EditScenePage', () => {
       providers: [
         { provide: ActivatedRoute, useValue: { paramMap: of(new Map([['sceneId', '1']])) } },
         { provide: SceneryService, useValue: {
-          getScene: jasmine.createSpy('getScene').and.returnValue(of(new Scene(1, 'Test scene', 'Description', '/uploads/image.jpg', 8))),
+          getScene: jasmine.createSpy('getScene').and.returnValue(of(new Scene(1, 'Test scene', 'Description', '/uploads/image.jpg', 8, undefined, undefined, [], undefined, undefined, 0, undefined, 1, undefined, undefined, false))),
           updateScene: jasmine.createSpy('updateScene').and.returnValue(of(new Scene(1, 'Updated scene', 'Updated description', 'https://example.com/updated.jpg', 9)))
         } },
         {
@@ -45,6 +45,7 @@ describe('EditScenePage', () => {
   it('should create', () => {
     expect(component).toBeTruthy();
     expect(component.scene?.id).toBe(1);
+    expect(component.sceneForm.controls.isPublic.value).toBe(false);
   });
 
   it('should update the scene and navigate back after a valid submission', async () => {
@@ -59,10 +60,20 @@ describe('EditScenePage', () => {
       description: 'Description',
       imageUrl: '/uploads/image.jpg',
       rating: 9,
+      isPublic: false,
       latitude: null,
       longitude: null,
       tags: []
     });
     expect(navController.navigateBack).toHaveBeenCalledWith('/scenery/tabs/my-scenes/1');
+  });
+
+  it('sends a changed public/private setting when editing a scene', async () => {
+    const service = TestBed.inject(SceneryService);
+    component.sceneForm.patchValue({ isPublic: true });
+
+    await component.onSave();
+
+    expect(service.updateScene).toHaveBeenCalledWith(1, jasmine.objectContaining({ isPublic: true }));
   });
 });

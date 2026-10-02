@@ -6,6 +6,7 @@ import { User } from '../../../auth/user.model';
 import { UserService } from '../../../auth/user.service';
 import { SceneryService } from '../../scenery.service';
 import { Scene } from '../../scene.model';
+import { Visit } from '../../../visits/visit.model';
 import { VisitsService } from '../../../visits/visits.service';
 import { ContentReportService } from '../../../shared/content-report.service';
 
@@ -21,9 +22,13 @@ export class SceneDetailPage implements OnInit {
   isLoading = true;
   loadError = false;
   isVisiting = false;
+  isRemovingVisit = false;
+  isCheckingVisit = true;
   visitError = false;
   visitRecorded = false;
+  private visitId?: number;
   pendingRating: number | null = null;
+  ratingDescription = '';
   isRating = false;
   ratingError = false;
   isReporting = false;
@@ -69,10 +74,14 @@ export class SceneDetailPage implements OnInit {
     this.loadError = false;
     this.scene = undefined;
     this.owner = undefined;
+    this.visitId = undefined;
+    this.visitRecorded = false;
+    this.isCheckingVisit = true;
     this.sceneryService.getScene(this.sceneId).subscribe({
       next: scene => {
         this.scene = scene;
         this.pendingRating = scene.currentUserRating ?? null;
+        this.ratingDescription = scene.currentUserRatingDescription ?? '';
         this.isLoading = false;
         if (scene.ownerUserId != null) {
           this.userService.getUser(scene.ownerUserId).subscribe({
@@ -80,6 +89,19 @@ export class SceneDetailPage implements OnInit {
             error: () => this.owner = undefined
           });
         }
+
+        if (this.isOwnScene) {
+          this.isCheckingVisit = false;
+          return;
+        }
+
+        this.visitsService.getUserVisits().subscribe({
+          next: visits => {
+            this.setVisitState(visits.find(visit => visit.sceneId === scene.id));
+            this.isCheckingVisit = false;
+          },
+          error: () => this.isCheckingVisit = false
+        });
       },
       error: () => {
         this.isLoading = false;
@@ -88,27 +110,68 @@ export class SceneDetailPage implements OnInit {
     });
   }
 
+  get visitButtonLabel(): string {
+    if (this.isCheckingVisit) {
+      return 'Checking visit...';
+    }
+    if (this.isRemovingVisit) {
+      return 'Removing visit...';
+    }
+    if (this.isVisiting) {
+      return 'Saving...';
+    }
+    return this.visitRecorded ? 'Unvisit' : 'Mark as visited';
+  }
+
   get isOwnScene(): boolean {
     return !!this.scene && this.scene.ownerUserId === this.authService.currentUserId;
   }
 
   onVisitScene() {
-    if (!this.scene || this.isVisiting) {
+    if (this.visitRecorded) {
+      this.removeVisit();
+      return;
+    }
+    if (!this.scene || this.isVisiting || this.isCheckingVisit) {
       return;
     }
 
     this.isVisiting = true;
     this.visitError = false;
     this.visitsService.recordVisit(this.scene.id).subscribe({
-      next: () => {
+      next: visit => {
         this.isVisiting = false;
-        this.visitRecorded = true;
+        this.setVisitState(visit);
       },
       error: () => {
         this.isVisiting = false;
         this.visitError = true;
       }
     });
+  }
+
+  private removeVisit(): void {
+    if (this.visitId == null || this.isRemovingVisit) {
+      return;
+    }
+
+    this.isRemovingVisit = true;
+    this.visitError = false;
+    this.visitsService.removeVisit(this.visitId).subscribe({
+      next: () => {
+        this.isRemovingVisit = false;
+        this.setVisitState(undefined);
+      },
+      error: () => {
+        this.isRemovingVisit = false;
+        this.visitError = true;
+      }
+    });
+  }
+
+  private setVisitState(visit?: Visit): void {
+    this.visitId = visit?.id;
+    this.visitRecorded = visit != null;
   }
 
   onSubmitRating() {
@@ -119,9 +182,11 @@ export class SceneDetailPage implements OnInit {
 
     this.isRating = true;
     this.ratingError = false;
-    this.sceneryService.rateScene(this.scene.id, this.pendingRating).subscribe({
+    this.sceneryService.rateScene(this.scene.id, this.pendingRating, this.ratingDescription.trim()).subscribe({
       next: scene => {
         this.scene = scene;
+        this.pendingRating = scene.currentUserRating ?? null;
+        this.ratingDescription = scene.currentUserRatingDescription ?? '';
         this.isRating = false;
       },
       error: () => {
@@ -142,8 +207,10 @@ export class SceneDetailPage implements OnInit {
       next: () => {
         if (this.scene) {
           this.scene.currentUserRating = undefined;
+          this.scene.currentUserRatingDescription = undefined;
         }
         this.pendingRating = null;
+        this.ratingDescription = '';
         this.isRating = false;
       },
       error: () => {

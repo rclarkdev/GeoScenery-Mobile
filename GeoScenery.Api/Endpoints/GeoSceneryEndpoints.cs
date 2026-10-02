@@ -38,9 +38,7 @@ public static class GeoSceneryEndpoints
         })
         .WithName("GetCurrentUser");
 
-        // The authenticated user's own scenes. The owner id is always derived from
-        // the token; there is intentionally no {userId}/scenes route so another
-        // user's private scene list cannot be requested by parameter manipulation.
+        // The authenticated user's own scenes, including private scenes.
         group.MapGet("/me/scenes", async Task<Ok<List<SceneResponse>>>
             (ClaimsPrincipal principal, ISceneService service, CancellationToken cancellationToken) =>
         {
@@ -49,6 +47,21 @@ public static class GeoSceneryEndpoints
             return TypedResults.Ok(scenes.Select(scene => ToResponse(scene, viewerId: viewerId)).ToList());
         })
         .WithName("GetMyScenes");
+
+        group.MapGet("/{id:long}/scenes", async Task<Results<Ok<List<SceneResponse>>, NotFound>>
+            (long id, ClaimsPrincipal principal, IUserService userService, ISceneService sceneService, CancellationToken cancellationToken) =>
+        {
+            var user = await userService.GetByIdAsync(id, cancellationToken);
+            if (user is null || user.IsSuspended)
+            {
+                return TypedResults.NotFound();
+            }
+
+            var viewerId = GetUserId(principal);
+            var scenes = await sceneService.GetPublicByOwnerAsync(id, cancellationToken);
+            return TypedResults.Ok(scenes.Select(scene => ToResponse(scene, viewerId: viewerId)).ToList());
+        })
+        .WithName("GetUserPublicScenes");
 
         group.MapGet("/{id:long}", async Task<Results<Ok<UserResponse>, NotFound>>
             (long id, ClaimsPrincipal principal, IUserService service, IFollowService followService, IUserBlockService blockService,
@@ -410,7 +423,12 @@ public static class GeoSceneryEndpoints
         group.MapGet("/{id:long}", async Task<Results<Ok<SceneResponse>, NotFound>>
             (long id, ClaimsPrincipal principal, ISceneService service, CancellationToken cancellationToken) =>
         {
+            var viewerId = TryGetUserId(principal);
             var scene = await service.GetByIdAsync(id, cancellationToken);
+            if (scene is null && viewerId.HasValue)
+            {
+                scene = await service.GetOwnedByIdAsync(id, viewerId.Value, cancellationToken);
+            }
             return scene is null ? TypedResults.NotFound() : TypedResults.Ok(ToResponse(scene, viewerId: TryGetUserId(principal)));
         })
         .WithName("GetScene");
@@ -438,6 +456,7 @@ public static class GeoSceneryEndpoints
                 Description = request.Description,
                 ImageUrl = request.ImageUrl,
                 Rating = request.Rating,
+                IsPublic = request.IsPublic,
                 Latitude = request.Latitude,
                 Longitude = request.Longitude,
                 OwnerUserId = GetUserId(principal)
@@ -473,7 +492,7 @@ public static class GeoSceneryEndpoints
                 Latitude = request.Latitude,
                 Longitude = request.Longitude,
                 OwnerUserId = GetUserId(principal)
-            }, GetUserId(principal), request.Tags, cancellationToken);
+            }, GetUserId(principal), request.Tags, cancellationToken, request.IsPublic);
             return scene is null ? TypedResults.NotFound() : TypedResults.Ok(ToResponse(scene, viewerId: GetUserId(principal)));
         })
         .RequireAuthorization();
@@ -500,7 +519,7 @@ public static class GeoSceneryEndpoints
                 return TypedResults.BadRequest();
             }
 
-            var rated = await service.RateAsync(id, userId, request.Rating, cancellationToken);
+            var rated = await service.RateAsync(id, userId, request.Rating, request.Description, cancellationToken);
             return TypedResults.Ok(ToResponse(rated!, viewerId: userId));
         })
         .WithName("RateScene")
@@ -613,10 +632,23 @@ public static class GeoSceneryEndpoints
         var currentUserRating = viewerId.HasValue
             ? scene.Ratings.FirstOrDefault(sceneRating => sceneRating.UserId == viewerId.Value)?.Rating
             : null;
+        var currentUserRatingDescription = viewerId.HasValue
+            ? scene.Ratings.FirstOrDefault(sceneRating => sceneRating.UserId == viewerId.Value)?.Description
+            : null;
+        var ratings = scene.Ratings
+            .OrderByDescending(sceneRating => sceneRating.CreatedAt)
+            .ThenByDescending(sceneRating => sceneRating.Id)
+            .Select(sceneRating => new SceneRatingResponse(
+                sceneRating.User?.DisplayName ?? "GeoScenery user",
+                sceneRating.Rating,
+                sceneRating.Description,
+                sceneRating.CreatedAt))
+            .ToList();
         return new(scene.Id, scene.Title, scene.Description, scene.ImageUrl, scene.Rating, scene.Latitude, scene.Longitude,
             scene.Tags.Select(tag => tag.Tag).OrderBy(tag => tag).ToList(), distanceKm,
             averageRating, ratingCount, currentUserRating,
-            scene.OwnerUserId, scene.CreatedAt, scene.UpdatedAt);
+            scene.OwnerUserId, scene.CreatedAt, scene.UpdatedAt, scene.IsPublic,
+            currentUserRatingDescription, ratings);
     }
 
     private static VisitResponse ToResponse(Visit visit) =>

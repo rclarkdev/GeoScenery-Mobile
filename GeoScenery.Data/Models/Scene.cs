@@ -26,6 +26,8 @@ public class Scene
 
     public long? OwnerUserId { get; set; }
 
+    public bool IsPublic { get; set; } = true;
+
     public bool IsHidden { get; set; }
 
     public DateTimeOffset? HiddenAt { get; set; }

@@ -37,6 +37,12 @@
     </ion-item>
 
     <ion-item>
+      <ion-toggle formControlName="isPublic">Make this scene public</ion-toggle>
+    </ion-item>
+    <ion-note color="medium" *ngIf="sceneForm.controls.isPublic.value">Other users can see this scene.</ion-note>
+    <ion-note color="medium" *ngIf="!sceneForm.controls.isPublic.value">Only you can see this scene.</ion-note>
+
+    <ion-item>
       <ion-input label="Tags" labelPlacement="stacked" placeholder="e.g. sunset, hiking, waterfall" formControlName="tags"></ion-input>
     </ion-item>
     <ion-note color="medium">Separate tags with commas.</ion-note>

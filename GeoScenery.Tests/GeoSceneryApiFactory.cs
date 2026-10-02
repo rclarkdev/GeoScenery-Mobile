@@ -17,6 +17,7 @@ public sealed class GeoSceneryApiFactory : WebApplicationFactory<Program>
     public string? LastVerificationUrl { get; private set; }
     public bool FailReportNotifications { get; set; }
     public List<(string Recipient, ContentReportNotification Report)> ReportNotifications { get; } = [];
+    public List<(string Recipient, SupportContactNotification Request)> SupportNotifications { get; } = [];
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
@@ -91,6 +92,13 @@ public sealed class GeoSceneryApiFactory : WebApplicationFactory<Program>
                 throw new InvalidOperationException("SMTP unavailable");
             }
 
+            return Task.FromResult(EmailDeliveryOutcome.Sent);
+        }
+
+        public Task<EmailDeliveryOutcome> SendSupportContactAsync(string recipient, SupportContactNotification request,
+            CancellationToken cancellationToken = default)
+        {
+            factory.SupportNotifications.Add((recipient, request));
             return Task.FromResult(EmailDeliveryOutcome.Sent);
         }
     }

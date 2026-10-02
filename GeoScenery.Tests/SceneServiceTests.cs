@@ -39,6 +39,37 @@ public sealed class SceneServiceTests
     }
 
     [Test]
+    public async Task GivenPublicAndPrivateScenes_WhenListingScenes_ThenOnlyPublicScenesAreVisibleToOthers()
+    {
+        var publicScene = await _service.CreateAsync(new Scene
+        {
+            Title = "Public",
+            OwnerUserId = _owner.Id,
+            IsPublic = true
+        }, null);
+        var privateScene = await _service.CreateAsync(new Scene
+        {
+            Title = "Private",
+            OwnerUserId = _owner.Id,
+            IsPublic = false
+        }, null);
+
+        var searchResults = await _service.SearchAsync(null, null, null, null);
+        var profileScenes = await _service.GetPublicByOwnerAsync(_owner.Id);
+        var ownerPrivateScene = await _service.GetOwnedByIdAsync(privateScene.Id, _owner.Id);
+        var otherUserPrivateScene = await _service.GetOwnedByIdAsync(privateScene.Id, _otherUser.Id);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(searchResults.Select(result => result.Scene.Id), Does.Contain(publicScene.Id));
+            Assert.That(searchResults.Select(result => result.Scene.Id), Does.Not.Contain(privateScene.Id));
+            Assert.That(profileScenes.Select(scene => scene.Id), Is.EqualTo(new[] { publicScene.Id }));
+            Assert.That(ownerPrivateScene, Is.Not.Null);
+            Assert.That(otherUserPrivateScene, Is.Null);
+        });
+    }
+
+    [Test]
     public async Task GivenAnExistingSceneId_WhenGettingTheScene_ThenTheSceneIsReturned()
     {
         var scene = await _service.CreateAsync(new Scene
@@ -95,6 +126,37 @@ public sealed class SceneServiceTests
         Assert.That(updated, Is.Not.Null);
         Assert.That(updated!.Title, Is.EqualTo("New title"));
         Assert.That(updated.Rating, Is.EqualTo(10));
+    }
+
+    [Test]
+    public async Task GivenAPrivateScene_WhenUpdatingWithoutVisibility_ThenItRemainsPrivate()
+    {
+        var scene = await _service.CreateAsync(new Scene
+        {
+            Title = "Private view",
+            OwnerUserId = _owner.Id,
+            IsPublic = false
+        }, null);
+
+        var updated = await _service.UpdateAsync(scene.Id, new Scene { Title = "Updated private view" }, _owner.Id, null);
+
+        Assert.That(updated, Is.Not.Null);
+        Assert.That(updated!.IsPublic, Is.False);
+    }
+
+    [Test]
+    public async Task GivenAPrivateScene_WhenOwnerChangesVisibilityToPublic_ThenItAppearsInPublicListings()
+    {
+        var scene = await _service.CreateAsync(new Scene
+        {
+            Title = "Private view",
+            OwnerUserId = _owner.Id,
+            IsPublic = false
+        }, null);
+
+        await _service.UpdateAsync(scene.Id, new Scene { Title = scene.Title }, _owner.Id, null, isPublic: true);
+
+        Assert.That((await _service.GetPublicByOwnerAsync(_owner.Id)).Select(item => item.Id), Does.Contain(scene.Id));
     }
 
     [Test]
@@ -190,23 +252,35 @@ public sealed class SceneServiceTests
     {
         var scene = await _service.CreateAsync(new Scene { Title = "Rated", OwnerUserId = _owner.Id }, null);
 
-        var rated = await _service.RateAsync(scene.Id, _otherUser.Id, 8);
+        var rated = await _service.RateAsync(scene.Id, _otherUser.Id, 8, "A great view.");
 
         Assert.That(rated, Is.Not.Null);
         Assert.That(rated!.Ratings.Single().Rating, Is.EqualTo(8));
         Assert.That(rated.Ratings.Single().UserId, Is.EqualTo(_otherUser.Id));
+        Assert.That(rated.Ratings.Single().Description, Is.EqualTo("A great view."));
     }
 
     [Test]
     public async Task GivenAnExistingRatingFromTheSameUser_WhenRatingAgain_ThenTheRatingIsUpdatedNotDuplicated()
     {
         var scene = await _service.CreateAsync(new Scene { Title = "Rated", OwnerUserId = _owner.Id }, null);
-        await _service.RateAsync(scene.Id, _otherUser.Id, 5);
+        await _service.RateAsync(scene.Id, _otherUser.Id, 5, "First impression.");
 
-        var rated = await _service.RateAsync(scene.Id, _otherUser.Id, 9);
+        var rated = await _service.RateAsync(scene.Id, _otherUser.Id, 9, "Updated after the hike.");
 
         Assert.That(rated!.Ratings.Count, Is.EqualTo(1));
         Assert.That(rated.Ratings.Single().Rating, Is.EqualTo(9));
+        Assert.That(rated.Ratings.Single().Description, Is.EqualTo("Updated after the hike."));
+    }
+
+    [Test]
+    public async Task GivenWhitespaceRatingFeedback_WhenRatingAScene_ThenFeedbackIsStoredAsNull()
+    {
+        var scene = await _service.CreateAsync(new Scene { Title = "Rated", OwnerUserId = _owner.Id }, null);
+
+        var rated = await _service.RateAsync(scene.Id, _otherUser.Id, 6, "   ");
+
+        Assert.That(rated!.Ratings.Single().Description, Is.Null);
     }
 
     [Test]

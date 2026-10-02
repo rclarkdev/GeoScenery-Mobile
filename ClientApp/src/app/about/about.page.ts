@@ -2,24 +2,30 @@ import { Component } from '@angular/core';
 
 @Component({
   selector: 'app-about',
-  templateUrl: './about.page.html'
+  templateUrl: './about.page.html',
+  styleUrls: ['./about.page.scss']
 })
 export class AboutPage {
   readonly features = [
     {
-      icon: 'camera-outline',
-      title: 'Capture the moment',
-      description: 'Create scenes with photos from your device and add the place where they happened.'
-    },
-    {
       icon: 'map-outline',
-      title: 'Explore nearby',
-      description: 'Search the community by location, distance, and tags with an interactive map.'
+      title: 'Find a scene your way',
+      description: 'Browse the map or search by place, distance, and tags.'
     },
     {
-      icon: 'people-outline',
-      title: 'Share with people',
-      description: 'Follow other explorers, discover their scenes, and exchange thoughtful ratings.'
+      icon: 'star-outline',
+      title: 'Leave a thoughtful rating',
+      description: 'Rate a scene and add a note if you feel like it.'
+    },
+    {
+      icon: 'chatbubbles-outline',
+      title: 'Keep in touch',
+      description: 'Follow profiles and message other explorers.'
+    },
+    {
+      icon: 'footsteps-outline',
+      title: 'Save places you like',
+      description: 'Add a visit when you choose, and remove it whenever you like.'
     }
   ];
 }

@@ -15,4 +15,7 @@ public interface IEmailSender
 
     Task<EmailDeliveryOutcome> SendContentReportNotificationAsync(string recipient, ContentReportNotification report,
         CancellationToken cancellationToken = default);
+
+    Task<EmailDeliveryOutcome> SendSupportContactAsync(string recipient, SupportContactNotification request,
+        CancellationToken cancellationToken = default);
 }

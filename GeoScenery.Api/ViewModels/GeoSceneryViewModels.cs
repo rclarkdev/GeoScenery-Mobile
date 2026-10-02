@@ -18,13 +18,26 @@ public sealed record SceneResponse(
     decimal? CurrentUserRating,
     long? OwnerUserId,
     DateTimeOffset CreatedAt,
-    DateTimeOffset UpdatedAt);
+    DateTimeOffset UpdatedAt,
+    bool IsPublic,
+    string? CurrentUserRatingDescription,
+    IReadOnlyList<SceneRatingResponse> Ratings);
+
+/// <summary>Represents a public individual rating and its optional feedback.</summary>
+public sealed record SceneRatingResponse(
+    string UserDisplayName,
+    decimal Rating,
+    string? Description,
+    DateTimeOffset CreatedAt);
 
 /// <summary>Payload for rating another user's scene.</summary>
 public sealed record RateSceneRequest
 {
     [Range(0, 10)]
     public decimal Rating { get; init; }
+
+    [MaxLength(1000)]
+    public string? Description { get; init; }
 }
 
 /// <summary>Payload for creating a scene.</summary>
@@ -41,6 +54,8 @@ public sealed record CreateSceneRequest
 
     [Range(0, 10)]
     public decimal Rating { get; init; }
+
+    public bool IsPublic { get; init; } = true;
 
     [Range(-90, 90)]
     public double? Latitude { get; init; }
@@ -66,6 +81,8 @@ public sealed record UpdateSceneRequest
 
     [Range(0, 10)]
     public decimal Rating { get; init; }
+
+    public bool? IsPublic { get; init; }
 
     [Range(-90, 90)]
     public double? Latitude { get; init; }

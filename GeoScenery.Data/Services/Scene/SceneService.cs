@@ -28,7 +28,8 @@ public sealed class SceneService : ISceneService
             .AsNoTracking()
             .Include(scene => scene.Tags)
             .Include(scene => scene.Ratings)
-            .Where(scene => !scene.IsHidden
+                .ThenInclude(rating => rating.User)
+            .Where(scene => scene.IsPublic && !scene.IsHidden
                 && (scene.OwnerUserId == null || scene.OwnerUser == null || !scene.OwnerUser.IsSuspended))
             .AsQueryable();
 
@@ -64,8 +65,19 @@ public sealed class SceneService : ISceneService
             .AsNoTracking()
             .Include(scene => scene.Tags)
             .Include(scene => scene.Ratings)
-            .FirstOrDefaultAsync(scene => scene.Id == id && !scene.IsHidden
+                .ThenInclude(rating => rating.User)
+            .FirstOrDefaultAsync(scene => scene.Id == id && scene.IsPublic && !scene.IsHidden
                 && (scene.OwnerUserId == null || scene.OwnerUser == null || !scene.OwnerUser.IsSuspended), cancellationToken);
+    }
+
+    public Task<Scene?> GetOwnedByIdAsync(long id, long ownerUserId, CancellationToken cancellationToken = default)
+    {
+        return _dbContext.Scenes
+            .AsNoTracking()
+            .Include(scene => scene.Tags)
+            .Include(scene => scene.Ratings)
+                .ThenInclude(rating => rating.User)
+            .FirstOrDefaultAsync(scene => scene.Id == id && scene.OwnerUserId == ownerUserId && !scene.IsHidden, cancellationToken);
     }
 
     public async Task<IReadOnlyList<Scene>> GetByOwnerAsync(long ownerUserId, CancellationToken cancellationToken = default)
@@ -74,7 +86,21 @@ public sealed class SceneService : ISceneService
             .AsNoTracking()
             .Include(scene => scene.Tags)
             .Include(scene => scene.Ratings)
+                .ThenInclude(rating => rating.User)
             .Where(scene => scene.OwnerUserId == ownerUserId)
+            .OrderBy(scene => scene.Title)
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<Scene>> GetPublicByOwnerAsync(long ownerUserId, CancellationToken cancellationToken = default)
+    {
+        return await _dbContext.Scenes
+            .AsNoTracking()
+            .Include(scene => scene.Tags)
+            .Include(scene => scene.Ratings)
+                .ThenInclude(rating => rating.User)
+            .Where(scene => scene.OwnerUserId == ownerUserId && scene.IsPublic && !scene.IsHidden
+                && (scene.OwnerUser == null || !scene.OwnerUser.IsSuspended))
             .OrderBy(scene => scene.Title)
             .ToListAsync(cancellationToken);
     }
@@ -93,7 +119,8 @@ public sealed class SceneService : ISceneService
         return scene;
     }
 
-    public async Task<Scene?> UpdateAsync(long id, Scene scene, long ownerUserId, IReadOnlyList<string>? tags, CancellationToken cancellationToken = default)
+    public async Task<Scene?> UpdateAsync(long id, Scene scene, long ownerUserId, IReadOnlyList<string>? tags,
+        CancellationToken cancellationToken = default, bool? isPublic = null)
     {
         var existingScene = await _dbContext.Scenes
             .Include(existing => existing.Tags)
@@ -108,6 +135,10 @@ public sealed class SceneService : ISceneService
         existingScene.Description = scene.Description;
         existingScene.ImageUrl = scene.ImageUrl;
         existingScene.Rating = scene.Rating;
+        if (isPublic.HasValue)
+        {
+            existingScene.IsPublic = isPublic.Value;
+        }
         existingScene.Latitude = scene.Latitude;
         existingScene.Longitude = scene.Longitude;
         existingScene.UpdatedAt = DateTimeOffset.UtcNow;
@@ -176,25 +207,30 @@ public sealed class SceneService : ISceneService
         return true;
     }
 
-    public async Task<Scene?> RateAsync(long sceneId, long userId, decimal rating, CancellationToken cancellationToken = default)
+    public async Task<Scene?> RateAsync(long sceneId, long userId, decimal rating, string? description = null,
+        CancellationToken cancellationToken = default)
     {
         var scene = await _dbContext.Scenes
             .Include(existing => existing.Ratings)
+                .ThenInclude(existingRating => existingRating.User)
             .FirstOrDefaultAsync(existing => existing.Id == sceneId, cancellationToken);
         if (scene is null)
         {
             return null;
         }
 
+        var normalizedDescription = string.IsNullOrWhiteSpace(description) ? null : description.Trim();
         var existingRating = scene.Ratings.FirstOrDefault(sceneRating => sceneRating.UserId == userId);
         if (existingRating is not null)
         {
             existingRating.Rating = rating;
+            existingRating.Description = normalizedDescription;
             existingRating.UpdatedAt = DateTimeOffset.UtcNow;
         }
         else
         {
-            scene.Ratings.Add(new SceneRating { UserId = userId, Rating = rating });
+            var user = await _dbContext.Users.FindAsync([userId], cancellationToken);
+            scene.Ratings.Add(new SceneRating { UserId = userId, User = user!, Rating = rating, Description = normalizedDescription });
         }
 
         await _dbContext.SaveChangesAsync(cancellationToken);

@@ -23,6 +23,7 @@ export class NewScenePage implements OnInit {
     description: ['', [Validators.required, Validators.maxLength(4000)]],
     imageUrl: ['', [Validators.required]],
     rating: [0, [Validators.min(0), Validators.max(10)]],
+    isPublic: [true],
     tags: [''],
     latitude: this.formBuilder.control<number | null>(null, [Validators.min(-90), Validators.max(90)]),
     longitude: this.formBuilder.control<number | null>(null, [Validators.min(-180), Validators.max(180)])

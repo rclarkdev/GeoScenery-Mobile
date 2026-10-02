@@ -14,7 +14,8 @@ describe('SceneryService', () => {
     title: scene.title,
     description: scene.description,
     imageUrl: scene.imageUrl,
-    rating: scene.rating
+    rating: scene.rating,
+    isPublic: true
   };
 
   beforeEach(() => {
@@ -41,6 +42,13 @@ describe('SceneryService', () => {
     request.flush(scene);
   });
 
+  it('gets only public scenes for a profile', () => {
+    service.getUserPublicScenes(42).subscribe(result => expect(result).toEqual([scene]));
+    const httpRequest = http.expectOne(`${environment.apiUrl}/api/users/42/scenes`);
+    expect(httpRequest.request.method).toBe('GET');
+    httpRequest.flush([scene]);
+  });
+
   it('creates a scene', () => {
     service.createScene(request).subscribe(result => expect(result).toEqual(scene));
     const httpRequest = http.expectOne(scenesUrl);
@@ -65,10 +73,10 @@ describe('SceneryService', () => {
   });
 
   it('rates a scene', () => {
-    service.rateScene(scene.id, 7).subscribe(result => expect(result).toEqual(scene));
+    service.rateScene(scene.id, 7, 'Beautiful view with a clear trail.').subscribe(result => expect(result).toEqual(scene));
     const httpRequest = http.expectOne(`${scenesUrl}/${scene.id}/rating`);
     expect(httpRequest.request.method).toBe('POST');
-    expect(httpRequest.request.body).toEqual({ rating: 7 });
+    expect(httpRequest.request.body).toEqual({ rating: 7, description: 'Beautiful view with a clear trail.' });
     httpRequest.flush(scene);
   });
 

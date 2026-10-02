@@ -109,4 +109,38 @@ public sealed class SmtpEmailSender(IConfiguration configuration, IHostEnvironme
         await client.SendMailAsync(message, cancellationToken);
         return EmailDeliveryOutcome.Sent;
     }
+
+    public async Task<EmailDeliveryOutcome> SendSupportContactAsync(string recipient, SupportContactNotification request,
+        CancellationToken cancellationToken = default)
+    {
+        var section = configuration.GetSection("Email");
+        var host = section["SmtpHost"];
+        if (string.IsNullOrWhiteSpace(host))
+        {
+            if (environment.IsDevelopment())
+            {
+                return EmailDeliveryOutcome.SkippedDevelopment;
+            }
+
+            throw new InvalidOperationException("Email:SmtpHost must be configured outside Development.");
+        }
+
+        using var client = CreateClient(section, host);
+        using var message = new MailMessage(section["From"] ?? "no-reply@geoscenery.local", recipient)
+        {
+            Subject = $"GeoScenery support: {request.Topic}",
+                Body = $"A user sent a support request through GeoScenery.\n\n"
+                + $"Name: {request.Name}\n"
+                + $"Reply email: {request.Email}\n"
+                + $"Topic: {request.Topic}\n"
+                + $"Submitted (UTC): {request.SubmittedAt:yyyy-MM-dd HH:mm:ss}\n\n"
+                + "Message:\n"
+                + request.Message,
+            IsBodyHtml = false
+        };
+        message.ReplyToList.Add(new MailAddress(request.Email, request.Name));
+        cancellationToken.ThrowIfCancellationRequested();
+        await client.SendMailAsync(message, cancellationToken);
+        return EmailDeliveryOutcome.Sent;
+    }
 }

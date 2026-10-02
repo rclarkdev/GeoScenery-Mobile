@@ -94,7 +94,7 @@ export class AuthPage {
       email: this.authForm.controls.email.value,
       password: this.authForm.controls.password.value
     }).subscribe({
-      next: () => this.navController.navigateRoot('/scenery/tabs/search'),
+      next: () => this.navController.navigateRoot('/scenery/tabs/profile'),
       error: (error: HttpErrorResponse) => {
         this.isSubmitting = false;
         this.authError = this.getAuthError(error);

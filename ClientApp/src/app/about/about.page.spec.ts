@@ -19,13 +19,24 @@ describe('AboutPage', () => {
     fixture.detectChanges();
   });
 
-  it('creates the about page with the core feature list', () => {
+  it('creates the about page with the confirmed product feature list', () => {
     expect(component).toBeTruthy();
-    expect(component.features.length).toBe(3);
+    expect(component.features.length).toBe(4);
     expect(component.features.map(feature => feature.title)).toEqual([
-      'Capture the moment',
-      'Explore nearby',
-      'Share with people'
+      'Find a scene your way',
+      'Leave a thoughtful rating',
+      'Keep in touch',
+      'Save places you like'
     ]);
+  });
+
+  it('includes the guide, privacy information, and practical FAQs', () => {
+    const pageText = fixture.nativeElement.textContent;
+
+    expect(pageText).toContain('A place, your way');
+    expect(pageText).toContain('You choose what to share.');
+    expect(pageText).toContain('Does GeoScenery track my visits?');
+    expect(pageText).toContain('Visits are never added automatically');
+    expect(pageText).toContain('Version 1.0.0');
   });
 });

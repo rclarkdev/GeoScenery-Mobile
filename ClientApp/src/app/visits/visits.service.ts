@@ -23,4 +23,8 @@ export class VisitsService {
     const request: CreateVisitRequest = { sceneId };
     return this.http.post<Visit>(this.visitsUrl, request);
   }
+
+  removeVisit(visitId: number): Observable<void> {
+    return this.http.delete<void>(`${this.visitsUrl}/${visitId}`);
+  }
 }

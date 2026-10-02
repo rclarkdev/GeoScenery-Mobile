@@ -7,30 +7,119 @@
   </ion-toolbar>
 </ion-header>
 
-<ion-content class="ion-padding">
-  <section class="about-intro ion-text-center">
-    <ion-icon name="earth-outline" aria-hidden="true"></ion-icon>
-    <h1>Notice more of the world around you.</h1>
-    <p>GeoScenery is a place to collect, explore, and share the scenes that make a place memorable.</p>
-  </section>
+<ion-content>
+  <main class="about-page">
+    <section class="about-hero" aria-labelledby="about-title">
+      <div class="hero-copy">
+        <p class="eyebrow"><span class="eyebrow-mark" aria-hidden="true"></span>Welcome to GeoScenery</p>
+        <h1 id="about-title">Keep the places<br class="desktop-break"> you love close.</h1>
+        <p class="hero-description">Save a scene that matters, explore places shared by others, and share only what you choose.</p>
+        <div class="hero-actions">
+          <ion-button routerLink="/auth" aria-label="Sign in or get started with GeoScenery">Sign in / Get started</ion-button>
+          <a class="text-link" href="#guide">See how it works <ion-icon name="arrow-down-outline" aria-hidden="true"></ion-icon></a>
+        </div>
+      </div>
+      <div class="hero-landscape" aria-hidden="true">
+        <span class="landscape-sun"></span>
+        <span class="landscape-ridge ridge-back"></span>
+        <span class="landscape-ridge ridge-front"></span>
+        <span class="landscape-pin"><ion-icon name="location-outline"></ion-icon></span>
+        <span class="landscape-caption">A place, remembered</span>
+      </div>
+    </section>
 
-  <ion-list lines="full">
-    <ion-item *ngFor="let feature of features">
-      <ion-icon slot="start" [name]="feature.icon" aria-hidden="true"></ion-icon>
-      <ion-label class="ion-text-wrap">
-        <h2>{{ feature.title }}</h2>
-        <p>{{ feature.description }}</p>
-      </ion-label>
-    </ion-item>
-  </ion-list>
+    <section class="guide-section" id="guide" aria-labelledby="guide-title">
+      <div class="section-heading">
+        <p class="eyebrow">Getting started</p>
+        <h2 id="guide-title">A place, your way</h2>
+        <p>Save a moment for yourself or share it with the community.</p>
+      </div>
+      <ol class="steps-list">
+        <li class="step">
+          <span class="step-number" aria-hidden="true">01</span>
+          <div>
+            <h3>Create a scene</h3>
+            <p>Add a photo, a few details, and optional tags. You choose whether the scene is public or private.</p>
+          </div>
+        </li>
+        <li class="step">
+          <span class="step-number" aria-hidden="true">02</span>
+          <div>
+            <h3>Explore the map</h3>
+            <p>Browse the map or search by place, distance, and tags.</p>
+          </div>
+        </li>
+        <li class="step">
+          <span class="step-number" aria-hidden="true">03</span>
+          <div>
+            <h3>Save or share</h3>
+            <p>Add a place to your visits when you want, or leave a rating with optional feedback.</p>
+          </div>
+        </li>
+      </ol>
+    </section>
 
-  <ion-item lines="none">
-    <ion-label class="ion-text-wrap">
-      <h2>Built around responsible sharing</h2>
-      <p>Photos and locations are yours to choose. Read our <a routerLink="/legal/community">Community Guidelines</a> and <a routerLink="/legal/privacy">Privacy Policy</a> before you begin.</p>
-    </ion-label>
-  </ion-item>
+    <section class="features-section" aria-labelledby="features-title">
+      <div class="features-intro">
+        <p class="eyebrow">Make it your own</p>
+        <h2 id="features-title">Find your kind of scenery.</h2>
+        <p>Explore at your pace and connect with places and people you enjoy.</p>
+      </div>
+      <ul class="feature-list">
+        <li class="feature-item" *ngFor="let feature of features">
+          <ion-icon [name]="feature.icon" aria-hidden="true"></ion-icon>
+          <div>
+            <h3>{{ feature.title }}</h3>
+            <p>{{ feature.description }}</p>
+          </div>
+        </li>
+      </ul>
+    </section>
 
-  <ion-button expand="block" fill="outline" routerLink="/legal/support">Contact support</ion-button>
-  <p class="ion-text-center" aria-label="Application version">Version 1.0.0</p>
+    <section class="privacy-section" aria-labelledby="privacy-title">
+      <div class="privacy-symbol" aria-hidden="true"><ion-icon name="shield-checkmark-outline"></ion-icon></div>
+      <div class="privacy-copy">
+        <p class="eyebrow">Your place, your choice</p>
+        <h2 id="privacy-title">You choose what to share.</h2>
+        <p>Scenes can be public or private, and adding a location is optional. Visits are never added automatically: save one when you choose, and remove it any time. You can edit your scenes, report concerns, or block users.</p>
+        <nav class="privacy-links" aria-label="Safety and privacy policies">
+          <a routerLink="/legal/community">Community Guidelines <ion-icon name="arrow-forward-outline" aria-hidden="true"></ion-icon></a>
+          <a routerLink="/legal/privacy">Privacy Policy <ion-icon name="arrow-forward-outline" aria-hidden="true"></ion-icon></a>
+        </nav>
+      </div>
+      <div class="privacy-note"><ion-icon name="eye-off-outline" aria-hidden="true"></ion-icon><span>Private scenes aren't publicly searchable.</span></div>
+    </section>
+
+    <section class="faq-section" aria-labelledby="faq-title">
+      <div class="faq-intro">
+        <p class="eyebrow">Good to know</p>
+        <h2 id="faq-title">A few quick answers</h2>
+      </div>
+      <div class="faq-list">
+        <details class="faq-item">
+          <summary>Who can see my scene?</summary>
+          <p>You choose public or private when creating or editing it. Private scenes aren't publicly searchable. See the <a routerLink="/legal/privacy">Privacy Policy</a> for details.</p>
+        </details>
+        <details class="faq-item">
+          <summary>Do I have to add a location?</summary>
+          <p>No. Location is optional when you create a scene.</p>
+        </details>
+        <details class="faq-item">
+          <summary>Does GeoScenery track my visits?</summary>
+          <p>No automatic visit logging. Save a place to your personal visits only when you choose, and remove it whenever you like. Ratings can include optional feedback.</p>
+        </details>
+      </div>
+    </section>
+
+    <footer class="about-footer">
+      <div class="footer-brand"><ion-icon name="earth-outline" aria-hidden="true"></ion-icon><span>GeoScenery</span></div>
+      <p>Have a question or need a hand?</p>
+      <a class="support-link" routerLink="/legal/support">Visit support <ion-icon name="arrow-forward-outline" aria-hidden="true"></ion-icon></a>
+      <nav class="footer-links" aria-label="Legal information">
+        <a routerLink="/legal/community">Community Guidelines</a>
+        <a routerLink="/legal/privacy">Privacy Policy</a>
+      </nav>
+      <p class="version" aria-label="Application version">Version 1.0.0</p>
+    </footer>
+  </main>
 </ion-content>

@@ -9,6 +9,7 @@ using GeoScenery.Api.Logging;
 using GeoScenery.Data.Context;
 using GeoScenery.Data.Models;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.EntityFrameworkCore;
@@ -69,7 +70,7 @@ public sealed class GeoSceneryApiTests
         return (await loginResponse.Content.ReadFromJsonAsync<AuthResponseModel>())!;
     }
 
-    private async Task<SceneResponse> CreateSceneAsync(string title = "Observation Point", string[]? tags = null, double? latitude = null, double? longitude = null)
+    private async Task<SceneResponse> CreateSceneAsync(string title = "Observation Point", string[]? tags = null, double? latitude = null, double? longitude = null, bool isPublic = true)
     {
         var imageUrl = await UploadTestSceneImageAsync();
         var response = await _client.PostAsJsonAsync("/api/scenes", new
@@ -78,6 +79,7 @@ public sealed class GeoSceneryApiTests
             description = "A scenic view.",
             imageUrl,
             rating = 9,
+            isPublic,
             tags,
             latitude,
             longitude
@@ -111,6 +113,80 @@ public sealed class GeoSceneryApiTests
         var response = await _client.GetAsync("/health/live");
 
         Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK));
+    }
+
+    [Test]
+    public async Task GivenPublicAndPrivateScenes_WhenListingAnotherUsersScenes_ThenOnlyPublicScenesAreReturned()
+    {
+        var publicScene = await CreateSceneAsync("Visible scene");
+        var privateScene = await CreateSceneAsync("Private scene", isPublic: false);
+
+        var response = await _client.GetAsync("/api/users/1/scenes");
+        var scenes = await response.Content.ReadFromJsonAsync<List<SceneResponse>>();
+        var ownScenesResponse = await _client.GetAsync("/api/users/me/scenes");
+        var ownScenes = await ownScenesResponse.Content.ReadFromJsonAsync<List<SceneResponse>>();
+        var ownPrivateScene = await _client.GetAsync($"/api/scenes/{privateScene.Id}");
+
+        _client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", CreateToken(2));
+        var otherUserPrivateScene = await _client.GetAsync($"/api/scenes/{privateScene.Id}");
+        var otherUserSceneListResponse = await _client.GetAsync("/api/users/1/scenes");
+        var otherUserScenes = await otherUserSceneListResponse.Content.ReadFromJsonAsync<List<SceneResponse>>();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(scenes, Is.Not.Null);
+            Assert.That(scenes!.Select(scene => scene.Id), Does.Contain(publicScene.Id));
+            Assert.That(scenes.Select(scene => scene.Id), Does.Not.Contain(privateScene.Id));
+            Assert.That(ownScenes!.Select(scene => scene.Id), Does.Contain(privateScene.Id));
+            Assert.That(ownPrivateScene.StatusCode, Is.EqualTo(HttpStatusCode.OK));
+            Assert.That(otherUserPrivateScene.StatusCode, Is.EqualTo(HttpStatusCode.NotFound));
+            Assert.That(otherUserScenes!.Select(scene => scene.Id), Does.Not.Contain(privateScene.Id));
+        });
+    }
+
+    [Test]
+    public async Task GivenASceneOwner_WhenChangingVisibility_ThenPublicListsReflectTheNewSetting()
+    {
+        var scene = await CreateSceneAsync("Visibility switch");
+        var makePrivate = await _client.PutAsJsonAsync($"/api/scenes/{scene.Id}", new
+        {
+            title = scene.Title,
+            description = scene.Description,
+            imageUrl = scene.ImageUrl,
+            rating = scene.Rating,
+            isPublic = false,
+            tags = scene.Tags,
+            latitude = scene.Latitude,
+            longitude = scene.Longitude
+        });
+        var privateResponse = await makePrivate.Content.ReadFromJsonAsync<SceneResponse>();
+        var privateListResponse = await _client.GetAsync("/api/users/1/scenes");
+        var privateList = await privateListResponse.Content.ReadFromJsonAsync<List<SceneResponse>>();
+
+        var makePublic = await _client.PutAsJsonAsync($"/api/scenes/{scene.Id}", new
+        {
+            title = scene.Title,
+            description = scene.Description,
+            imageUrl = scene.ImageUrl,
+            rating = scene.Rating,
+            isPublic = true,
+            tags = scene.Tags,
+            latitude = scene.Latitude,
+            longitude = scene.Longitude
+        });
+        var publicResponse = await makePublic.Content.ReadFromJsonAsync<SceneResponse>();
+        var publicListResponse = await _client.GetAsync("/api/users/1/scenes");
+        var publicList = await publicListResponse.Content.ReadFromJsonAsync<List<SceneResponse>>();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(makePrivate.StatusCode, Is.EqualTo(HttpStatusCode.OK));
+            Assert.That(privateResponse!.IsPublic, Is.False);
+            Assert.That(privateList!.Select(item => item.Id), Does.Not.Contain(scene.Id));
+            Assert.That(makePublic.StatusCode, Is.EqualTo(HttpStatusCode.OK));
+            Assert.That(publicResponse!.IsPublic, Is.True);
+            Assert.That(publicList!.Select(item => item.Id), Does.Contain(scene.Id));
+        });
     }
 
     [Test]
@@ -1038,10 +1114,79 @@ public sealed class GeoSceneryApiTests
     public async Task GivenTheDefaultMasterAccount_WhenTheDatabaseIsCreated_ThenItHasTheAdminRole()
     {
         using var database = new TestDatabase();
+        var master = await database.Context.Users.AsNoTracking().SingleAsync(user => user.Id == 1);
         var role = await database.Context.UserRoles.AsNoTracking()
             .SingleAsync(userRole => userRole.UserId == 1);
 
         Assert.That(role.RoleName, Is.EqualTo(AppRoles.Admin));
+        Assert.That(new PasswordHasher<User>().VerifyHashedPassword(master, master.PasswordHash, "password"),
+            Is.EqualTo(PasswordVerificationResult.Success));
+        Assert.That(database.Context.Database.GetMigrations(),
+            Does.Contain("20261002083311_SetMasterAdminPassword"));
+    }
+
+    [Test]
+    public async Task GivenAValidAnonymousSupportRequest_WhenAnAdminExists_ThenItIsEmailedToTheAdmin()
+    {
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var database = scope.ServiceProvider.GetRequiredService<MyProjectDbContext>();
+            database.UserRoles.RemoveRange(database.UserRoles.Where(userRole => userRole.UserId == 1));
+            database.UserRoles.Add(new UserRole { UserId = 1, RoleName = AppRoles.Admin });
+            await database.SaveChangesAsync();
+        }
+
+        _client.DefaultRequestHeaders.Authorization = null;
+        var response = await _client.PostAsJsonAsync("/api/support/contact", new
+        {
+            name = "Sam Explorer",
+            email = "sam@example.com",
+            topic = "Technical problem",
+            message = "The map does not load on my device."
+        });
+        var result = await response.Content.ReadFromJsonAsync<SupportContactResponse>();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK));
+            Assert.That(result?.Message, Does.Contain("sent"));
+            Assert.That(_factory.SupportNotifications, Has.Count.EqualTo(1));
+            Assert.That(_factory.SupportNotifications[0].Recipient, Is.EqualTo("test@example.com"));
+            Assert.That(_factory.SupportNotifications[0].Request.Email, Is.EqualTo("sam@example.com"));
+            Assert.That(_factory.SupportNotifications[0].Request.Message, Is.EqualTo("The map does not load on my device."));
+        });
+    }
+
+    [Test]
+    public async Task GivenNoAdministrators_WhenSubmittingSupportRequest_ThenDeliveryIsUnavailable()
+    {
+        _client.DefaultRequestHeaders.Authorization = null;
+        var response = await _client.PostAsJsonAsync("/api/support/contact", new
+        {
+            name = "Sam Explorer",
+            email = "sam@example.com",
+            topic = "Other",
+            message = "I have a question about my account."
+        });
+
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.ServiceUnavailable));
+        Assert.That(_factory.SupportNotifications, Is.Empty);
+    }
+
+    [Test]
+    public async Task GivenAnInvalidSupportRequest_WhenSubmitted_ThenItIsRejected()
+    {
+        _client.DefaultRequestHeaders.Authorization = null;
+        var response = await _client.PostAsJsonAsync("/api/support/contact", new
+        {
+            name = "Sam Explorer",
+            email = "not-an-email",
+            topic = "Other",
+            message = "Too short"
+        });
+
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.BadRequest));
+        Assert.That(_factory.SupportNotifications, Is.Empty);
     }
 
     [Test]
@@ -1302,13 +1447,61 @@ public sealed class GeoSceneryApiTests
         var rater = await RegisterUserAsync("Rater", "rater@example.com");
         _client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", CreateToken(rater.UserId));
 
-        var response = await _client.PostAsJsonAsync($"/api/scenes/{scene.Id}/rating", new { rating = 8 });
+        var response = await _client.PostAsJsonAsync($"/api/scenes/{scene.Id}/rating", new
+        {
+            rating = 8,
+            description = "The overlook is beautiful, and the trail is well marked."
+        });
         var rated = await response.Content.ReadFromJsonAsync<SceneResponse>();
+        _client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", CreateToken(1));
+        var visibleToAnotherUserResponse = await _client.GetAsync($"/api/scenes/{scene.Id}");
+        var visibleToAnotherUser = await visibleToAnotherUserResponse.Content.ReadFromJsonAsync<SceneResponse>();
 
         Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK));
         Assert.That(rated!.AverageRating, Is.EqualTo(8));
         Assert.That(rated.RatingCount, Is.EqualTo(1));
         Assert.That(rated.CurrentUserRating, Is.EqualTo(8));
+        Assert.That(rated.CurrentUserRatingDescription, Is.EqualTo("The overlook is beautiful, and the trail is well marked."));
+        Assert.That(visibleToAnotherUser!.CurrentUserRatingDescription, Is.Null,
+            "A different viewer must not receive the rater's private edit-state field.");
+        Assert.That(visibleToAnotherUser.Ratings, Has.Count.EqualTo(1));
+        Assert.That(visibleToAnotherUser.Ratings[0].UserDisplayName, Is.EqualTo("Rater"));
+        Assert.That(visibleToAnotherUser.Ratings[0].Rating, Is.EqualTo(8));
+        Assert.That(visibleToAnotherUser.Ratings[0].Description, Is.EqualTo("The overlook is beautiful, and the trail is well marked."));
+    }
+
+    [Test]
+    public async Task GivenAnExistingRater_WhenUpdatingFeedback_ThenTheIndividualReviewIsReplaced()
+    {
+        var scene = await CreateSceneAsync();
+        var rater = await RegisterUserAsync("Feedback author", "feedback-author@example.com");
+        _client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", CreateToken(rater.UserId));
+        await _client.PostAsJsonAsync($"/api/scenes/{scene.Id}/rating", new { rating = 6, description = "Initial feedback." });
+
+        var response = await _client.PostAsJsonAsync($"/api/scenes/{scene.Id}/rating", new { rating = 9, description = "Revised feedback." });
+        var rated = await response.Content.ReadFromJsonAsync<SceneResponse>();
+
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK));
+        Assert.That(rated!.Ratings, Has.Count.EqualTo(1));
+        Assert.That(rated.Ratings[0].Rating, Is.EqualTo(9));
+        Assert.That(rated.Ratings[0].Description, Is.EqualTo("Revised feedback."));
+        Assert.That(rated.CurrentUserRatingDescription, Is.EqualTo("Revised feedback."));
+    }
+
+    [Test]
+    public async Task GivenRatingFeedbackExceedingTheMaximumLength_WhenRatingAScene_ThenTheApiReturnsBadRequest()
+    {
+        var scene = await CreateSceneAsync();
+        var rater = await RegisterUserAsync("Long feedback", "long-feedback@example.com");
+        _client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", CreateToken(rater.UserId));
+
+        var response = await _client.PostAsJsonAsync($"/api/scenes/{scene.Id}/rating", new
+        {
+            rating = 5,
+            description = new string('a', 1001)
+        });
+
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.BadRequest));
     }
 
     [Test]

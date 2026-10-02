@@ -1,3 +1,10 @@
+export interface SceneRating {
+    userDisplayName: string;
+    rating: number;
+    description?: string | null;
+    createdAt: string;
+}
+
 export class Scene {
     constructor(
         public id: number,
@@ -14,7 +21,10 @@ export class Scene {
         public currentUserRating?: number,
         public ownerUserId?: number,
         public createdAt?: string,
-        public updatedAt?: string
+        public updatedAt?: string,
+        public isPublic = true,
+        public currentUserRatingDescription?: string | null,
+        public ratings: SceneRating[] = []
     ) {
 
     }

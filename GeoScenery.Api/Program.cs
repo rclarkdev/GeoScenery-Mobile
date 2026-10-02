@@ -134,6 +134,17 @@ builder.Services.AddRateLimiter(options =>
                 QueueLimit = 0
             }));
 
+    // The public support form is rate-limited by client IP to reduce email abuse.
+    options.AddPolicy("support-contact", context =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 3,
+                Window = TimeSpan.FromHours(1),
+                QueueLimit = 0
+            }));
+
     options.AddPolicy("email-verification", context =>
         RateLimitPartition.GetFixedWindowLimiter(
             partitionKey: context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
@@ -224,6 +235,7 @@ app.MapHealthEndpoints();
 app.MapAuthEndpoints(builder.Configuration);
 app.MapGeoSceneryEndpoints();
 app.MapImageEndpoints();
+app.MapSupportEndpoints();
 
 app.Run();
 

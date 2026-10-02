@@ -20,6 +20,11 @@
         Edit profile
       </ion-button>
       <div class="relationship-actions" *ngIf="!isOwnProfile">
+        <ion-button class="identity-action" fill="outline" size="small"
+          [routerLink]="['/scenery/tabs/profile', user.id, 'scenes']">
+          <ion-icon slot="start" name="images-outline"></ion-icon>
+          View public scenes
+        </ion-button>
         <ion-button class="identity-action" *ngIf="!user.isBlockedByCurrentUser && !user.hasBlockedCurrentUser"
           fill="outline" size="small" [color]="user.isFollowedByCurrentUser ? 'medium' : 'primary'"
           [disabled]="isFollowChanging || isBlockChanging" (click)="toggleFollow()">

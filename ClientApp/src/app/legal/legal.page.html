@@ -7,11 +7,130 @@
   </ion-toolbar>
 </ion-header>
 
-<ion-content class="ion-padding">
-  <article>
-    <section *ngFor="let section of sections">
-      <h2>{{ section.heading }}</h2>
-      <p>{{ section.body }}</p>
-    </section>
-  </article>
+<ion-content class="legal-content">
+  <main class="legal-page" [ngSwitch]="documentKey">
+    <article *ngSwitchCase="'support'" aria-labelledby="legal-title">
+      <header class="page-intro support-intro">
+        <span class="intro-symbol" aria-hidden="true"><ion-icon name="help-buoy-outline"></ion-icon></span>
+        <div>
+          <p class="eyebrow">We're here to help</p>
+          <h1 id="legal-title">{{ title }}</h1>
+          <p class="intro-copy">Find the right next step for account questions, safety concerns, or a problem with the app.</p>
+        </div>
+      </header>
+
+      <section class="topic-list" aria-label="Support topics">
+        <article class="topic-row" *ngFor="let topic of supportTopics">
+          <span class="topic-symbol" aria-hidden="true"><ion-icon [name]="topic.icon"></ion-icon></span>
+          <div>
+            <h2>{{ topic.heading }}</h2>
+            <p>{{ topic.body }}</p>
+          </div>
+        </article>
+      </section>
+
+      <form class="support-form" aria-labelledby="request-title" (ngSubmit)="submitSupportRequest()">
+        <p class="eyebrow">A useful request</p>
+        <h2 id="request-title">Tell us what happened</h2>
+        <p class="form-intro">Your message and reply email go to active GeoScenery administrators.</p>
+        <div class="form-grid">
+          <ion-item lines="none">
+            <ion-input label="Your name" labelPlacement="stacked" name="name" autocomplete="name"
+              maxlength="200" required [(ngModel)]="supportForm.name"></ion-input>
+          </ion-item>
+          <ion-item lines="none">
+            <ion-input label="Reply email" labelPlacement="stacked" name="email" type="email"
+              autocomplete="email" maxlength="320" required [(ngModel)]="supportForm.email"></ion-input>
+          </ion-item>
+        </div>
+        <ion-item lines="none">
+          <ion-select label="What do you need help with?" labelPlacement="stacked" name="topic" required
+            [(ngModel)]="supportForm.topic">
+            <ion-select-option value="Account or sign-in">Account or sign-in</ion-select-option>
+            <ion-select-option value="Privacy or safety">Privacy or safety</ion-select-option>
+            <ion-select-option value="App or technical issue">App or technical issue</ion-select-option>
+            <ion-select-option value="Other">Something else</ion-select-option>
+          </ion-select>
+        </ion-item>
+        <ion-item lines="none">
+          <ion-textarea label="Message" labelPlacement="stacked" name="message"
+            placeholder="Describe the issue and what you expected to happen." minlength="10"
+            maxlength="4000" rows="5" required [autoGrow]="true"
+            [(ngModel)]="supportForm.message"></ion-textarea>
+        </ion-item>
+        <div class="website-trap" aria-hidden="true">
+          <label>Leave this field empty<input name="website" tabindex="-1" autocomplete="off" [(ngModel)]="supportForm.website"></label>
+        </div>
+        <p class="security-note"><ion-icon name="lock-closed-outline" aria-hidden="true"></ion-icon><span>Never include your password, verification code, or password-reset token.</span></p>
+        <ion-button type="submit" [disabled]="isSubmittingSupport || !supportForm.name.trim() || !supportForm.email.trim() || !supportForm.topic || supportForm.message.trim().length < 10">
+          {{ isSubmittingSupport ? 'Sending…' : 'Send to support' }}
+        </ion-button>
+        <ion-note class="form-feedback" color="success" role="status" *ngIf="supportSuccess">{{ supportSuccess }}</ion-note>
+        <ion-note class="form-feedback" color="danger" role="alert" *ngIf="supportError">{{ supportError }}</ion-note>
+      </form>
+
+      <p class="location-note">Scene locations are optional. Location may be used for discovery when you choose that feature; visit history is added by you and can be removed.</p>
+      <nav class="related-links" aria-label="Related information">
+        <a routerLink="/legal/community">Community Guidelines <ion-icon name="arrow-forward-outline" aria-hidden="true"></ion-icon></a>
+        <a routerLink="/legal/privacy">Privacy Policy <ion-icon name="arrow-forward-outline" aria-hidden="true"></ion-icon></a>
+      </nav>
+    </article>
+
+    <article *ngSwitchCase="'community'" aria-labelledby="legal-title">
+      <header class="page-intro community-intro">
+        <span class="intro-symbol" aria-hidden="true"><ion-icon name="heart-outline"></ion-icon></span>
+        <div>
+          <p class="eyebrow">A good place to share</p>
+          <h1 id="legal-title">{{ title }}</h1>
+          <p class="intro-copy">Help keep scene sharing welcoming, useful, and safe for everyone.</p>
+          <p class="last-updated">Last updated {{ policyLastUpdated }}</p>
+        </div>
+      </header>
+
+      <ul class="guideline-list" aria-label="Community commitments">
+        <li class="guideline-row" *ngFor="let guideline of guidelines">
+          <span class="topic-symbol community-symbol" aria-hidden="true"><ion-icon [name]="guideline.icon"></ion-icon></span>
+          <div>
+            <h2>{{ guideline.heading }}</h2>
+            <p>{{ guideline.body }}</p>
+          </div>
+        </li>
+      </ul>
+
+      <section class="report-panel" aria-labelledby="report-title">
+        <span class="report-symbol" aria-hidden="true"><ion-icon name="flag-outline"></ion-icon></span>
+        <div>
+          <p class="eyebrow">See something concerning?</p>
+          <h2 id="report-title">Use the in-app report controls</h2>
+          <p>Choose Report scene or Report profile and provide a clear reason. For other questions, visit <a routerLink="/legal/support">Support</a>. Reports do not guarantee a particular review timeline or outcome.</p>
+        </div>
+      </section>
+
+      <nav class="related-links" aria-label="Related policies">
+        <a routerLink="/legal/privacy">Privacy Policy <ion-icon name="arrow-forward-outline" aria-hidden="true"></ion-icon></a>
+        <a routerLink="/legal/terms">Terms of Service <ion-icon name="arrow-forward-outline" aria-hidden="true"></ion-icon></a>
+        <a routerLink="/legal/support">Support <ion-icon name="arrow-forward-outline" aria-hidden="true"></ion-icon></a>
+      </nav>
+    </article>
+
+    <article *ngSwitchDefault class="document-article" aria-labelledby="legal-title">
+      <header class="page-intro document-intro">
+        <p class="eyebrow">GeoScenery information</p>
+        <h1 id="legal-title">{{ title }}</h1>
+        <p class="last-updated">Last updated {{ policyLastUpdated }}</p>
+      </header>
+      <section class="document-section" *ngFor="let section of sections">
+        <h2>{{ section.heading }}</h2>
+        <p>{{ section.body }}</p>
+        <a class="document-link" *ngIf="section.linkText && section.linkUrl"
+          [href]="section.linkUrl" target="_blank" rel="noopener noreferrer">
+          {{ section.linkText }} <ion-icon name="open-outline" aria-hidden="true"></ion-icon>
+        </a>
+      </section>
+      <nav class="related-links" aria-label="Related information">
+        <a routerLink="/legal/community">Community Guidelines <ion-icon name="arrow-forward-outline" aria-hidden="true"></ion-icon></a>
+        <a routerLink="/legal/support">Support <ion-icon name="arrow-forward-outline" aria-hidden="true"></ion-icon></a>
+      </nav>
+    </article>
+  </main>
 </ion-content>

@@ -1,0 +1,35 @@
+<ion-header>
+  <ion-toolbar>
+    <ion-buttons slot="start">
+      <ion-back-button defaultHref="/scenery/tabs/profile"></ion-back-button>
+    </ion-buttons>
+    <ion-title>{{ user ? user.displayName + "'s scenes" : 'Public scenes' }}</ion-title>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content>
+  <div class="scene-state" *ngIf="isLoading" role="status">
+    <ion-spinner name="crescent"></ion-spinner>
+    <p>Loading scenes...</p>
+  </div>
+
+  <ion-note class="scene-state" color="danger" *ngIf="!isLoading && loadError" role="alert">
+    Unable to load this user's public scenes.
+  </ion-note>
+
+  <ion-note class="scene-state" color="medium" *ngIf="!isLoading && !loadError && scenes.length === 0">
+    {{ user ? user.displayName + ' has no public scenes yet.' : 'No public scenes yet.' }}
+  </ion-note>
+
+  <ion-list *ngIf="!isLoading && !loadError && scenes.length > 0">
+    <ion-item *ngFor="let scene of scenes" [routerLink]="['/scenery/tabs/search', scene.id]" detail>
+      <ion-thumbnail slot="start">
+        <ion-img [src]="scene.imageUrl | imageUrl"></ion-img>
+      </ion-thumbnail>
+      <ion-label>
+        <h2>{{ scene.title }}</h2>
+        <p>{{ scene.description }}</p>
+      </ion-label>
+    </ion-item>
+  </ion-list>
+</ion-content>

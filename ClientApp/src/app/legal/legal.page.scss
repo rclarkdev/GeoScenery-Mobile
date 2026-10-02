@@ -1,0 +1,410 @@
+:host {
+  --legal-ink: #263746;
+  --legal-muted: #536674;
+  --legal-blue: #286b91;
+  --legal-blue-soft: #e8f1f5;
+  --legal-line: #dce4e5;
+  --legal-paper: #fffefa;
+  color: var(--legal-ink);
+}
+
+ion-content.legal-content {
+  --background: #f6f6f2;
+}
+
+.legal-page {
+  box-sizing: border-box;
+  width: min(100%, 800px);
+  margin: 0 auto;
+  padding: 28px 20px 48px;
+}
+
+.page-intro {
+  display: flex;
+  align-items: flex-start;
+  gap: 17px;
+  margin: 0 0 28px;
+}
+
+.intro-symbol,
+.topic-symbol,
+.report-symbol {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  color: var(--legal-blue);
+  background: var(--legal-blue-soft);
+}
+
+.intro-symbol {
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  font-size: 25px;
+}
+
+.eyebrow {
+  margin: 0 0 5px;
+  color: var(--legal-blue);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.065em;
+  line-height: 1.4;
+  text-transform: uppercase;
+}
+
+h1,
+h2,
+p {
+  margin-top: 0;
+}
+
+h1 {
+  margin-bottom: 7px;
+  color: var(--legal-ink);
+  font-size: clamp(28px, 5vw, 32px);
+  font-weight: 650;
+  letter-spacing: -0.025em;
+  line-height: 1.2;
+}
+
+.intro-copy {
+  max-width: 620px;
+  margin: 0;
+  color: var(--legal-muted);
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+.last-updated {
+  margin: 8px 0 0;
+  color: #687983;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.topic-list,
+.guideline-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.topic-row,
+.guideline-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 17px 0;
+  border-bottom: 1px solid var(--legal-line);
+}
+
+.topic-row:first-child,
+.guideline-row:first-child {
+  padding-top: 0;
+}
+
+.topic-symbol {
+  width: 36px;
+  height: 36px;
+  margin-top: 1px;
+  border-radius: 11px;
+  font-size: 19px;
+}
+
+.topic-row h2,
+.guideline-row h2,
+.request-panel h2,
+.report-panel h2 {
+  margin: 0 0 5px;
+  color: var(--legal-ink);
+  font-size: 18px;
+  font-weight: 650;
+  line-height: 1.35;
+}
+
+.topic-row p,
+.guideline-row p,
+.request-panel li,
+.request-panel > p,
+.report-panel p,
+.document-section p {
+  margin: 0;
+  color: var(--legal-muted);
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+.request-panel,
+.support-form {
+  margin-top: 26px;
+  padding: 20px 22px;
+  border: 1px solid #d8e5e8;
+  border-left: 3px solid var(--legal-blue);
+  border-radius: 8px;
+  background: var(--legal-paper);
+}
+
+.support-form h2 {
+  margin: 0 0 5px;
+  color: var(--legal-ink);
+  font-size: 21px;
+  font-weight: 650;
+  line-height: 1.35;
+}
+
+.form-intro {
+  margin: 0 0 16px;
+  color: var(--legal-muted);
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.support-form ion-item {
+  --background: #fff;
+  --border-color: var(--legal-line);
+  --border-radius: 6px;
+  --inner-border-width: 0;
+  margin: 0 0 12px;
+  border: 1px solid var(--legal-line);
+  border-radius: 6px;
+}
+
+.support-form ion-input,
+.support-form ion-select,
+.support-form ion-textarea {
+  --padding-start: 12px;
+  --padding-end: 12px;
+  color: var(--legal-ink);
+}
+
+.support-form ion-button {
+  --background: var(--legal-blue);
+  --border-radius: 6px;
+  min-height: 44px;
+  margin: 15px 0 0;
+  text-transform: none;
+}
+
+.form-feedback {
+  display: block;
+  margin-top: 12px;
+  line-height: 1.5;
+}
+
+.website-trap {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+}
+
+.request-panel ul {
+  display: grid;
+  gap: 5px;
+  margin: 13px 0 16px;
+  padding-left: 20px;
+}
+
+.request-panel li {
+  padding-left: 2px;
+}
+
+.security-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding-top: 13px;
+  border-top: 1px solid var(--legal-line);
+  color: #354c59 !important;
+  font-weight: 600;
+}
+
+.security-note ion-icon {
+  flex: 0 0 auto;
+  margin-top: 3px;
+  color: var(--legal-blue);
+  font-size: 18px;
+}
+
+.contact-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-top: 15px;
+  padding: 13px 15px;
+  border: 1px solid #e2d9bf;
+  border-radius: 8px;
+  background: #fbf7e9;
+  color: #584c30;
+}
+
+.contact-notice > ion-icon {
+  flex: 0 0 auto;
+  margin-top: 2px;
+  color: #78622e;
+  font-size: 19px;
+}
+
+.contact-notice p {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.contact-notice strong {
+  display: block;
+  margin-bottom: 2px;
+  color: #493c20;
+}
+
+.location-note {
+  margin: 19px 0 0;
+  color: var(--legal-muted);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.report-panel {
+  display: flex;
+  align-items: flex-start;
+  gap: 15px;
+  margin-top: 27px;
+  padding: 19px 20px;
+  border: 1px solid var(--legal-line);
+  border-radius: 8px;
+  background: var(--legal-paper);
+}
+
+.report-symbol {
+  width: 38px;
+  height: 38px;
+  border-radius: 11px;
+  font-size: 20px;
+}
+
+.report-panel p:last-child {
+  margin: 0;
+}
+
+a {
+  color: #205f83;
+  font-weight: 600;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+}
+
+a:hover {
+  color: #164763;
+  text-decoration-thickness: 2px;
+}
+
+a:focus-visible {
+  border-radius: 3px;
+  outline: 3px solid #174f70;
+  outline-offset: 3px;
+}
+
+.related-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 22px;
+  margin-top: 25px;
+  padding-top: 17px;
+  border-top: 1px solid var(--legal-line);
+}
+
+.related-links a {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 32px;
+  font-size: 14px;
+  text-decoration: none;
+}
+
+.related-links ion-icon {
+  font-size: 15px;
+}
+
+.document-intro {
+  display: block;
+  margin-bottom: 21px;
+}
+
+.document-section {
+  padding: 17px 0;
+  border-bottom: 1px solid var(--legal-line);
+}
+
+.document-section:first-of-type {
+  padding-top: 0;
+}
+
+.document-section h2 {
+  margin: 0 0 6px;
+  color: var(--legal-ink);
+  font-size: 19px;
+  font-weight: 650;
+  line-height: 1.4;
+}
+
+.document-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 8px;
+  font-size: 14px;
+}
+
+.document-link ion-icon {
+  font-size: 15px;
+}
+
+@media (max-width: 480px) {
+  .legal-page {
+    padding: 23px 18px 36px;
+  }
+
+  .page-intro {
+    gap: 13px;
+    margin-bottom: 23px;
+  }
+
+  .intro-symbol {
+    width: 42px;
+    height: 42px;
+    border-radius: 12px;
+    font-size: 22px;
+  }
+
+  .topic-row,
+  .guideline-row {
+    gap: 11px;
+    padding: 15px 0;
+  }
+
+  .request-panel,
+  .support-form,
+  .report-panel {
+    padding: 17px 16px;
+  }
+
+  .form-grid {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+
+  .related-links {
+    gap: 6px 17px;
+  }
+}

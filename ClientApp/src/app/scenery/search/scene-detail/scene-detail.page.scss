@@ -1,1 +1,134 @@
 @use '../../scene-detail';
+
+.community-rating {
+	padding: 1rem 0;
+	border-bottom: 1px solid var(--ion-color-step-150, #e5e7eb);
+}
+
+.community-rating:last-child {
+	border-bottom: 0;
+}
+
+.community-rating-heading {
+	display: flex;
+	justify-content: space-between;
+	gap: 1rem;
+}
+
+.community-rating p {
+	margin: 0.6rem 0 0.35rem;
+	white-space: pre-wrap;
+}
+
+.community-rating .empty-feedback,
+.community-rating time {
+	color: var(--ion-color-medium);
+}
+
+.community-rating time {
+	font-size: 0.8rem;
+}
+
+.visit-history-action {
+	position: relative;
+	width: 100%;
+	min-height: 44px;
+	margin: 0;
+	border-radius: 4px;
+	background: var(--ion-color-primary);
+	box-shadow: 0 2px 5px rgb(0 0 0 / 26%);
+	color: #fff;
+	-webkit-text-fill-color: #fff;
+	font-size: 14px !important;
+	font-weight: 500;
+	letter-spacing: 0.06em;
+	line-height: 1.2;
+	text-transform: uppercase;
+	text-align: center;
+	cursor: pointer;
+}
+
+.visit-history-button {
+	position: absolute;
+	inset: 0;
+	width: 100%;
+	min-height: 44px;
+	border: 0;
+	border-radius: inherit;
+	background: transparent;
+	cursor: pointer;
+	appearance: none;
+	-webkit-appearance: none;
+}
+
+.visit-history-label {
+	position: absolute;
+	inset: 0;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	color: #fff;
+	-webkit-text-fill-color: #fff;
+	font: inherit;
+	letter-spacing: inherit;
+	text-transform: inherit;
+	pointer-events: none;
+}
+
+.visit-history-action:has(.visit-history-button:disabled) {
+	opacity: 0.5;
+	cursor: default;
+}
+
+.report-action {
+	position: relative;
+	display: flex;
+	min-height: 44px;
+	align-items: center;
+	gap: 8px;
+	width: fit-content;
+	color: var(--ion-color-danger);
+	font-size: 14px;
+	cursor: pointer;
+}
+
+.report-label {
+	position: relative;
+	margin-left: 32px;
+	color: var(--ion-color-danger);
+	-webkit-text-fill-color: var(--ion-color-danger);
+	font: inherit;
+}
+
+.report-button {
+	position: absolute;
+	inset: 0;
+	width: 100%;
+	height: 100%;
+	margin: 0;
+	padding: 0;
+	border: 0;
+	background: transparent;
+	color: var(--ion-color-danger);
+	cursor: pointer;
+	appearance: none;
+	-webkit-appearance: none;
+}
+
+.report-button ion-icon {
+	position: absolute;
+	left: 0;
+	font-size: 18px;
+}
+
+.report-button:disabled,
+.report-action:has(.report-button:disabled) {
+	cursor: default;
+	opacity: 0.5;
+}
+
+/* Keep native controls free of browser default text styling. */
+.visit-history-button,
+.report-button {
+	font: inherit;
+}

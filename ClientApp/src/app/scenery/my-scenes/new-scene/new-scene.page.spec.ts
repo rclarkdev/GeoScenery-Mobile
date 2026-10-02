@@ -55,6 +55,7 @@ describe('NewScenePage', () => {
       description: 'A description',
       imageUrl: 'blob:http://localhost/photo-id',
       rating: 8,
+      isPublic: true,
       tags: 'sunset, beach',
       latitude: null,
       longitude: null
@@ -68,10 +69,26 @@ describe('NewScenePage', () => {
       description: 'A description',
       imageUrl: '/uploads/image.jpg',
       rating: 8,
+      isPublic: true,
       latitude: null,
       longitude: null,
       tags: ['sunset', 'beach']
     });
     expect(navController.navigateBack).toHaveBeenCalledWith('/scenery/tabs/my-scenes');
+  });
+
+  it('sends a private visibility choice when creating a scene', async () => {
+    const service = TestBed.inject(SceneryService);
+    component.sceneForm.patchValue({
+      title: 'Private scene',
+      description: 'Only for me',
+      imageUrl: 'blob:http://localhost/private-photo',
+      rating: 6,
+      isPublic: false
+    });
+
+    await component.onSave();
+
+    expect(service.createScene).toHaveBeenCalledWith(jasmine.objectContaining({ isPublic: false }));
   });
 });

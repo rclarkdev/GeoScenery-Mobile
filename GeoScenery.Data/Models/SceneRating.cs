@@ -17,6 +17,9 @@ public class SceneRating
     [Range(0, 10)]
     public decimal Rating { get; set; }
 
+    [MaxLength(1000)]
+    public string? Description { get; set; }
+
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
 
     public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;

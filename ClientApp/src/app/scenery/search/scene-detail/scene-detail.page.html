@@ -74,6 +74,12 @@
         <p class="section-copy">Share your rating with the community.</p>
         <ion-range min="0" max="10" step="1" [snaps]="true" [ticks]="true" [pin]="true"
           aria-label="Your rating from 0 to 10" [(ngModel)]="pendingRating"></ion-range>
+        <ion-item lines="none">
+          <ion-textarea label="Feedback (optional)" labelPlacement="stacked"
+            placeholder="What shaped your rating?" maxlength="1000" [autoGrow]="true"
+            [(ngModel)]="ratingDescription"></ion-textarea>
+        </ion-item>
+        <ion-note class="action-note" color="medium">Your rating and feedback will be visible to other users.</ion-note>
         <div class="rating-actions">
           <ion-button [disabled]="isRating || pendingRating == null" (click)="onSubmitRating()">
             {{ isRating ? 'Saving...' : (scene.currentUserRating != null ? 'Update rating' : 'Submit rating') }}
@@ -86,22 +92,39 @@
         <ion-note class="action-note" color="danger" *ngIf="ratingError">Unable to save your rating.</ion-note>
       </section>
 
+      <section class="scene-section community-ratings" *ngIf="scene.ratings.length > 0" aria-labelledby="community-ratings-heading">
+        <h2 id="community-ratings-heading">Individual ratings</h2>
+        <article class="community-rating" *ngFor="let review of scene.ratings">
+          <div class="community-rating-heading">
+            <strong>{{ review.userDisplayName }}</strong>
+            <span>{{ review.rating }} / 10</span>
+          </div>
+          <p *ngIf="review.description; else noRatingFeedback">{{ review.description }}</p>
+          <ng-template #noRatingFeedback><p class="empty-feedback">No written feedback.</p></ng-template>
+          <time [attr.datetime]="review.createdAt">{{ review.createdAt | date:'mediumDate' }}</time>
+        </article>
+      </section>
+
       <section class="scene-section" aria-labelledby="visit-heading">
         <h2 id="visit-heading">Visit history</h2>
-        <p class="section-copy">Add this place to your personal visit history.</p>
-        <ion-button class="primary-action" expand="block" [disabled]="isVisiting || visitRecorded" (click)="onVisitScene()">
-          {{ isVisiting ? 'Saving...' : (visitRecorded ? 'Added to visit history' : 'Mark as visited') }}
-        </ion-button>
+        <p class="section-copy">{{ visitRecorded ? 'This place is in your visit history.' : 'Add this place to your personal visit history.' }}</p>
+        <div class="visit-history-action">
+          <button class="visit-history-button" type="button" [attr.aria-label]="visitButtonLabel"
+            [disabled]="isVisiting || isRemovingVisit || isCheckingVisit" (click)="onVisitScene()"></button>
+          <span class="visit-history-label" aria-hidden="true">{{ visitButtonLabel }}</span>
+        </div>
         <ion-note class="action-note" color="success" role="status" *ngIf="visitRecorded">Visit saved.</ion-note>
-        <ion-note class="action-note" color="danger" *ngIf="visitError">Unable to record this visit.</ion-note>
+        <ion-note class="action-note" color="danger" *ngIf="visitError">Unable to update your visit history.</ion-note>
       </section>
     </ng-template>
 
     <section class="scene-section report-section" *ngIf="!isOwnScene" aria-label="Report scene">
-      <ion-button fill="clear" color="danger" [disabled]="isReporting" (click)="reportScene()">
-        <ion-icon slot="start" name="flag-outline"></ion-icon>
-        {{ isReporting ? 'Submitting report...' : 'Report scene' }}
-      </ion-button>
+      <div class="report-action">
+        <button class="report-button" type="button" aria-label="Report scene" [disabled]="isReporting" (click)="reportScene()">
+          <ion-icon name="flag-outline" aria-hidden="true"></ion-icon>
+        </button>
+        <span class="report-label" aria-hidden="true">{{ isReporting ? 'Submitting report...' : 'Report scene' }}</span>
+      </div>
       <ion-note [color]="reportFeedbackIsError ? 'danger' : 'success'" role="status" *ngIf="reportFeedback">
         {{ reportFeedback }}
       </ion-note>

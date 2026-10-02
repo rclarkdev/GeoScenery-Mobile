@@ -90,6 +90,7 @@ describe('ProfilePage', () => {
   it('shows a logout action on the signed-in user profile', () => {
     expect(fixture.nativeElement.textContent).toContain('Log out');
     expect(fixture.nativeElement.textContent).not.toContain('Report profile');
+    expect(fixture.nativeElement.textContent).not.toContain('View public scenes');
   });
 
   it('prompts for a description and submits a profile report', async () => {
@@ -143,6 +144,7 @@ describe('ProfilePage', () => {
 
     expect(component.isOwnProfile).toBe(false);
     expect(fixture.nativeElement.textContent).not.toContain('Log out');
+    expect(fixture.nativeElement.textContent).toContain('View public scenes');
 
     component.toggleFollow();
 
