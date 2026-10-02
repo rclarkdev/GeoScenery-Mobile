@@ -25,6 +25,8 @@ bld/
 [Oo]bj/
 # Temporary output used for isolated local builds
 /build-check/
+# Production client runtime config is generated from GEOSCENERY_API_URL.
+ClientApp/src/assets/app-config.runtime.js
 [Ll]og/
 
 # Visual Studio 2015 cache/options directory

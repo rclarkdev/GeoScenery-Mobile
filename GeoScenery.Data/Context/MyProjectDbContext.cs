@@ -32,17 +32,6 @@ public class MyProjectDbContext : DbContext
             new Role { Name = AppRoles.Member },
             new Role { Name = AppRoles.Admin });
 
-        modelBuilder.Entity<User>().HasData(new User
-        {
-            Id = 1,
-            DisplayName = "Master",
-            Email = "vjryanaye@gmail.com",
-            // ASP.NET Core PasswordHasher v3 hash for the initial password "password".
-            PasswordHash = "AQAAAAIAAYagAAAAEAABAgMEBQYHCAkKCwwNDg/73hTTOMxvghBX8/SnisILxwGxHjepOzeQw1EOAZRz8w==",
-            IsEmailVerified = true,
-            CreatedAt = new DateTimeOffset(2026, 9, 22, 0, 0, 0, TimeSpan.Zero)
-        });
-
         modelBuilder.Entity<User>()
             .Property(user => user.IsEmailVerified)
             .HasDefaultValue(true);
@@ -55,12 +44,6 @@ public class MyProjectDbContext : DbContext
         modelBuilder.Entity<Scene>()
             .Property(scene => scene.IsPublic)
             .HasDefaultValue(true);
-
-        modelBuilder.Entity<UserRole>().HasData(new UserRole
-        {
-            UserId = 1,
-            RoleName = AppRoles.Admin
-        });
 
         modelBuilder.Entity<UserRole>()
             .HasKey(userRole => new { userRole.UserId, userRole.RoleName });

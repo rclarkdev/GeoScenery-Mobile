@@ -443,6 +443,38 @@ public sealed class GeoSceneryApiTests
     }
 
     [Test]
+    public async Task GivenTheConfiguredBootstrapAdmin_WhenLoggingInRepeatedly_ThenBootstrapIsIdempotent()
+    {
+        var account = await RegisterUserAsync("Bootstrap admin", "bootstrap@example.com");
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<MyProjectDbContext>();
+        var user = await db.Users.SingleAsync(candidate => candidate.Id == account.UserId);
+        var initialPasswordHash = user.PasswordHash;
+
+        var firstLogin = await _client.PostAsJsonAsync("/api/auth/login", new
+        {
+            email = "bootstrap@example.com",
+            password = "Password123!"
+        });
+        var secondLogin = await _client.PostAsJsonAsync("/api/auth/login", new
+        {
+            email = "bootstrap@example.com",
+            password = "Password123!"
+        });
+        var adminAssignments = await db.UserRoles.CountAsync(role => role.UserId == account.UserId
+            && role.RoleName == AppRoles.Admin);
+        await db.Entry(user).ReloadAsync();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(firstLogin.StatusCode, Is.EqualTo(HttpStatusCode.OK));
+            Assert.That(secondLogin.StatusCode, Is.EqualTo(HttpStatusCode.OK));
+            Assert.That(adminAssignments, Is.EqualTo(1));
+            Assert.That(user.PasswordHash, Is.EqualTo(initialPasswordHash));
+        });
+    }
+
+    [Test]
     public async Task GivenTheOnlyAdmin_WhenRemovingTheirAdminRole_ThenTheApiRejectsTheChange()
     {
         var admin = await RegisterUserAsync("Admin", "admin@example.com");
@@ -1111,18 +1143,13 @@ public sealed class GeoSceneryApiTests
     }
 
     [Test]
-    public async Task GivenTheDefaultMasterAccount_WhenTheDatabaseIsCreated_ThenItHasTheAdminRole()
+    public async Task GivenAFreshDatabase_WhenItIsCreated_ThenItDoesNotSeedAPrivilegedAccount()
     {
         using var database = new TestDatabase();
-        var master = await database.Context.Users.AsNoTracking().SingleAsync(user => user.Id == 1);
-        var role = await database.Context.UserRoles.AsNoTracking()
-            .SingleAsync(userRole => userRole.UserId == 1);
-
-        Assert.That(role.RoleName, Is.EqualTo(AppRoles.Admin));
-        Assert.That(new PasswordHasher<User>().VerifyHashedPassword(master, master.PasswordHash, "password"),
-            Is.EqualTo(PasswordVerificationResult.Success));
-        Assert.That(database.Context.Database.GetMigrations(),
-            Does.Contain("20261002083311_SetMasterAdminPassword"));
+        Assert.That(await database.Context.Users.AsNoTracking().AnyAsync(), Is.False);
+        Assert.That(await database.Context.UserRoles.AsNoTracking().AnyAsync(), Is.False);
+        Assert.That(await database.Context.Roles.AsNoTracking().Select(role => role.Name).ToListAsync(),
+            Is.EquivalentTo(new[] { AppRoles.Admin, AppRoles.Member }));
     }
 
     [Test]

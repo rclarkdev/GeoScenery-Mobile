@@ -14,11 +14,11 @@ npm run build -- --configuration production
 
 ## Roles and permissions
 
-Accounts receive the `Member` role by default. The built-in `Master` account is seeded with the `Admin` role. The `Admin` role grants explicit application permissions through ASP.NET Core authorization policies; role assignments are stored in the database, never accepted from registration data or trusted from client-supplied claims. Admin user management is available through `GET /api/admin/users` and `PUT /api/admin/users/{id}/roles`. The last administrator cannot be demoted.
+Accounts receive the `Member` role by default. No user account or password is seeded into a fresh database. The `Admin` role grants explicit application permissions through ASP.NET Core authorization policies; role assignments are stored in the database, never accepted from registration data or trusted from client-supplied claims. Admin user management is available through `GET /api/admin/users` and `PUT /api/admin/users/{id}/roles`. The last administrator cannot be demoted.
 
-To provision another trusted administrator safely:
+To provision the first trusted administrator safely:
 
-1. Apply the database migration, then create the trusted administrator account through the normal registration flow.
+1. Apply the database migrations, then create the trusted administrator account through the normal registration flow.
 2. Read that account's `userId` from the registration response. Configure `Authorization__BootstrapAdminUserId` with that existing ID in the API environment (or App Service settings).
 3. Sign in as that account once. The API grants the `Admin` role and returns a token with role/permission claims. Remove `Authorization__BootstrapAdminUserId` after promotion; the database role assignment remains.
 
