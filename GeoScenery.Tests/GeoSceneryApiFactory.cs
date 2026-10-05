@@ -16,6 +16,7 @@ public sealed class GeoSceneryApiFactory : WebApplicationFactory<Program>
     public string? LastResetUrl { get; private set; }
     public string? LastVerificationUrl { get; private set; }
     public bool FailReportNotifications { get; set; }
+    public bool FailVerificationEmails { get; set; }
     public List<(string Recipient, ContentReportNotification Report)> ReportNotifications { get; } = [];
     public List<(string Recipient, SupportContactNotification Request)> SupportNotifications { get; } = [];
 
@@ -80,6 +81,11 @@ public sealed class GeoSceneryApiFactory : WebApplicationFactory<Program>
         public Task<EmailDeliveryOutcome> SendEmailVerificationAsync(string recipient, string verificationUrl, CancellationToken cancellationToken = default)
         {
             factory.LastVerificationUrl = verificationUrl;
+            if (factory.FailVerificationEmails)
+            {
+                throw new InvalidOperationException("SMTP unavailable");
+            }
+
             return Task.FromResult(EmailDeliveryOutcome.Sent);
         }
 

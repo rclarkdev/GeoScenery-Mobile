@@ -28,9 +28,9 @@ public sealed record LoginRequest
 
 public sealed record AuthResponse(long UserId, string DisplayName, string Email, string Token);
 
-public sealed record RegistrationResponse(string Message, string? DevelopmentToken = null);
+public sealed record RegistrationResponse(string Message, bool EmailSent);
 
-public sealed record EmailVerificationResponse(string Message, string? DevelopmentToken = null);
+public sealed record EmailVerificationResponse(string Message, bool? EmailSent);
 
 public sealed record ResendVerificationRequest
 {
@@ -59,4 +59,4 @@ public sealed record ResetPasswordRequest
     public required string Password { get; init; }
 }
 
-public sealed record PasswordResetResponse(string Message, string? DevelopmentToken = null);
+public sealed record PasswordResetResponse(string Message);

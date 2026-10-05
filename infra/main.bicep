@@ -7,11 +7,10 @@ param sqlConnectionString string
 param jwtKey string
 param jwtIssuer string
 param clientOrigin string
+param smtpHost string = 'smtp.gmail.com'
+param smtpUsername string
 @secure()
 param smtpPassword string
-param smtpHost string
-param smtpUsername string
-param smtpFrom string
 param clientResetUrl string
 
 resource plan 'Microsoft.Web/serverfarms@2023-12-01' = {
@@ -66,19 +65,19 @@ resource app 'Microsoft.Web/sites@2023-12-01' = {
           value: clientOrigin
         }
         {
-          name: 'Email__From'
-          value: smtpFrom
-        }
-        {
-          name: 'Email__SmtpHost'
+          name: 'EmailSettings__SmtpClient'
           value: smtpHost
         }
         {
-          name: 'Email__Username'
+          name: 'EmailSettings__SmtpPort'
+          value: '587'
+        }
+        {
+          name: 'EmailSettings__NetworkCredentials__Username'
           value: smtpUsername
         }
         {
-          name: 'Email__SmtpPassword'
+          name: 'EmailSettings__NetworkCredentials__Password'
           value: smtpPassword
         }
         {

@@ -27,21 +27,20 @@
     </ion-note>
     <ion-note color="danger" *ngIf="authError">{{ authError }}</ion-note>
       <ion-note color="success" *ngIf="recoverySent">If an account exists, a reset link has been sent.</ion-note>
-    <ion-note color="medium" *ngIf="developmentResetToken">
-      Development reset token: {{ developmentResetToken }}
-    </ion-note>
     <ion-button expand="block" type="submit" [disabled]="isSubmitting">
       {{ isSubmitting ? 'Please wait...' : (isRegistering ? 'Create account' : 'Sign in') }}
     </ion-button>
   </form>
   <section *ngIf="registrationComplete" class="auth-status" role="status">
-    <h2>Check your email</h2>
-    <p>We sent a verification link to {{ authForm.controls.email.value }}. Verify your email address before signing in.</p>
-    <ion-note color="medium" *ngIf="developmentVerificationToken">
-      Development verification token: {{ developmentVerificationToken }}
-    </ion-note>
+    <h2>{{ registrationEmailSent ? 'Check your email' : 'Account created' }}</h2>
+    <p [attr.role]="registrationEmailSent ? 'status' : 'alert'">
+      {{ registrationMessage }}<ng-container *ngIf="registrationEmailSent"> We sent it to {{ authForm.controls.email.value }}.</ng-container>
+    </p>
     <ion-note color="danger" *ngIf="verificationError" role="alert">{{ verificationError }}</ion-note>
-    <ion-note color="success" *ngIf="verificationResent">If the account exists and needs verification, another email has been sent.</ion-note>
+    <ion-note color="medium" *ngIf="verificationMessage && !verificationResent && !verificationError" role="status">
+      {{ verificationMessage }}
+    </ion-note>
+    <ion-note color="success" *ngIf="verificationResent">A verification email was accepted by the mail server.</ion-note>
     <ion-button expand="block" fill="outline" [disabled]="isSubmitting" (click)="onResendVerification()">
       {{ isSubmitting ? 'Please wait...' : 'Resend verification email' }}
     </ion-button>
@@ -57,7 +56,10 @@
     Resend verification email
   </ion-button>
   <ion-note color="success" *ngIf="verificationResent && !registrationComplete" role="status">
-    If the account exists and needs verification, another email has been sent.
+    A verification email was accepted by the mail server.
+  </ion-note>
+  <ion-note color="medium" *ngIf="verificationMessage && !verificationResent && !verificationError && !registrationComplete" role="status">
+    {{ verificationMessage }}
   </ion-note>
   <ion-note color="danger" *ngIf="verificationError && !registrationComplete" role="alert">
     {{ verificationError }}

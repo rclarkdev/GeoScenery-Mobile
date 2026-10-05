@@ -1,6 +1,5 @@
 export interface PasswordResetResponse {
   message: string;
-  developmentToken?: string;
 }
 
 import { Injectable } from '@angular/core';
@@ -24,12 +23,12 @@ export interface AuthRequest {
 
 export interface RegistrationResponse {
   message: string;
-  developmentToken?: string;
+  emailSent: boolean;
 }
 
 export interface EmailVerificationResponse {
   message: string;
-  developmentToken?: string;
+  emailSent: boolean | null;
 }
 
 @Injectable({ providedIn: 'root' })

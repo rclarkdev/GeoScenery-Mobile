@@ -40,7 +40,7 @@ describe('AuthService', () => {
     expect(request.request.method).toBe('POST');
     expect(request.request.body.email).toBe('ava@example.com');
     expect(request.request.body.confirmPassword).toBe('Password123!');
-    request.flush({ message: 'Check your email.' });
+    request.flush({ message: 'Check your email.', emailSent: true });
   });
 
   it('posts a verification token to the verify endpoint', () => {
@@ -56,7 +56,7 @@ describe('AuthService', () => {
     const request = http.expectOne(`${authUrl}/resend-verification`);
     expect(request.request.method).toBe('POST');
     expect(request.request.body).toEqual({ email: 'ava@example.com' });
-    request.flush({ message: 'If the account exists, a verification email has been sent.' });
+    request.flush({ message: 'If the account exists, a verification email has been sent.', emailSent: true });
   });
 
   it('rejects an expired token', () => {

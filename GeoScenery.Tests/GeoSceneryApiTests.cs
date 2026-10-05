@@ -1629,8 +1629,59 @@ public sealed class GeoSceneryApiTests
 
         Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK));
         var registration = await response.Content.ReadFromJsonAsync<RegistrationResponse>();
-        Assert.That(registration?.Message, Does.Contain("verification link"));
+        Assert.That(registration?.EmailSent, Is.True);
+        Assert.That(registration?.Message, Does.Contain("accepted by the mail server"));
         Assert.That(_factory.LastVerificationUrl, Does.Contain("token="));
+    }
+
+    [Test]
+    public async Task GivenVerificationEmailDeliveryFails_WhenRegistering_ThenTheResponseWarnsThatTheAccountWasCreatedWithoutEmail()
+    {
+        _factory.FailVerificationEmails = true;
+
+        var response = await _client.PostAsJsonAsync("/api/auth/register", new
+        {
+            displayName = "Ava",
+            email = "email-failure@example.com",
+            password = "Password123!",
+            confirmPassword = "Password123!"
+        });
+        var registration = await response.Content.ReadFromJsonAsync<RegistrationResponse>();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK));
+            Assert.That(registration?.EmailSent, Is.False);
+            Assert.That(registration?.Message, Does.Contain("couldn't send"));
+            Assert.That(_factory.LastVerificationUrl, Does.Contain("token="));
+        });
+        Assert.That(await response.Content.ReadAsStringAsync(), Does.Not.Contain("Token"));
+    }
+
+    [Test]
+    public async Task GivenVerificationEmailDeliveryFails_WhenResending_ThenTheResponseReportsDeliveryFailure()
+    {
+        await _client.PostAsJsonAsync("/api/auth/register", new
+        {
+            displayName = "Ava",
+            email = "resend-failure@example.com",
+            password = "Password123!",
+            confirmPassword = "Password123!"
+        });
+        _factory.FailVerificationEmails = true;
+
+        var response = await _client.PostAsJsonAsync("/api/auth/resend-verification", new
+        {
+            email = "resend-failure@example.com"
+        });
+        var result = await response.Content.ReadFromJsonAsync<EmailVerificationResponse>();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK));
+            Assert.That(result?.EmailSent, Is.False);
+            Assert.That(result?.Message, Does.Contain("couldn't send"));
+        });
     }
 
     [Test]

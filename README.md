@@ -32,11 +32,24 @@ All EF Core migration files, including the baseline, per-migration designer file
 
 ## Content reports
 
-Authenticated users can report another user's profile with `POST /api/users/{id}/reports` or a scene with `POST /api/scenes/{id}/reports`. Both requests require a non-empty description (up to 2,000 characters); users cannot report their own profile or scenes. Reports are stored with target and reporter snapshots, limited to five submissions per user per hour, and emailed to every user currently assigned the `Admin` role. Configure the existing `Email` SMTP settings for delivery in production; development logs report notification details instead.
+Authenticated users can report another user's profile with `POST /api/users/{id}/reports` or a scene with `POST /api/scenes/{id}/reports`. Both requests require a non-empty description (up to 2,000 characters); users cannot report their own profile or scenes. Reports are stored with target and reporter snapshots, limited to five submissions per user per hour, and emailed to every user currently assigned the `Admin` role. Email uses authenticated SMTP through MailKit. Configure `EmailSettings:SmtpClient`, `EmailSettings:SmtpPort`, and `EmailSettings:NetworkCredentials:Username/Password`. Supply credentials through environment variables or a secret store, not committed configuration. Delivery is skipped in Development when settings are incomplete.
+
+### Local SMTP email setup
+
+The API uses the same MailKit SMTP approach as CollectionsOfMineLive. For Gmail, use an account with 2-Step Verification and create an app password for SMTP; no Entra app registration is required. From the repository root, set the SMTP account and app password as .NET user secrets:
+
+```powershell
+$project = ".\GeoScenery.Api\GeoScenery.Api.csproj"
+dotnet user-secrets init --project $project
+dotnet user-secrets set "EmailSettings:NetworkCredentials:Username" "your-smtp-account@gmail.com" --project $project
+dotnet user-secrets set "EmailSettings:NetworkCredentials:Password" "your-gmail-app-password" --project $project
+```
+
+The SMTP host defaults to `smtp.gmail.com` on port 587. Keep the app password out of source control and chat. Restart the API after setting these values, then use **Resend verification email** for an account created before email was configured. For another SMTP provider, override `EmailSettings:SmtpClient` and `EmailSettings:SmtpPort` as needed. Delivery failures are logged by the API and are not reported to the client as successful sends.
 
 ## Account verification and recovery
 
-Registration requires the password and confirmation to match. New accounts cannot sign in until they follow the single-use verification link emailed to the supplied address (expires after 24 hours). Unverified users can request another link from the sign-in screen; resend responses are generic and rate limited. The verification landing page is configured through `Email:ClientVerificationUrl` (production environment variable `Email__ClientVerificationUrl`). Existing accounts remain verified when the migration is applied. The sign-in screen's forgot-password flow sends a one-hour, single-use reset link through `Email:ClientResetUrl`; successfully resetting a password also verifies mailbox ownership.
+Registration requires the password and confirmation to match. New accounts cannot sign in until they follow the single-use verification link emailed to the supplied address (expires after 24 hours). Verification and password-reset tokens are never returned by the API or displayed in the app. The registration screen reports when SMTP rejects the email, or when delivery is skipped because SMTP is not configured in Development; a successful response means the SMTP server accepted the message, not that it reached the inbox. Configure the SMTP settings above and check spam folders if needed. Unverified users can request another link from the sign-in screen; resend responses remain generic when no unverified account is found and are rate limited. The verification landing page is configured through `Email:ClientVerificationUrl` (production environment variable `Email__ClientVerificationUrl`). Existing accounts remain verified when the migration is applied. The sign-in screen's forgot-password flow sends a one-hour, single-use reset link through `Email:ClientResetUrl`; successfully resetting a password also verifies mailbox ownership.
 
 ## Request logging
 

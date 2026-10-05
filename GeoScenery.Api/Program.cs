@@ -37,6 +37,7 @@ if (string.IsNullOrWhiteSpace(jwtKey))
 var jwtIssuer = builder.Configuration["Jwt:Issuer"] ?? "GeoScenery";
 var jwtAudience = builder.Configuration["Jwt:Audience"] ?? "GeoScenery.Client";
 builder.Services.AddSingleton<IPasswordHasher<GeoScenery.Data.Models.User>, PasswordHasher<GeoScenery.Data.Models.User>>();
+builder.Services.Configure<EmailSettings>(builder.Configuration.GetSection("EmailSettings"));
 builder.Services.AddScoped<IEmailSender, SmtpEmailSender>();
 builder.Services.AddMemoryCache();
 builder.Services.AddSingleton<ILoginAttemptTracker, LoginAttemptTracker>();

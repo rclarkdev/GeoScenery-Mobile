@@ -21,7 +21,7 @@ public static class AuthEndpoints
 
         group.MapPost("/register", async Task<Results<Ok<RegistrationResponse>, Conflict<string>, BadRequest<string>>>
             (RegisterRequest request, MyProjectDbContext db, IPasswordHasher<User> hasher, IEmailSender emailSender,
-                IConfiguration appConfiguration, IHostEnvironment environment, HttpContext context,
+                IConfiguration appConfiguration, HttpContext context,
                 CancellationToken cancellationToken) =>
         {
             if (!string.Equals(request.Password, request.ConfirmPassword, StringComparison.Ordinal))
@@ -64,8 +64,13 @@ public static class AuthEndpoints
             RequestAuditContext.Set(context, "operationOutcome", verificationEmailOutcome == EmailDeliveryOutcome.Failed
                 ? "PartialFailure" : "Success");
             return TypedResults.Ok(new RegistrationResponse(
-                "Account created. Check your email for a verification link before signing in.",
-                environment.IsDevelopment() ? rawToken : null));
+                verificationEmailOutcome switch
+                {
+                    EmailDeliveryOutcome.Sent => "Account created. The verification email was accepted by the mail server. Check your inbox and spam folder before signing in.",
+                    EmailDeliveryOutcome.SkippedDevelopment => "Account created, but SMTP email isn't configured in this development environment. Configure it as described in the README, then request a new verification email.",
+                    _ => "Account created, but we couldn't send the verification email. Please try resending later."
+                },
+                verificationEmailOutcome == EmailDeliveryOutcome.Sent));
         })
         .WithName("Register")
         .RequireRateLimiting("auth-register");
@@ -142,24 +147,19 @@ public static class AuthEndpoints
 
         group.MapPost("/resend-verification", async Task<Ok<EmailVerificationResponse>>
             (ResendVerificationRequest request, MyProjectDbContext db, IEmailSender emailSender,
-                IConfiguration appConfiguration, IHostEnvironment environment, HttpContext context,
+                IConfiguration appConfiguration, HttpContext context,
                 CancellationToken cancellationToken) =>
         {
             var normalizedEmail = request.Email.Trim().ToLowerInvariant();
             var user = await db.Users.FirstOrDefaultAsync(candidate => candidate.Email == normalizedEmail, cancellationToken);
-            string? developmentToken = null;
             var attempted = false;
             var outcome = EmailDeliveryOutcome.Failed;
             if (user is not null && !user.IsEmailVerified)
             {
                 attempted = true;
-                developmentToken = await CreateEmailVerificationTokenAsync(user, db, cancellationToken);
-                outcome = await SendVerificationEmailSafelyAsync(user, developmentToken, emailSender,
+                var rawToken = await CreateEmailVerificationTokenAsync(user, db, cancellationToken);
+                outcome = await SendVerificationEmailSafelyAsync(user, rawToken, emailSender,
                     appConfiguration, context, cancellationToken);
-                if (!environment.IsDevelopment())
-                {
-                    developmentToken = null;
-                }
             }
 
             RequestAuditContext.Set(context, "operation", "verification-resend");
@@ -171,14 +171,22 @@ public static class AuthEndpoints
                     ? "PartialFailure" : "Success");
             }
 
+            var message = !attempted
+                ? "If the account exists and needs verification, we will send a verification email."
+                : outcome switch
+                {
+                    EmailDeliveryOutcome.Sent => "If the account exists and needs verification, a verification email has been sent.",
+                    EmailDeliveryOutcome.SkippedDevelopment => "SMTP email isn't configured in this development environment. Configure it as described in the README, then request a new verification email.",
+                    _ => "We couldn't send the verification email. Please try again later."
+                };
             return TypedResults.Ok(new EmailVerificationResponse(
-                "If the account exists and needs verification, a verification email has been sent.", developmentToken));
+                message, attempted ? outcome == EmailDeliveryOutcome.Sent : null));
         })
         .WithName("ResendEmailVerification")
         .RequireRateLimiting("email-verification");
 
         group.MapPost("/forgot-password", async Task<Ok<PasswordResetResponse>>
-            (ForgotPasswordRequest request, MyProjectDbContext db, IEmailSender emailSender, IHostEnvironment environment,
+            (ForgotPasswordRequest request, MyProjectDbContext db, IEmailSender emailSender,
                 HttpContext context, CancellationToken cancellationToken) =>
         {
             RequestAuditContext.Set(context, "operation", "password-reset-request");
@@ -216,8 +224,7 @@ public static class AuthEndpoints
                 RequestAuditContext.Set(context, "operationOutcome", "PartialFailure");
                 // Keep this response generic so SMTP errors cannot reveal account existence.
             }
-            var developmentToken = environment.IsDevelopment() ? rawToken : null;
-            return TypedResults.Ok(new PasswordResetResponse("If an account exists, a reset link has been sent.", developmentToken));
+            return TypedResults.Ok(new PasswordResetResponse("If an account exists, a reset link has been sent."));
         }).RequireRateLimiting("password-reset");
 
         group.MapPost("/reset-password", async Task<Results<NoContent, BadRequest<string>>>

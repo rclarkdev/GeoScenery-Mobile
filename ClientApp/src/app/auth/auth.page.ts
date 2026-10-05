@@ -14,10 +14,11 @@ export class AuthPage {
   isSubmitting = false;
   authError: string | null = null;
   recoverySent = false;
-  developmentResetToken: string | null = null;
   registrationComplete = false;
-  developmentVerificationToken: string | null = null;
+  registrationMessage: string | null = null;
+  registrationEmailSent = false;
   verificationResent = false;
+  verificationMessage: string | null = null;
   verificationError: string | null = null;
   canResendVerification = false;
 
@@ -38,10 +39,11 @@ export class AuthPage {
     this.isRegistering = !this.isRegistering;
     this.authError = null;
     this.recoverySent = false;
-    this.developmentResetToken = null;
     this.registrationComplete = false;
-    this.developmentVerificationToken = null;
+    this.registrationMessage = null;
+    this.registrationEmailSent = false;
     this.verificationResent = false;
+    this.verificationMessage = null;
     this.verificationError = null;
     this.canResendVerification = false;
     const displayName = this.authForm.controls.displayName;
@@ -80,7 +82,8 @@ export class AuthPage {
         next: response => {
           this.isSubmitting = false;
           this.registrationComplete = true;
-          this.developmentVerificationToken = response.developmentToken ?? null;
+          this.registrationMessage = response.message;
+          this.registrationEmailSent = response.emailSent;
         },
         error: (error: HttpErrorResponse) => {
           this.isSubmitting = false;
@@ -112,11 +115,14 @@ export class AuthPage {
 
     this.isSubmitting = true;
     this.verificationError = null;
+    this.verificationMessage = null;
+    this.verificationResent = false;
     this.authService.resendVerification(email.value).subscribe({
       next: response => {
         this.isSubmitting = false;
-        this.verificationResent = true;
-        this.developmentVerificationToken = response.developmentToken ?? this.developmentVerificationToken;
+        this.verificationResent = response.emailSent === true;
+        this.verificationMessage = response.message;
+        this.verificationError = response.emailSent === false ? response.message : null;
       },
       error: () => {
         this.isSubmitting = false;
@@ -138,7 +144,6 @@ export class AuthPage {
       next: response => {
         this.isSubmitting = false;
         this.recoverySent = true;
-        this.developmentResetToken = response.developmentToken ?? null;
       },
       error: () => {
         this.isSubmitting = false;
