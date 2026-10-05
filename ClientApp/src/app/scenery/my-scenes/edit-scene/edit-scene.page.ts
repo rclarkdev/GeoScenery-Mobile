@@ -1,26 +1,31 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnDestroy, OnInit } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 import { FormBuilder, Validators } from '@angular/forms';
 import { Camera, CameraDirection, CameraResultType, CameraSource } from '@capacitor/camera';
+import { Capacitor } from '@capacitor/core';
 import { Geolocation } from '@capacitor/geolocation';
 import { SceneryService } from '../../scenery.service';
 import { NavController } from '@ionic/angular';
 import { Scene } from '../../scene.model';
 import { firstValueFrom } from 'rxjs';
 import { ImageUploadService } from '../../../shared/image-upload.service';
+import { PhotoCropperService } from '../../../shared/photo-cropper/photo-cropper.service';
 
 @Component({
   selector: 'app-edit-scene',
   templateUrl: './edit-scene.page.html',
   styleUrls: ['./edit-scene.page.scss'],
 })
-export class EditScenePage implements OnInit {
+export class EditScenePage implements OnInit, OnDestroy {
 
   scene?: Scene;
   isSaving = false;
   saveError = false;
   isLocating = false;
   locationError = false;
+  photoError = false;
+  private pendingImageFile: File | null = null;
+  private previewObjectUrl: string | null = null;
   readonly sceneForm = this.formBuilder.nonNullable.group({
     title: ['', [Validators.required, Validators.maxLength(200)]],
     description: ['', [Validators.required, Validators.maxLength(4000)]],
@@ -37,7 +42,8 @@ export class EditScenePage implements OnInit {
     private sceneryService: SceneryService,
     private imageUploadService: ImageUploadService,
     private navCtrl: NavController,
-    private formBuilder: FormBuilder
+    private formBuilder: FormBuilder,
+    private photoCropperService: PhotoCropperService
   ) { }
 
   ngOnInit() {
@@ -68,6 +74,10 @@ export class EditScenePage implements OnInit {
     });
   }
 
+  ngOnDestroy(): void {
+    this.revokePreviewObjectUrl();
+  }
+
   async useCurrentLocation() {
     this.isLocating = true;
     this.locationError = false;
@@ -84,7 +94,13 @@ export class EditScenePage implements OnInit {
     }
   }
 
-  async onPickImage() {
+  async onPickImage(fileInput: HTMLInputElement) {
+    this.photoError = false;
+    if (!Capacitor.isNativePlatform()) {
+      fileInput.click();
+      return;
+    }
+
     try {
       // Prompt lets the user choose between the camera and their photo library
       const photo = await Camera.getPhoto({
@@ -94,11 +110,33 @@ export class EditScenePage implements OnInit {
         source: CameraSource.Prompt
       });
       if (photo.webPath) {
-        this.sceneForm.patchValue({ imageUrl: photo.webPath });
-        this.sceneForm.controls.imageUrl.markAsTouched();
+        const file = await this.photoCropperService.cropFromUri(photo.webPath, { kind: 'scene' });
+        if (file) {
+          this.setPendingImage(file);
+        }
+      }
+    } catch (error) {
+      if (!(error instanceof Error) || !/cancel/i.test(error.message)) {
+        this.photoError = true;
+      }
+    }
+  }
+
+  async onWebFileSelected(event: Event): Promise<void> {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    input.value = '';
+    if (!file) {
+      return;
+    }
+    this.photoError = false;
+    try {
+      const cropped = await this.photoCropperService.crop(file, { kind: 'scene' });
+      if (cropped) {
+        this.setPendingImage(cropped);
       }
     } catch {
-      // user cancelled the picker
+      this.photoError = true;
     }
   }
 
@@ -113,7 +151,7 @@ export class EditScenePage implements OnInit {
     const { tags, ...rest } = this.sceneForm.getRawValue();
     try {
       const imageUrl = (await firstValueFrom(
-        this.imageUploadService.uploadSelectedImage(rest.imageUrl, 'scene')
+        this.imageUploadService.uploadSelectedImage(this.pendingImageFile ?? rest.imageUrl, 'scene')
       )).url;
       await firstValueFrom(this.sceneryService.updateScene(this.scene.id, {
         ...rest,
@@ -127,4 +165,18 @@ export class EditScenePage implements OnInit {
     }
   }
 
+  private setPendingImage(file: File): void {
+    this.revokePreviewObjectUrl();
+    this.pendingImageFile = file;
+    this.previewObjectUrl = URL.createObjectURL(file);
+    this.sceneForm.patchValue({ imageUrl: this.previewObjectUrl });
+    this.sceneForm.controls.imageUrl.markAsTouched();
+  }
+
+  private revokePreviewObjectUrl(): void {
+    if (this.previewObjectUrl) {
+      URL.revokeObjectURL(this.previewObjectUrl);
+      this.previewObjectUrl = null;
+    }
+  }
 }

@@ -19,7 +19,9 @@
         </ion-avatar>
         <div>
           <h2 id="photo-heading">Profile photo</h2>
-          <ion-button fill="outline" size="small" type="button" (click)="onPickPhoto()">
+          <input #photoInput class="photo-file-input" type="file" accept="image/jpeg,image/png,image/webp"
+            aria-hidden="true" tabindex="-1" (change)="onWebFileSelected($event)">
+          <ion-button fill="outline" size="small" type="button" (click)="onPickPhoto(photoInput)">
             <ion-icon slot="start" name="camera-outline"></ion-icon>
             {{ profileImageUrl ? 'Change photo' : 'Add photo' }}
           </ion-button>

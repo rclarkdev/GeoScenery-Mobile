@@ -8,12 +8,17 @@ import { NewScenePage } from './new-scene.page';
 import { SceneryService } from '../../scenery.service';
 import { ImageUploadService } from '../../../shared/image-upload.service';
 import { ImageUrlPipe } from '../../../shared/image-url.pipe';
+import { PhotoCropperService } from '../../../shared/photo-cropper/photo-cropper.service';
 
 describe('NewScenePage', () => {
   let component: NewScenePage;
   let fixture: ComponentFixture<NewScenePage>;
+  let photoCropperService: jasmine.SpyObj<PhotoCropperService>;
 
   beforeEach(waitForAsync(() => {
+    photoCropperService = jasmine.createSpyObj('PhotoCropperService', ['crop', 'cropFromUri']);
+    photoCropperService.crop.and.resolveTo(undefined);
+    photoCropperService.cropFromUri.and.resolveTo(undefined);
     TestBed.configureTestingModule({
       declarations: [ NewScenePage ],
       imports: [ReactiveFormsModule, IonicModule.forRoot(), ImageUrlPipe],
@@ -23,6 +28,7 @@ describe('NewScenePage', () => {
           provide: ImageUploadService,
           useValue: { uploadSelectedImage: jasmine.createSpy('uploadSelectedImage').and.returnValue(of({ url: '/uploads/image.jpg' })) }
         },
+        { provide: PhotoCropperService, useValue: photoCropperService },
         { provide: NavController, useValue: { navigateBack: jasmine.createSpy('navigateBack') } }
       ],
       schemas: [CUSTOM_ELEMENTS_SCHEMA],
@@ -90,5 +96,31 @@ describe('NewScenePage', () => {
     await component.onSave();
 
     expect(service.createScene).toHaveBeenCalledWith(jasmine.objectContaining({ isPublic: false }));
+  });
+
+  it('keeps a confirmed crop pending and uploads its File only when the scene is saved', async () => {
+    const croppedFile = new File(['crop'], 'cropped.jpg', { type: 'image/jpeg' });
+    photoCropperService.crop.and.resolveTo(croppedFile);
+    const fileInput = { files: [new File(['source'], 'source.jpg', { type: 'image/jpeg' })], value: 'selected' } as any;
+    await component.onWebFileSelected({ target: fileInput } as any);
+    component.sceneForm.patchValue({ title: 'A scene', description: 'A view' });
+
+    await component.onSave();
+
+    expect(photoCropperService.crop).toHaveBeenCalledWith(jasmine.any(File), { kind: 'scene' });
+    expect(TestBed.inject(ImageUploadService).uploadSelectedImage).toHaveBeenCalledWith(croppedFile, 'scene');
+    expect(fileInput.value).toBe('');
+  });
+
+  it('does not replace a scene image when the crop is canceled', async () => {
+    const previousImage = 'https://example.com/previous.jpg';
+    component.sceneForm.patchValue({ imageUrl: previousImage });
+    photoCropperService.crop.and.resolveTo(undefined);
+
+    await component.onWebFileSelected({
+      target: { files: [new File(['source'], 'source.jpg', { type: 'image/jpeg' })], value: 'selected' }
+    } as any);
+
+    expect(component.sceneForm.controls.imageUrl.value).toBe(previousImage);
   });
 });

@@ -24,13 +24,16 @@
     </ion-note>
 
     <ion-img *ngIf="sceneForm.controls.imageUrl.value" [src]="sceneForm.controls.imageUrl.value | imageUrl"></ion-img>
-    <ion-button expand="block" fill="outline" type="button" (click)="onPickImage()">
+    <input #imageInput class="photo-file-input" type="file" accept="image/jpeg,image/png,image/webp"
+      aria-hidden="true" tabindex="-1" (change)="onWebFileSelected($event)">
+    <ion-button expand="block" fill="outline" type="button" (click)="onPickImage(imageInput)">
       <ion-icon slot="start" name="camera-outline"></ion-icon>
       {{ sceneForm.controls.imageUrl.value ? 'Change photo' : 'Add photo' }}
     </ion-button>
     <ion-note color="danger" *ngIf="sceneForm.controls.imageUrl.touched && sceneForm.controls.imageUrl.invalid">
       Add a photo.
     </ion-note>
+    <ion-note color="danger" role="alert" *ngIf="photoError">That photo could not be opened. Choose a JPEG, PNG, or WebP image.</ion-note>
 
     <ion-item>
       <ion-input label="Rating" labelPlacement="stacked" type="number" formControlName="rating"></ion-input>

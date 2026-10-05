@@ -1,7 +1,8 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnDestroy, OnInit } from '@angular/core';
 import { FormBuilder, Validators } from '@angular/forms';
 import { HttpErrorResponse } from '@angular/common/http';
 import { Camera, CameraDirection, CameraResultType, CameraSource } from '@capacitor/camera';
+import { Capacitor } from '@capacitor/core';
 import { Geolocation } from '@capacitor/geolocation';
 import { AlertController, NavController } from '@ionic/angular';
 import { firstValueFrom } from 'rxjs';
@@ -9,13 +10,14 @@ import { AuthService } from '../../../auth/auth.service';
 import { User } from '../../../auth/user.model';
 import { UserService } from '../../../auth/user.service';
 import { ImageUploadService } from '../../../shared/image-upload.service';
+import { PhotoCropperService } from '../../../shared/photo-cropper/photo-cropper.service';
 
 @Component({
   selector: 'app-edit-profile',
   templateUrl: './edit-profile.page.html',
   styleUrls: ['./edit-profile.page.scss'],
 })
-export class EditProfilePage implements OnInit {
+export class EditProfilePage implements OnInit, OnDestroy {
   user?: User;
   profileImageUrl: string | null = null;
   isSaving = false;
@@ -31,6 +33,8 @@ export class EditProfilePage implements OnInit {
   isPasswordFormOpen = false;
   passwordMessage: string | null = null;
   passwordError: string | null = null;
+  private pendingPhotoFile: File | null = null;
+  private previewObjectUrl: string | null = null;
 
   readonly profileForm = this.formBuilder.nonNullable.group({
     displayName: ['', [Validators.required, Validators.maxLength(200)]],
@@ -58,7 +62,8 @@ export class EditProfilePage implements OnInit {
     private userService: UserService,
     private imageUploadService: ImageUploadService,
     private navCtrl: NavController,
-    private alertController: AlertController
+    private alertController: AlertController,
+    private photoCropperService: PhotoCropperService
   ) { }
 
   ngOnInit() {
@@ -75,6 +80,10 @@ export class EditProfilePage implements OnInit {
       });
       this.emailForm.controls.email.setValue(user.email ?? '');
     });
+  }
+
+  ngOnDestroy(): void {
+    this.revokePreviewObjectUrl();
   }
 
   toggleEmailForm(): void {
@@ -94,8 +103,13 @@ export class EditProfilePage implements OnInit {
     this.passwordForm.reset();
   }
 
-  async onPickPhoto(): Promise<void> {
+  async onPickPhoto(fileInput: HTMLInputElement): Promise<void> {
     this.photoError = false;
+    if (!Capacitor.isNativePlatform()) {
+      fileInput.click();
+      return;
+    }
+
     try {
       const photo = await Camera.getPhoto({
         quality: 80,
@@ -104,12 +118,33 @@ export class EditProfilePage implements OnInit {
         source: CameraSource.Prompt
       });
       if (photo.webPath) {
-        this.profileImageUrl = photo.webPath;
+        const file = await this.photoCropperService.cropFromUri(photo.webPath, { kind: 'profile' });
+        if (file) {
+          this.setPendingPhoto(file);
+        }
       }
     } catch (error) {
       if (!(error instanceof Error) || !/cancel/i.test(error.message)) {
         this.photoError = true;
       }
+    }
+  }
+
+  async onWebFileSelected(event: Event): Promise<void> {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    input.value = '';
+    if (!file) {
+      return;
+    }
+    this.photoError = false;
+    try {
+      const cropped = await this.photoCropperService.crop(file, { kind: 'profile' });
+      if (cropped) {
+        this.setPendingPhoto(cropped);
+      }
+    } catch {
+      this.photoError = true;
     }
   }
 
@@ -209,7 +244,11 @@ export class EditProfilePage implements OnInit {
     this.saveError = false;
     try {
       let profileImageUrl = this.profileImageUrl;
-      if (profileImageUrl && profileImageUrl !== this.user.profileImageUrl) {
+      if (this.pendingPhotoFile) {
+        profileImageUrl = (await firstValueFrom(
+          this.imageUploadService.uploadSelectedImage(this.pendingPhotoFile, 'profile')
+        )).url;
+      } else if (profileImageUrl && profileImageUrl !== this.user.profileImageUrl) {
         profileImageUrl = (await firstValueFrom(
           this.imageUploadService.uploadSelectedImage(profileImageUrl, 'profile')
         )).url;
@@ -225,6 +264,20 @@ export class EditProfilePage implements OnInit {
     } catch {
       this.isSaving = false;
       this.saveError = true;
+    }
+  }
+
+  private setPendingPhoto(file: File): void {
+    this.revokePreviewObjectUrl();
+    this.pendingPhotoFile = file;
+    this.previewObjectUrl = URL.createObjectURL(file);
+    this.profileImageUrl = this.previewObjectUrl;
+  }
+
+  private revokePreviewObjectUrl(): void {
+    if (this.previewObjectUrl) {
+      URL.revokeObjectURL(this.previewObjectUrl);
+      this.previewObjectUrl = null;
     }
   }
 

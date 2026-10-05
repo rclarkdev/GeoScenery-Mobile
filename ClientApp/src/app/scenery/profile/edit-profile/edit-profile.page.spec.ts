@@ -10,6 +10,7 @@ import { UserService } from '../../../auth/user.service';
 import { User } from '../../../auth/user.model';
 import { ImageUploadService } from '../../../shared/image-upload.service';
 import { ImageUrlPipe } from '../../../shared/image-url.pipe';
+import { PhotoCropperService } from '../../../shared/photo-cropper/photo-cropper.service';
 
 describe('EditProfilePage', () => {
   let component: EditProfilePage;
@@ -17,8 +18,12 @@ describe('EditProfilePage', () => {
   let userService: jasmine.SpyObj<UserService>;
   let imageUploadService: jasmine.SpyObj<ImageUploadService>;
   let alertController: jasmine.SpyObj<AlertController>;
+  let photoCropperService: jasmine.SpyObj<PhotoCropperService>;
 
   beforeEach(waitForAsync(() => {
+    photoCropperService = jasmine.createSpyObj('PhotoCropperService', ['crop', 'cropFromUri']);
+    photoCropperService.crop.and.resolveTo(undefined);
+    photoCropperService.cropFromUri.and.resolveTo(undefined);
     userService = jasmine.createSpyObj('UserService', ['getCurrentUser', 'updateUser', 'changeEmail', 'changePassword', 'deleteUser']);
     userService.getCurrentUser.and.returnValue(of(new User(1, 'Test user', 'test@example.com', 'photo.jpg', 10, 20)));
     userService.updateUser.and.returnValue(of(new User(1, 'Updated user', 'updated@example.com')));
@@ -40,7 +45,8 @@ describe('EditProfilePage', () => {
           navigateBack: jasmine.createSpy('navigateBack'),
           navigateRoot: jasmine.createSpy('navigateRoot')
         } },
-        { provide: AlertController, useValue: alertController }
+        { provide: AlertController, useValue: alertController },
+        { provide: PhotoCropperService, useValue: photoCropperService }
       ],
       schemas: [CUSTOM_ELEMENTS_SCHEMA],
     })
@@ -141,6 +147,30 @@ describe('EditProfilePage', () => {
     expect(userService.updateUser).toHaveBeenCalledWith(1, jasmine.objectContaining({
       profileImageUrl: '/uploads/new-photo.jpg'
     }));
+  });
+
+  it('uploads the confirmed cropped File when saving a changed profile photo', async () => {
+    const croppedFile = new File(['crop'], 'cropped.jpg', { type: 'image/jpeg' });
+    photoCropperService.crop.and.resolveTo(croppedFile);
+    await component.onWebFileSelected({
+      target: { files: [new File(['source'], 'source.jpg', { type: 'image/jpeg' })], value: 'selected' }
+    } as any);
+
+    await component.onSave();
+
+    expect(photoCropperService.crop).toHaveBeenCalledWith(jasmine.any(File), { kind: 'profile' });
+    expect(imageUploadService.uploadSelectedImage).toHaveBeenCalledWith(croppedFile, 'profile');
+  });
+
+  it('leaves the existing profile photo unchanged when crop is canceled', async () => {
+    const previousPhoto = component.profileImageUrl;
+    photoCropperService.crop.and.resolveTo(undefined);
+
+    await component.onWebFileSelected({
+      target: { files: [new File(['source'], 'source.jpg', { type: 'image/jpeg' })], value: 'selected' }
+    } as any);
+
+    expect(component.profileImageUrl).toBe(previousPhoto);
   });
 
   it('places account deletion in the advanced section', () => {
