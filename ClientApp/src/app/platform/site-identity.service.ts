@@ -84,6 +84,13 @@ export class SiteIdentityService {
         return;
       }
 
+      if (error instanceof HttpErrorResponse
+        && error.status >= 200 && error.status < 300
+        && error.error instanceof SyntaxError) {
+        this.stateSubject.next({ status: 'unavailable', identity: null, failure: 'invalid-payload' });
+        return;
+      }
+
       this.stateSubject.next({
         status: 'unavailable',
         identity: null,

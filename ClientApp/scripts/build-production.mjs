@@ -61,6 +61,7 @@ if (configuredPlatformUrl) {
     || platformHostname.endsWith('.localhost')
     || platformHostname.endsWith('.local')
     || platformHostname.endsWith('.internal')
+    || platformHostname === 'example.com'
     || platformHostname.endsWith('.example')
     || platformHostname.endsWith('.example.com')
     || platformHostname.endsWith('.test')

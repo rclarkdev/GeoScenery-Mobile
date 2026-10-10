@@ -10,10 +10,18 @@ import { SceneryService } from '../scenery.service';
 export class MyScenesPage {
 
   myScenes: Scene[] = [];
+  readonly failedImageIds = new Set<number>();
 
   constructor(private sceneryService: SceneryService) { }
 
   ionViewWillEnter(): void {
-    this.sceneryService.getMyScenes().subscribe(scenes => this.myScenes = scenes);
+    this.sceneryService.getMyScenes().subscribe(scenes => {
+      this.myScenes = scenes;
+      this.failedImageIds.clear();
+    });
+  }
+
+  onSceneImageError(sceneId: number): void {
+    this.failedImageIds.add(sceneId);
   }
 }

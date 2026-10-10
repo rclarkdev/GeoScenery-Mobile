@@ -55,6 +55,30 @@
 	display: none;
 }
 
+@media (max-width: 420px) {
+	app-search .map-workspace .filter-panel {
+		padding: 14px;
+	}
+
+	app-search .map-workspace .coordinate-fields {
+		grid-template-columns: minmax(0, 1fr);
+	}
+
+	app-search .map-workspace .location-heading {
+		flex-wrap: wrap;
+		padding-bottom: 4px;
+	}
+
+	app-search .map-workspace .filter-actions {
+		grid-template-columns: minmax(0, 1fr);
+		align-items: stretch;
+
+		ion-button {
+			width: 100%;
+		}
+	}
+}
+
 .scene-preview-popup .leaflet-popup-content-wrapper {
 	border: 1px solid rgba(0, 0, 0, 0.1);
 	border-radius: 8px;

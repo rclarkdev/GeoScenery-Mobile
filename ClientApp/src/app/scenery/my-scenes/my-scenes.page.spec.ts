@@ -48,4 +48,22 @@ describe('MyScenesPage', () => {
     expect(sceneryService.getMyScenes).toHaveBeenCalledTimes(2);
     expect(component.myScenes.map(scene => scene.title)).toEqual(['New scene']);
   });
+
+  it('shows an accessible fallback when a scene image fails to load', () => {
+    const image = fixture.nativeElement.querySelector('ion-img');
+    image.dispatchEvent(new Event('ionError'));
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('ion-img')).toBeNull();
+    expect(fixture.nativeElement.querySelector('.scene-image-fallback')?.getAttribute('aria-label'))
+      .toBe('Scene image unavailable');
+  });
+
+  it('shows an accessible fallback for a scene without an image URL', () => {
+    component.myScenes = [new Scene(2, 'Unpictured scene', 'Description', '', 0)];
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('ion-img')).toBeNull();
+    expect(fixture.nativeElement.querySelector('.scene-image-fallback')).not.toBeNull();
+  });
 });

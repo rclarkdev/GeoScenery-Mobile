@@ -5,7 +5,17 @@
 </ion-header>
 
 <ion-content class="ion-padding">
-  <ion-list *ngIf="visits.length > 0">
+  <div class="visits-state" *ngIf="isLoading" role="status" aria-live="polite">
+    <ion-spinner name="crescent" aria-hidden="true"></ion-spinner>
+    <p>Loading visits...</p>
+  </div>
+
+  <div class="visits-state" *ngIf="!isLoading && loadError" role="alert">
+    <p>Unable to load your visits.</p>
+    <ion-button fill="outline" (click)="retryLoad()">Try again</ion-button>
+  </div>
+
+  <ion-list *ngIf="!isLoading && !loadError && visits.length > 0">
     <ion-item *ngFor="let visit of visits">
       <ion-label>
         <h2>{{ visit.sceneTitle || ('Scene ' + visit.sceneId) }}</h2>
@@ -13,5 +23,7 @@
       </ion-label>
     </ion-item>
   </ion-list>
-  <ion-note *ngIf="visits.length === 0">No visits recorded yet.</ion-note>
+  <ion-note *ngIf="!isLoading && !loadError && visits.length === 0" role="status">
+    No visits recorded yet.
+  </ion-note>
 </ion-content>

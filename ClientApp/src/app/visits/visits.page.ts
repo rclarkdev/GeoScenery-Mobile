@@ -9,11 +9,32 @@ import { VisitsService } from './visits.service';
 })
 export class VisitsPage implements OnInit {
   visits: Visit[] = [];
+  isLoading = true;
+  loadError = false;
 
   constructor(private visitsService: VisitsService) { }
 
   ngOnInit() {
-    this.visitsService.getUserVisits().subscribe(visits => this.visits = visits);
+    this.loadVisits();
   }
 
+  retryLoad(): void {
+    this.loadVisits();
+  }
+
+  private loadVisits(): void {
+    this.isLoading = true;
+    this.loadError = false;
+    this.visitsService.getUserVisits().subscribe({
+      next: visits => {
+        this.visits = visits;
+        this.isLoading = false;
+      },
+      error: () => {
+        this.visits = [];
+        this.isLoading = false;
+        this.loadError = true;
+      }
+    });
+  }
 }

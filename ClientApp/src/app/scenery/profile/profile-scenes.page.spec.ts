@@ -68,4 +68,23 @@ describe('ProfileScenesPage', () => {
     expect(component.loadError).toBeTrue();
     expect(fixture.nativeElement.textContent).toContain("Unable to load this user's public scenes.");
   });
+
+  it('shows an accessible fallback when a public scene image fails to load', () => {
+    createPage();
+    const image = fixture.nativeElement.querySelector('ion-img');
+
+    image.dispatchEvent(new Event('ionError'));
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('ion-img')).toBeNull();
+    expect(fixture.nativeElement.querySelector('.scene-image-fallback')?.getAttribute('aria-label'))
+      .toBe('Scene image unavailable');
+  });
+
+  it('shows an accessible fallback for a public scene without an image URL', () => {
+    createPage(of(visitedUser), of([new Scene(8, 'Unpictured scene', 'No image.', '', 0)]));
+
+    expect(fixture.nativeElement.querySelector('ion-img')).toBeNull();
+    expect(fixture.nativeElement.querySelector('.scene-image-fallback')).not.toBeNull();
+  });
 });

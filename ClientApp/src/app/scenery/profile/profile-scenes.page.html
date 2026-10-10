@@ -24,7 +24,11 @@
   <ion-list *ngIf="!isLoading && !loadError && scenes.length > 0">
     <ion-item *ngFor="let scene of scenes" [routerLink]="['/scenery/tabs/search', scene.id]" detail>
       <ion-thumbnail slot="start">
-        <ion-img [src]="scene.imageUrl | imageUrl" [alt]="scene.title + ' scenery'"></ion-img>
+        <ion-img *ngIf="scene.imageUrl && !failedImageIds.has(scene.id)"
+          [src]="scene.imageUrl | imageUrl" [alt]="scene.title + ' scenery'"
+          (ionError)="onSceneImageError(scene.id)"></ion-img>
+        <span class="scene-image-fallback" *ngIf="!scene.imageUrl || failedImageIds.has(scene.id)"
+          role="img" aria-label="Scene image unavailable">Image unavailable</span>
       </ion-thumbnail>
       <ion-label>
         <h2>{{ scene.title }}</h2>

@@ -1,5 +1,8 @@
 import { HttpClientTestingModule, HttpTestingController } from '@angular/common/http/testing';
+import { HttpErrorResponse } from '@angular/common/http';
 import { TestBed } from '@angular/core/testing';
+import { fakeAsync, flushMicrotasks, tick } from '@angular/core/testing';
+import { throwError } from 'rxjs';
 import { SKIP_AUTH } from '../auth/auth.interceptor';
 import { PLATFORM_CONFIG_URL, SiteIdentityService } from './site-identity.service';
 
@@ -97,6 +100,21 @@ describe('SiteIdentityService', () => {
     expect(service.currentState.identity).toBeNull();
   });
 
+  it('classifies an HTTP 200 JSON parse failure as an invalid payload', async () => {
+    configure(platformOrigin);
+    spyOn<any>(service['http'], 'get').and.returnValue(throwError(() => new HttpErrorResponse({
+      status: 200,
+      statusText: 'OK',
+      error: new SyntaxError('Unexpected end of JSON input')
+    })));
+
+    await service.initialize();
+
+    expect(service.currentState).toEqual({
+      status: 'unavailable', identity: null, failure: 'invalid-payload'
+    });
+  });
+
   it('falls back on HTTP 404 and server errors without rejecting initialization', async () => {
     configure(platformOrigin);
     const notFoundInitialization = service.initialize();
@@ -124,6 +142,21 @@ describe('SiteIdentityService', () => {
       status: 'unavailable', identity: null, failure: 'network-error'
     });
   });
+
+  it('times out a stalled platform request and leaves the app on local defaults', fakeAsync(() => {
+    configure(platformOrigin);
+    let initialized = false;
+    void service.initialize().then(() => initialized = true);
+    http.expectOne(endpoint);
+
+    tick(8000);
+    flushMicrotasks();
+
+    expect(initialized).toBe(true);
+    expect(service.currentState).toEqual({
+      status: 'unavailable', identity: null, failure: 'network-error'
+    });
+  }));
 
   it('classifies a browser CORS-style status-zero failure as a network fallback', async () => {
     configure(platformOrigin);

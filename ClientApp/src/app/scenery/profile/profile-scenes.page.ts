@@ -14,6 +14,7 @@ import { SceneryService } from '../scenery.service';
 export class ProfileScenesPage implements OnInit {
   user?: User;
   scenes: Scene[] = [];
+  readonly failedImageIds = new Set<number>();
   isLoading = true;
   loadError = false;
 
@@ -41,6 +42,7 @@ export class ProfileScenesPage implements OnInit {
         next: result => {
           this.user = result.user;
           this.scenes = result.scenes;
+          this.failedImageIds.clear();
           this.isLoading = false;
         },
         error: () => {
@@ -49,5 +51,9 @@ export class ProfileScenesPage implements OnInit {
         }
       });
     });
+  }
+
+  onSceneImageError(sceneId: number): void {
+    this.failedImageIds.add(sceneId);
   }
 }
