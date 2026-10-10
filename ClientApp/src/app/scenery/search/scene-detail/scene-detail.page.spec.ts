@@ -1,6 +1,6 @@
 import { CUSTOM_ELEMENTS_SCHEMA } from '@angular/core';
 import { ComponentFixture, TestBed, waitForAsync } from '@angular/core/testing';
-import { ActivatedRoute } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { HttpClientTestingModule } from '@angular/common/http/testing';
 import { RouterTestingModule } from '@angular/router/testing';
 import { AlertController, NavController } from '@ionic/angular';
@@ -133,6 +133,22 @@ describe('SceneDetailPage', () => {
     const ownerLink = fixture.nativeElement.querySelector('.scene-owner');
     expect(ownerLink?.textContent).toContain('Scene owner');
     expect(ownerLink?.getAttribute('href')).toBe('/scenery/tabs/profile/2');
+  });
+
+  it('opens coordinate and radius search for a located scene', () => {
+    configure(new Scene(1, 'Located scene', 'Description', 'https://example.com/image.jpg', 8,
+      45.5, -93.25), 999);
+    fixture = TestBed.createComponent(SceneDetailPage);
+    component = fixture.componentInstance;
+    fixture.detectChanges();
+    const router = TestBed.inject(Router);
+    const navigate = spyOn(router, 'navigate').and.resolveTo(true);
+
+    component.exploreNearbyScenes();
+
+    expect(navigate).toHaveBeenCalledWith(['/scenery/tabs/search'], {
+      queryParams: { latitude: 45.5, longitude: -93.25, radiusKm: 10 }
+    });
   });
 
   it('is the owner when the current user owns the scene', () => {

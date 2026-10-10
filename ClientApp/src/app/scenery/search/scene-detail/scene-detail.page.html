@@ -8,26 +8,31 @@
 </ion-header>
 
 <ion-content>
-  <div class="page-state" *ngIf="isLoading">
+  <div class="page-state" *ngIf="isLoading" role="status" aria-live="polite">
     <ion-spinner name="crescent"></ion-spinner>
     <p>Loading scene...</p>
   </div>
-  <div class="page-state" *ngIf="loadError">
+  <div class="page-state" *ngIf="loadError" role="alert">
     <h2>Scene unavailable</h2>
     <p>We couldn't load this scene.</p>
     <ion-button fill="outline" (click)="retryLoad()">Try again</ion-button>
   </div>
 
   <main class="scene-detail-shell" *ngIf="scene && !isLoading">
-    <div class="scene-hero" *ngIf="scene.imageUrl">
-      <ion-img [src]="scene.imageUrl | imageUrl"></ion-img>
+    <div class="scene-hero" *ngIf="scene.imageUrl && !sceneImageFailed; else sceneImageUnavailable">
+      <ion-img [src]="scene.imageUrl | imageUrl" [alt]="scene.title + ' scenery'"
+        (ionError)="sceneImageFailed = true"></ion-img>
     </div>
+    <ng-template #sceneImageUnavailable>
+      <div class="scene-hero scene-hero--empty" role="img" aria-label="No scene image available">No scene image available</div>
+    </ng-template>
 
     <article class="scene-heading">
       <h1>{{ scene.title }}</h1>
       <a class="scene-owner" *ngIf="owner" [routerLink]="['/scenery/tabs/profile', owner.id]">
         <ion-avatar>
-          <ion-img *ngIf="owner.profileImageUrl; else ownerPlaceholder" [src]="owner.profileImageUrl | imageUrl"></ion-img>
+          <ion-img *ngIf="owner.profileImageUrl; else ownerPlaceholder" [src]="owner.profileImageUrl | imageUrl"
+            [alt]="owner.displayName + ' profile photo'"></ion-img>
           <ng-template #ownerPlaceholder>
             <ion-icon name="person-circle-outline"></ion-icon>
           </ng-template>
@@ -55,6 +60,12 @@
       <div *ngIf="scene.latitude != null && scene.longitude != null">
         <dt>Location</dt>
         <dd>{{ scene.latitude | number:'1.4-4' }}, {{ scene.longitude | number:'1.4-4' }}</dd>
+        <dd>
+          <ion-button fill="outline" size="small" class="location-action" (click)="exploreNearbyScenes()">
+            <ion-icon slot="start" name="map-outline" aria-hidden="true"></ion-icon>
+            Explore within 10 km
+          </ion-button>
+        </dd>
       </div>
     </dl>
 

@@ -12,7 +12,7 @@
     <form [formGroup]="profileForm" (ngSubmit)="onSave()">
       <section class="photo-editor" aria-labelledby="photo-heading">
         <ion-avatar>
-          <ion-img *ngIf="profileImageUrl; else photoPlaceholder" [src]="profileImageUrl | imageUrl"></ion-img>
+          <ion-img *ngIf="profileImageUrl; else photoPlaceholder" [src]="profileImageUrl | imageUrl" alt="Profile photo preview"></ion-img>
           <ng-template #photoPlaceholder>
             <ion-icon name="person-circle-outline"></ion-icon>
           </ng-template>

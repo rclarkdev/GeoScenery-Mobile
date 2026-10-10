@@ -3,6 +3,19 @@
 
 /** Ionic CSS Variables **/
 :root {
+  --gs-color-background: #101614;
+  --gs-color-surface: #19211d;
+  --gs-color-surface-raised: #222c26;
+  --gs-color-text-primary: #f3f4ed;
+  --gs-color-text-secondary: #bec8bf;
+  --gs-color-border: #354139;
+  --gs-color-geographic-accent: #d8a85b;
+  --gs-color-geographic-ink: #69501e;
+  --gs-content-width: 1240px;
+  --gs-media-card-ratio: 16 / 10;
+  --gs-motion-fast: 140ms;
+  --gs-safe-area-bottom: env(safe-area-inset-bottom);
+
   /** primary **/
   --ion-color-primary: #3880ff;
   --ion-color-primary-rgb: 56, 128, 255;

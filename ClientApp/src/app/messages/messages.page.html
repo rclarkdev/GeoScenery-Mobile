@@ -17,7 +17,8 @@
         [routerLink]="['/scenery/tabs/messages', conversation.user.id]">
         <ion-avatar slot="start">
           <ion-img *ngIf="conversation.user.profileImageUrl; else placeholder"
-            [src]="conversation.user.profileImageUrl | imageUrl"></ion-img>
+            [src]="conversation.user.profileImageUrl | imageUrl"
+            [alt]="conversation.user.displayName + ' profile photo'"></ion-img>
           <ng-template #placeholder><ion-icon name="person-circle-outline"></ion-icon></ng-template>
         </ion-avatar>
         <ion-label>

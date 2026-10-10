@@ -23,7 +23,7 @@
       Enter a description.
     </ion-note>
 
-    <ion-img *ngIf="sceneForm.controls.imageUrl.value" [src]="sceneForm.controls.imageUrl.value | imageUrl"></ion-img>
+    <ion-img *ngIf="sceneForm.controls.imageUrl.value" [src]="sceneForm.controls.imageUrl.value | imageUrl" alt="Scene photo preview"></ion-img>
     <input #imageInput class="photo-file-input" type="file" accept="image/jpeg,image/png,image/webp"
       aria-hidden="true" tabindex="-1" (change)="onWebFileSelected($event)">
     <ion-button expand="block" fill="outline" type="button" (click)="onPickImage(imageInput)">

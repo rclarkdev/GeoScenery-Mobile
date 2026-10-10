@@ -1,5 +1,5 @@
 import { Component, OnInit } from '@angular/core';
-import { ActivatedRoute } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { AlertController, NavController } from '@ionic/angular';
 import { AuthService } from '../../../auth/auth.service';
 import { User } from '../../../auth/user.model';
@@ -21,6 +21,7 @@ export class SceneDetailPage implements OnInit {
   owner?: User;
   isLoading = true;
   loadError = false;
+  sceneImageFailed = false;
   isVisiting = false;
   isRemovingVisit = false;
   isCheckingVisit = true;
@@ -39,6 +40,7 @@ export class SceneDetailPage implements OnInit {
   constructor(
     private navCtrl: NavController,
     private route: ActivatedRoute,
+    private router: Router,
     private authService: AuthService,
     private userService: UserService,
     private sceneryService: SceneryService,
@@ -65,6 +67,20 @@ export class SceneDetailPage implements OnInit {
     this.loadScene();
   }
 
+  exploreNearbyScenes(): void {
+    if (this.scene?.latitude == null || this.scene.longitude == null) {
+      return;
+    }
+
+    void this.router.navigate(['/scenery/tabs/search'], {
+      queryParams: {
+        latitude: this.scene.latitude,
+        longitude: this.scene.longitude,
+        radiusKm: 10
+      }
+    });
+  }
+
   private loadScene(): void {
     if (this.sceneId == null) {
       return;
@@ -73,6 +89,7 @@ export class SceneDetailPage implements OnInit {
     this.isLoading = true;
     this.loadError = false;
     this.scene = undefined;
+    this.sceneImageFailed = false;
     this.owner = undefined;
     this.visitId = undefined;
     this.visitRecorded = false;

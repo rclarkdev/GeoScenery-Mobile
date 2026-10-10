@@ -11,7 +11,8 @@
   <main class="conversation-shell">
     <section class="conversation-intro" *ngIf="recipient">
       <ion-avatar>
-        <ion-img *ngIf="recipient.profileImageUrl; else placeholder" [src]="recipient.profileImageUrl | imageUrl"></ion-img>
+        <ion-img *ngIf="recipient.profileImageUrl; else placeholder" [src]="recipient.profileImageUrl | imageUrl"
+          [alt]="recipient.displayName + ' profile photo'"></ion-img>
         <ng-template #placeholder><ion-icon name="person-circle-outline"></ion-icon></ng-template>
       </ion-avatar>
       <h1>{{ recipient.displayName }}</h1>

@@ -42,6 +42,19 @@
 	}
 }
 
+.scene-preview__image {
+	width: 100%;
+	max-height: 132px;
+	aspect-ratio: 16 / 10;
+	border-radius: 5px;
+	background: var(--ion-color-light);
+	object-fit: cover;
+}
+
+.scene-preview__image[hidden] {
+	display: none;
+}
+
 .scene-preview-popup .leaflet-popup-content-wrapper {
 	border: 1px solid rgba(0, 0, 0, 0.1);
 	border-radius: 8px;
@@ -54,6 +67,13 @@
 
 .scene-preview-popup .leaflet-popup-tip {
 	box-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.scene-map .leaflet-control-zoom a {
+	width: 44px;
+	height: 44px;
+	line-height: 42px;
+	font-size: 22px;
 }
 
 .scene-preview__action {
@@ -78,6 +98,22 @@ ion-modal.photo-crop-modal {
 	--width: min(100%, 900px);
 	--height: 100%;
 	--border-radius: 0;
+}
+
+:focus-visible {
+	outline: 3px solid var(--ion-color-primary);
+	outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	*,
+	*::before,
+	*::after {
+		scroll-behavior: auto !important;
+		animation-duration: 0.01ms !important;
+		animation-iteration-count: 1 !important;
+		transition-duration: 0.01ms !important;
+	}
 }
 
 @media (min-width: 601px) {

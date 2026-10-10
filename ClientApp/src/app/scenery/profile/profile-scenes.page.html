@@ -24,7 +24,7 @@
   <ion-list *ngIf="!isLoading && !loadError && scenes.length > 0">
     <ion-item *ngFor="let scene of scenes" [routerLink]="['/scenery/tabs/search', scene.id]" detail>
       <ion-thumbnail slot="start">
-        <ion-img [src]="scene.imageUrl | imageUrl"></ion-img>
+        <ion-img [src]="scene.imageUrl | imageUrl" [alt]="scene.title + ' scenery'"></ion-img>
       </ion-thumbnail>
       <ion-label>
         <h2>{{ scene.title }}</h2>

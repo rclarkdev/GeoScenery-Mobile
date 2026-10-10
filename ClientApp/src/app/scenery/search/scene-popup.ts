@@ -1,4 +1,5 @@
 import { Scene } from '../scene.model';
+import { ImageUrlPipe } from '../../shared/image-url.pipe';
 
 /**
  * Builds the DOM content for a scene's Leaflet marker popup.
@@ -10,6 +11,17 @@ import { Scene } from '../scene.model';
 export function createScenePopupContent(scene: Scene, onViewDetails: () => void): HTMLDivElement {
   const container = document.createElement('div');
   container.className = 'scene-preview';
+  const imageUrl = new ImageUrlPipe().transform(scene.imageUrl);
+  if (imageUrl) {
+    const image = document.createElement('img');
+    image.className = 'scene-preview__image';
+    image.src = imageUrl;
+    image.alt = `${scene.title} scenery`;
+    image.loading = 'lazy';
+    image.decoding = 'async';
+    image.addEventListener('error', () => image.remove());
+    container.append(image);
+  }
   const title = document.createElement('strong');
   const metadata = document.createElement('span');
   const detailsButton = document.createElement('button');

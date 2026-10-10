@@ -19,9 +19,12 @@
   </div>
 
   <main class="scene-detail-shell" *ngIf="scene && !isLoading">
-    <div class="scene-hero" *ngIf="scene.imageUrl">
-      <ion-img [src]="scene.imageUrl | imageUrl"></ion-img>
+    <div class="scene-hero" *ngIf="scene.imageUrl; else sceneImageUnavailable">
+      <ion-img [src]="scene.imageUrl | imageUrl" [alt]="scene.title + ' scenery'"></ion-img>
     </div>
+    <ng-template #sceneImageUnavailable>
+      <div class="scene-hero scene-hero--empty" role="img" aria-label="No scene image available">No scene image available</div>
+    </ng-template>
 
     <article class="scene-heading">
       <h1>{{ scene.title }}</h1>

@@ -1,6 +1,6 @@
 import { AfterViewInit, Component, ElementRef, Inject, InjectionToken, OnDestroy, OnInit, ViewChild } from '@angular/core';
 import { FormBuilder, Validators } from '@angular/forms';
-import { Router } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { Geolocation } from '@capacitor/geolocation';
 import * as L from 'leaflet';
 import { UserService } from '../../auth/user.service';
@@ -29,6 +29,7 @@ export class SearchPage implements OnInit, AfterViewInit, OnDestroy {
   isSearching = false;
   searchError = false;
   activeFilterCount = 0;
+  viewMode: 'browse' | 'map' = 'browse';
 
   private map?: any;
   private sceneMarkers: any[] = [];
@@ -71,6 +72,7 @@ export class SearchPage implements OnInit, AfterViewInit, OnDestroy {
 
   constructor(
     private formBuilder: FormBuilder,
+    private route: ActivatedRoute,
     private router: Router,
     private sceneryService: SceneryService,
     private userService: UserService,
@@ -78,6 +80,11 @@ export class SearchPage implements OnInit, AfterViewInit, OnDestroy {
   ) { }
 
   ngOnInit() {
+    if (this.applyNearbyQuery()) {
+      this.onSearch();
+      return;
+    }
+
     this.refreshViewData();
   }
 
@@ -87,10 +94,34 @@ export class SearchPage implements OnInit, AfterViewInit, OnDestroy {
       return;
     }
 
-    this.refreshViewData();
+    if (this.applyNearbyQuery()) {
+      this.onSearch();
+    } else {
+      this.refreshViewData();
+    }
+  }
+
+  private applyNearbyQuery(): boolean {
+    const params = this.route.snapshot.queryParamMap;
+    const latitude = params.get('latitude');
+    const longitude = params.get('longitude');
+    const radiusKm = params.get('radiusKm');
+    if (latitude == null || longitude == null || radiusKm == null) {
+      return false;
+    }
+
+    const values = {
+      latitude: Number(latitude),
+      longitude: Number(longitude),
+      radiusKm: Number(radiusKm)
+    };
+    this.searchForm.patchValue(values);
+    return this.searchForm.valid && !this.hasInvalidCoordinates && !this.radiusNeedsLocation;
   }
 
   private refreshViewData(): void {
+    this.isSearching = true;
+    this.searchError = false;
     const { tags, latitude, longitude, radiusKm } = this.searchForm.getRawValue();
     const tagList = tags.split(',').map(tag => tag.trim()).filter(tag => tag.length > 0);
     const sceneryRequest = this.isFiltered
@@ -105,10 +136,14 @@ export class SearchPage implements OnInit, AfterViewInit, OnDestroy {
     sceneryRequest.subscribe({
       next: scenery => {
         this.loadedScenery = scenery;
+        this.isSearching = false;
         this.searchError = false;
         this.updateMap();
       },
-      error: () => this.searchError = true
+      error: () => {
+        this.isSearching = false;
+        this.searchError = true;
+      }
     });
 
     this.userService.getCurrentUser().subscribe({
@@ -147,6 +182,51 @@ export class SearchPage implements OnInit, AfterViewInit, OnDestroy {
     this.isFilterPanelOpen = !this.isFilterPanelOpen;
   }
 
+  setViewMode(mode: 'browse' | 'map'): void {
+    this.viewMode = mode;
+    if (mode === 'map') {
+      this.scheduleMapInitialization();
+    }
+  }
+
+  retrySearch(): void {
+    if (this.isSearching) {
+      return;
+    }
+
+    this.isSearching = true;
+    this.searchError = false;
+    const { tags, latitude, longitude, radiusKm } = this.searchForm.getRawValue();
+    const tagList = tags.split(',').map(tag => tag.trim()).filter(tag => tag.length > 0);
+    const request = this.isFiltered
+      ? this.sceneryService.searchScenery({
+          tags: tagList,
+          latitude: latitude ?? undefined,
+          longitude: longitude ?? undefined,
+          radiusKm: radiusKm ?? undefined
+        })
+      : this.sceneryService.getScenery();
+
+    request.subscribe({
+      next: scenery => {
+        this.loadedScenery = scenery;
+        this.isSearching = false;
+        this.searchError = false;
+        this.updateMap();
+      },
+      error: () => {
+        this.isSearching = false;
+        this.searchError = true;
+      }
+    });
+  }
+
+  onSceneImageError(event: Event): void {
+    const image = event.target as HTMLImageElement;
+    image.hidden = true;
+    image.parentElement?.classList.add('media-failed');
+  }
+
   async useCurrentLocation() {
     this.isLocating = true;
     this.locationError = false;
@@ -176,7 +256,11 @@ export class SearchPage implements OnInit, AfterViewInit, OnDestroy {
     const filterCount = Number(tagList.length > 0) + Number(latitude != null && longitude != null) + Number(radiusKm != null);
 
     this.isSearching = true;
+    this.isFiltered = true;
+    this.activeFilterCount = filterCount;
     this.searchError = false;
+    this.loadedScenery = [];
+    this.updateMap();
     this.sceneryService.searchScenery({
       tags: tagList,
       latitude: latitude ?? undefined,
@@ -201,6 +285,16 @@ export class SearchPage implements OnInit, AfterViewInit, OnDestroy {
   clearSearch(): void {
     const shouldReload = this.isFiltered;
     this.searchForm.reset({ tags: '', latitude: null, longitude: null, radiusKm: null });
+    if (this.route.snapshot.queryParamMap.has('latitude')
+      || this.route.snapshot.queryParamMap.has('longitude')
+      || this.route.snapshot.queryParamMap.has('radiusKm')) {
+      void this.router.navigate([], {
+        relativeTo: this.route,
+        queryParams: { latitude: null, longitude: null, radiusKm: null },
+        queryParamsHandling: 'merge',
+        replaceUrl: true
+      });
+    }
     this.isFiltered = false;
     this.activeFilterCount = 0;
     this.searchError = false;
@@ -209,6 +303,8 @@ export class SearchPage implements OnInit, AfterViewInit, OnDestroy {
     }
 
     this.isSearching = true;
+    this.loadedScenery = [];
+    this.updateMap();
     this.sceneryService.getScenery().subscribe({
       next: scenery => {
         this.loadedScenery = scenery;

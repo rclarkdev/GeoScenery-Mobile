@@ -27,6 +27,24 @@ describe('createScenePopupContent', () => {
     expect(onViewDetails).toHaveBeenCalledTimes(1);
   });
 
+  it('shows the selected scene image with informative alternative text', () => {
+    const content = createScenePopupContent(
+      new Scene(1, 'Alpine lake', 'A scenic view.', 'https://example.com/lake.jpg', 8),
+      () => undefined
+    );
+
+    const image = content.querySelector('img');
+    expect(image?.src).toBe('https://example.com/lake.jpg');
+    expect(image?.alt).toBe('Alpine lake scenery');
+  });
+
+  it('omits the image when a scene has no image URL', () => {
+    const content = createScenePopupContent(new Scene(1, 'Unpictured place', '', '', 0), () => undefined);
+
+    expect(content.querySelector('img')).toBeNull();
+    expect(content.querySelector('button')).not.toBeNull();
+  });
+
   it('treats an img-tag XSS title as inert text instead of executable HTML', () => {
     const payload = '<img src=x onerror="alert(1)">';
     const content = createScenePopupContent(
@@ -35,7 +53,7 @@ describe('createScenePopupContent', () => {
     );
 
     // The payload must not materialize as elements or attributes.
-    expect(content.querySelector('img')).toBeNull();
+    expect(content.querySelector('img')?.getAttribute('src')).toBe('https://example.com/view.jpg');
     expect(content.querySelector('[onerror]')).toBeNull();
 
     // The full payload is preserved as literal text.

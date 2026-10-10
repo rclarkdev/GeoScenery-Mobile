@@ -8,7 +8,8 @@
   <main class="profile-shell">
     <section class="identity" aria-labelledby="profile-name">
       <ion-avatar>
-        <ion-img *ngIf="user.profileImageUrl; else placeholder" [src]="user.profileImageUrl | imageUrl"></ion-img>
+        <ion-img *ngIf="user.profileImageUrl; else placeholder" [src]="user.profileImageUrl | imageUrl"
+          [alt]="user.displayName + ' profile photo'"></ion-img>
         <ng-template #placeholder>
           <ion-icon name="person-circle-outline"></ion-icon>
         </ng-template>

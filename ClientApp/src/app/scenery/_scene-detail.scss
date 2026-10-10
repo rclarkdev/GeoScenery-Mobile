@@ -19,13 +19,32 @@ ion-content {
   aspect-ratio: 16 / 9;
   overflow: hidden;
   border-radius: 8px;
-  background: var(--ion-color-light);
+  display: grid;
+  place-items: center;
+  background: #18201c;
+  color: #f3f4ed;
 
   ion-img {
     width: 100%;
     height: 100%;
-    object-fit: cover;
+    object-fit: contain;
+
+    &::part(image) {
+      object-fit: contain;
+    }
   }
+}
+
+.scene-hero--empty {
+  min-height: 180px;
+  color: var(--ion-color-medium-shade);
+}
+
+.location-action {
+  min-height: 44px;
+  margin: 10px 0 0;
+  --color: var(--gs-color-geographic-ink);
+  --border-color: var(--gs-color-geographic-ink);
 }
 
 .scene-heading {
