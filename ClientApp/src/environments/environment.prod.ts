@@ -2,6 +2,7 @@ declare global {
   interface Window {
     __GEOSCENERY_CONFIG__?: {
       apiUrl?: string;
+      platformConfigUrl?: string;
     };
   }
 }
@@ -25,5 +26,6 @@ if (parsedApiUrl.protocol !== 'https:'
 
 export const environment = {
   production: true,
-  apiUrl: parsedApiUrl.origin
+  apiUrl: parsedApiUrl.origin,
+  platformConfigUrl: window.__GEOSCENERY_CONFIG__?.platformConfigUrl
 };

@@ -1,6 +1,7 @@
 import { Component } from '@angular/core';
 
 import { Platform } from '@ionic/angular';
+import { SiteIdentityService } from './platform/site-identity.service';
 
 @Component({
   selector: 'app-root',
@@ -9,8 +10,10 @@ import { Platform } from '@ionic/angular';
 })
 export class AppComponent {
   constructor(
-    private platform: Platform
+    private platform: Platform,
+    private siteIdentity: SiteIdentityService
   ) {
+    void this.siteIdentity.initialize();
     this.initializeApp();
   }
 

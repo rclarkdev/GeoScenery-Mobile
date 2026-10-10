@@ -35,8 +35,49 @@ if (parsedApiUrl.protocol !== 'https:'
   process.exit(1);
 }
 
+let platformConfigUrl;
+const configuredPlatformUrl = process.env.GEOSCENERY_PLATFORM_CONFIG_URL?.trim();
+if (configuredPlatformUrl) {
+  let parsedPlatformUrl;
+  try {
+    parsedPlatformUrl = new URL(configuredPlatformUrl);
+  } catch {
+    console.error('GEOSCENERY_PLATFORM_CONFIG_URL must be a valid HTTPS URL when provided.');
+    process.exit(1);
+  }
+
+  const platformHostname = parsedPlatformUrl.hostname.toLowerCase();
+  const platformIsIpv4 = /^\d{1,3}(?:\.\d{1,3}){3}$/.test(platformHostname);
+  const platformIsIpv6 = platformHostname.startsWith('[') || platformHostname.includes(':');
+  if (parsedPlatformUrl.protocol !== 'https:'
+    || parsedPlatformUrl.username.length > 0
+    || parsedPlatformUrl.password.length > 0
+    || parsedPlatformUrl.pathname !== '/'
+    || parsedPlatformUrl.search.length > 0
+    || parsedPlatformUrl.hash.length > 0
+    || platformIsIpv4
+    || platformIsIpv6
+    || platformHostname === 'localhost'
+    || platformHostname.endsWith('.localhost')
+    || platformHostname.endsWith('.local')
+    || platformHostname.endsWith('.internal')
+    || platformHostname.endsWith('.example')
+    || platformHostname.endsWith('.example.com')
+    || platformHostname.endsWith('.test')
+    || platformHostname.endsWith('.invalid')
+    || !platformHostname.includes('.')) {
+    console.error('GEOSCENERY_PLATFORM_CONFIG_URL must be a public HTTPS DNS origin when provided.');
+    process.exit(1);
+  }
+
+  platformConfigUrl = parsedPlatformUrl.origin;
+}
+
 const configPath = resolve('src/assets/app-config.runtime.js');
-const config = `window.__GEOSCENERY_CONFIG__ = Object.freeze({ apiUrl: ${JSON.stringify(parsedApiUrl.origin)} });\n`;
+const config = `window.__GEOSCENERY_CONFIG__ = Object.freeze(${JSON.stringify({
+  apiUrl: parsedApiUrl.origin,
+  platformConfigUrl
+})});\n`;
 await writeFile(configPath, config, { encoding: 'utf8', mode: 0o644 });
 
 const angularCli = resolve('node_modules/@angular/cli/bin/ng.js');
