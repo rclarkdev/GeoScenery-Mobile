@@ -80,9 +80,11 @@ The wrapper validates both URLs (public HTTPS origins only), writes the runtime 
 
 GeoScenery consumes the shared platform's anonymous, read-only `GET /api/site/config` endpoint (`SiteIdentityService`) to verify that it is being served by the `geoscenery` site. The lookup is optional and fail-open:
 
+The platform owns the response contract; each site owns how it accepts and applies that contract. GeoScenery consumes only the common `key` and optional `name` fields; other platform fields do not affect this identity check.
+
 - It runs once at startup, fire-and-forget, so it never blocks route initialization or normal workflows.
 - The request is anonymous: it sets the existing `SKIP_AUTH` interceptor context and `withCredentials = false`, so no GeoScenery bearer token or cookie is sent to the platform.
-- Identity is accepted only when the returned site key is exactly `geoscenery`. The optional display name is validated before being kept.
+- Identity is accepted only when the returned site key is exactly `geoscenery`. The optional display name must be non-empty after trimming and no longer than 200 characters.
 - Absent platform origin, invalid origin, timeout (8 s), HTTP errors, network/CORS failures, malformed payloads, or a wrong site key leave the app on its local/default behavior with a clear diagnostic state (`unconfigured` / `unavailable` + `failure` reason).
 - No client-supplied site IDs, names, or request parameters influence which site the platform resolves.
 

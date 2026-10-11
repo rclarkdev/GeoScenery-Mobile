@@ -67,14 +67,18 @@ describe('SiteIdentityService', () => {
 
   it('rejects a different site key and leaves identity unset', async () => {
     configure(platformOrigin);
-    const initialization = service.initialize();
-    http.expectOne(endpoint).flush({ key: 'collectionsofmine', name: 'CollectionsOfMine' });
+    const keys = ['collectionsofmine', 'GeoScenery', ' geoscenery'];
 
-    await initialization;
+    for (const key of keys) {
+      const initialization = service.initialize();
+      http.expectOne(endpoint).flush({ key, name: 'Other site' });
 
-    expect(service.currentState).toEqual({
-      status: 'unavailable', identity: null, failure: 'site-key-mismatch'
-    });
+      await initialization;
+
+      expect(service.currentState).toEqual({
+        status: 'unavailable', identity: null, failure: 'site-key-mismatch'
+      });
+    }
   });
 
   it('rejects a missing or malformed required key', async () => {
@@ -91,13 +95,28 @@ describe('SiteIdentityService', () => {
 
   it('rejects malformed optional identity metadata', async () => {
     configure(platformOrigin);
+    for (const name of ['  ', 'N'.repeat(201), null]) {
+      const initialization = service.initialize();
+      http.expectOne(endpoint).flush({ key: 'geoscenery', name });
+
+      await initialization;
+
+      expect(service.currentState.failure).toBe('invalid-payload');
+      expect(service.currentState.identity).toBeNull();
+    }
+  });
+
+  it('trims a provided display name and accepts the 200-character limit', async () => {
+    configure(platformOrigin);
+    const name = 'N'.repeat(200);
     const initialization = service.initialize();
-    http.expectOne(endpoint).flush({ key: 'geoscenery', name: '  ' });
+    http.expectOne(endpoint).flush({ key: 'geoscenery', name: ` ${name} ` });
 
     await initialization;
 
-    expect(service.currentState.failure).toBe('invalid-payload');
-    expect(service.currentState.identity).toBeNull();
+    expect(service.currentState).toEqual({
+      status: 'available', identity: { key: 'geoscenery', name }
+    });
   });
 
   it('classifies an HTTP 200 JSON parse failure as an invalid payload', async () => {
