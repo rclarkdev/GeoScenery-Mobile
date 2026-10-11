@@ -66,4 +66,30 @@ The repository includes:
 
 Configure the production App Service settings from `GeoScenery.Api/appsettings.Production.template.json`. Store database, JWT, and SMTP secrets in Azure App Service configuration or GitHub environment secrets; do not commit them.
 
-The production client must be built with the deployed API URL in `ClientApp/src/environments/environment.prod.ts`.
+The production client must be built through the build wrapper with the deployed API origin:
+
+```powershell
+$env:GEOSCENERY_API_URL = "https://api.your-domain.example"
+$env:GEOSCENERY_PLATFORM_CONFIG_URL = "https://platform-collectionsofmine.your-domain.example"  # optional
+npm run build:production
+```
+
+The wrapper validates both URLs (public HTTPS origins only), writes the runtime configuration to `ClientApp/src/assets/app-config.runtime.js`, and then runs the Angular production build. `index.html` loads that script and `environment.prod.ts` reads `window.__GEOSCENERY_CONFIG__` from it, so a direct `ng build --configuration production` without the generated runtime file produces a client that fails to start; CI currently runs the direct build, so production URL provisioning is wired into the deployment phase, not CI.
+
+## Platform site identity
+
+GeoScenery consumes the shared platform's anonymous, read-only `GET /api/site/config` endpoint (`SiteIdentityService`) to verify that it is being served by the `geoscenery` site. The lookup is optional and fail-open:
+
+- It runs once at startup, fire-and-forget, so it never blocks route initialization or normal workflows.
+- The request is anonymous: it sets the existing `SKIP_AUTH` interceptor context and `withCredentials = false`, so no GeoScenery bearer token or cookie is sent to the platform.
+- Identity is accepted only when the returned site key is exactly `geoscenery`. The optional display name is validated before being kept.
+- Absent platform origin, invalid origin, timeout (8 s), HTTP errors, network/CORS failures, malformed payloads, or a wrong site key leave the app on its local/default behavior with a clear diagnostic state (`unconfigured` / `unavailable` + `failure` reason).
+- No client-supplied site IDs, names, or request parameters influence which site the platform resolves.
+
+The platform origin is supplied from:
+
+- **Development (browser):** `ClientApp/src/environments/environment.ts` sets `platformConfigUrl` to the platform's local origin (default `http://localhost:5050`). CORS on the platform allow-lists the common Angular/Ionic dev origins.
+- **Development (native/mobile):** `platformConfigUrl` is left `undefined`, so no platform request is attempted.
+- **Production:** `GEOSCENERY_PLATFORM_CONFIG_URL` is injected by `npm run build:production` into the generated runtime config, as above. When it is absent, the client runs on local defaults and never claims platform identity.
+
+A recognized-site handshake requires the platform to have an **active `geoscenery` site with a verified host/domain** mapped in its site configuration. The platform resolves sites from its own trusted host database and rejects unknown, inactive, or unverified hosts. The default local development platform resolves `localhost` to `collectionsofmine`, so the out-of-the-box dev origin deliberately produces a wrong-site fallback (correct fail-open behavior); to exercise the recognized-site path locally, add a `geoscenery` site with a verified host to the platform database and point `platformConfigUrl` at that host. Platform-side resolution and the `geoscenery` contract are covered by the platform integration tests (`SiteResolutionTests`) in the CollectionsOfMine repository.
