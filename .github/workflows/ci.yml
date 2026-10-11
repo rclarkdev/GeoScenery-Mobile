@@ -33,9 +33,15 @@ jobs:
       - name: Install dependencies
         working-directory: ClientApp
         run: npm ci
+      - name: Test production configuration
+        working-directory: ClientApp
+        run: npm run test:config
       - name: Test
         working-directory: ClientApp
         run: npm test -- --watch=false --browsers=ChromeHeadless
       - name: Production build
         working-directory: ClientApp
-        run: npm run build -- --configuration production
+        env:
+          GEOSCENERY_API_URL: https://api.geoscenery.test
+          GEOSCENERY_PLATFORM_CONFIG_URL: https://platform.geoscenery.test
+        run: npm run build:production -- --ci

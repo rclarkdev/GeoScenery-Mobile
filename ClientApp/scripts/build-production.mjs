@@ -1,86 +1,122 @@
-import { writeFile } from 'node:fs/promises';
+import { readFile, writeFile } from 'node:fs/promises';
 import { spawnSync } from 'node:child_process';
 import { resolve } from 'node:path';
+import { runInNewContext } from 'node:vm';
+import { pathToFileURL } from 'node:url';
 
-const apiUrl = process.env.GEOSCENERY_API_URL?.trim();
-if (!apiUrl) {
-  console.error('Set GEOSCENERY_API_URL to the deployed HTTPS API origin before creating a production client build.');
-  process.exit(1);
+const CI_TEST_ORIGINS = new Set([
+  'api.geoscenery.test',
+  'platform.geoscenery.test'
+]);
+
+export function parseProductionConfig(env = process.env, { allowCiTestOrigins = false } = {}) {
+  const apiUrl = validateOrigin(env.GEOSCENERY_API_URL, 'GEOSCENERY_API_URL', { allowCiTestOrigins });
+  const configuredPlatformUrl = env.GEOSCENERY_PLATFORM_CONFIG_URL?.trim();
+  const platformConfigUrl = configuredPlatformUrl
+    ? validateOrigin(configuredPlatformUrl, 'GEOSCENERY_PLATFORM_CONFIG_URL', { allowCiTestOrigins })
+    : undefined;
+
+  return { apiUrl, platformConfigUrl };
 }
 
-let parsedApiUrl;
-try {
-  parsedApiUrl = new URL(apiUrl);
-} catch {
-  console.error('GEOSCENERY_API_URL must be a valid HTTPS URL.');
-  process.exit(1);
-}
+function validateOrigin(value, variableName, { allowCiTestOrigins }) {
+  if (!value?.trim()) {
+    if (variableName === 'GEOSCENERY_PLATFORM_CONFIG_URL') {
+      return undefined;
+    }
+    throw new Error('Set GEOSCENERY_API_URL to the deployed HTTPS API origin before creating a production client build.');
+  }
 
-const hostname = parsedApiUrl.hostname.toLowerCase();
-const isIpv4Address = /^\d{1,3}(?:\.\d{1,3}){3}$/.test(hostname);
-const isIpv6Address = hostname.startsWith('[') || hostname.includes(':');
-if (parsedApiUrl.protocol !== 'https:'
-  || isIpv4Address
-  || isIpv6Address
-  || hostname === 'localhost'
-  || hostname.endsWith('.localhost')
-  || hostname.endsWith('.local')
-  || hostname.endsWith('.internal')
-  || hostname.endsWith('.example')
-  || hostname.endsWith('.example.com')
-  || hostname.endsWith('.test')
-  || hostname.endsWith('.invalid')
-  || !hostname.includes('.')) {
-  console.error('GEOSCENERY_API_URL must be a public HTTPS DNS hostname, not a placeholder, local, emulator, or IP address.');
-  process.exit(1);
-}
-
-let platformConfigUrl;
-const configuredPlatformUrl = process.env.GEOSCENERY_PLATFORM_CONFIG_URL?.trim();
-if (configuredPlatformUrl) {
-  let parsedPlatformUrl;
+  let parsedUrl;
   try {
-    parsedPlatformUrl = new URL(configuredPlatformUrl);
+    parsedUrl = new URL(value.trim());
   } catch {
-    console.error('GEOSCENERY_PLATFORM_CONFIG_URL must be a valid HTTPS URL when provided.');
-    process.exit(1);
+    throw new Error(`${variableName} must be a valid HTTPS origin.`);
   }
 
-  const platformHostname = parsedPlatformUrl.hostname.toLowerCase();
-  const platformIsIpv4 = /^\d{1,3}(?:\.\d{1,3}){3}$/.test(platformHostname);
-  const platformIsIpv6 = platformHostname.startsWith('[') || platformHostname.includes(':');
-  if (parsedPlatformUrl.protocol !== 'https:'
-    || parsedPlatformUrl.username.length > 0
-    || parsedPlatformUrl.password.length > 0
-    || parsedPlatformUrl.pathname !== '/'
-    || parsedPlatformUrl.search.length > 0
-    || parsedPlatformUrl.hash.length > 0
-    || platformIsIpv4
-    || platformIsIpv6
-    || platformHostname === 'localhost'
-    || platformHostname.endsWith('.localhost')
-    || platformHostname.endsWith('.local')
-    || platformHostname.endsWith('.internal')
-    || platformHostname === 'example.com'
-    || platformHostname.endsWith('.example')
-    || platformHostname.endsWith('.example.com')
-    || platformHostname.endsWith('.test')
-    || platformHostname.endsWith('.invalid')
-    || !platformHostname.includes('.')) {
-    console.error('GEOSCENERY_PLATFORM_CONFIG_URL must be a public HTTPS DNS origin when provided.');
-    process.exit(1);
+  const hostname = parsedUrl.hostname.toLowerCase();
+  const isIpv4Address = /^\d{1,3}(?:\.\d{1,3}){3}$/.test(hostname);
+  const isIpv6Address = hostname.startsWith('[') || hostname.includes(':');
+  const isCiFixture = allowCiTestOrigins && CI_TEST_ORIGINS.has(hostname);
+  const isReservedOrLocal = hostname === 'localhost'
+    || hostname.endsWith('.localhost')
+    || hostname.endsWith('.local')
+    || hostname.endsWith('.internal')
+    || hostname === 'example.com'
+    || hostname.endsWith('.example')
+    || hostname.endsWith('.example.com')
+    || hostname === 'example.org'
+    || hostname.endsWith('.example.org')
+    || hostname === 'example.net'
+    || hostname.endsWith('.example.net')
+    || hostname.endsWith('.test')
+    || hostname.endsWith('.invalid');
+
+  if (parsedUrl.protocol !== 'https:'
+    || parsedUrl.username.length > 0 || parsedUrl.password.length > 0
+    || parsedUrl.pathname !== '/' || parsedUrl.search.length > 0 || parsedUrl.hash.length > 0
+    || isIpv4Address || isIpv6Address
+    || (!isCiFixture && isReservedOrLocal)
+    || !hostname.includes('.')) {
+    throw new Error(`${variableName} must be a public HTTPS origin${allowCiTestOrigins ? ' (or its designated CI fixture origin)' : ''}.`);
   }
 
-  platformConfigUrl = parsedPlatformUrl.origin;
+  if (isCiFixture && ((variableName === 'GEOSCENERY_API_URL' && hostname !== 'api.geoscenery.test')
+    || (variableName === 'GEOSCENERY_PLATFORM_CONFIG_URL' && hostname !== 'platform.geoscenery.test'))) {
+    throw new Error(`${variableName} uses the wrong designated CI fixture hostname.`);
+  }
+
+  return parsedUrl.origin;
 }
 
-const configPath = resolve('src/assets/app-config.runtime.js');
-const config = `window.__GEOSCENERY_CONFIG__ = Object.freeze(${JSON.stringify({
-  apiUrl: parsedApiUrl.origin,
-  platformConfigUrl
-})});\n`;
-await writeFile(configPath, config, { encoding: 'utf8', mode: 0o644 });
+export function renderRuntimeConfig(config) {
+  return `window.__GEOSCENERY_CONFIG__ = Object.freeze(${JSON.stringify(config)});\n`;
+}
 
-const angularCli = resolve('node_modules/@angular/cli/bin/ng.js');
-const result = spawnSync(process.execPath, [angularCli, 'build', '--configuration', 'production'], { stdio: 'inherit' });
-process.exit(result.status ?? 1);
+export async function verifyProductionArtifact(outputPath, expectedConfig) {
+  const indexHtml = await readFile(resolve(outputPath, 'index.html'), 'utf8');
+  const runtimeAssetPath = resolve(outputPath, 'assets/app-config.runtime.js');
+  const runtimeAsset = await readFile(runtimeAssetPath, 'utf8');
+  const runtimeLoader = /<script\b[^>]*\bsrc=["']assets\/app-config\.runtime\.js["'][^>]*>\s*<\/script>/i.exec(indexHtml);
+  const loaderIndex = runtimeLoader?.index ?? -1;
+  const appBundleIndex = indexHtml.indexOf('main.');
+
+  if (loaderIndex === -1 || appBundleIndex === -1 || loaderIndex > appBundleIndex) {
+    throw new Error('Production artifact must load assets/app-config.runtime.js before the application bundle.');
+  }
+
+  const sandbox = { window: {} };
+  runInNewContext(runtimeAsset, sandbox);
+  const actualConfig = JSON.parse(JSON.stringify(sandbox.window.__GEOSCENERY_CONFIG__));
+  if (JSON.stringify(actualConfig) !== JSON.stringify(expectedConfig)) {
+    throw new Error('Production runtime asset does not contain the validated production configuration.');
+  }
+}
+
+async function main() {
+  const args = process.argv.slice(2);
+  const allowCiTestOrigins = args.length === 1 && args[0] === '--ci';
+  if (args.length > 0 && !allowCiTestOrigins) {
+    throw new Error('The only supported build option is --ci for non-deployable CI validation builds.');
+  }
+
+  const config = parseProductionConfig(process.env, { allowCiTestOrigins });
+  const configPath = resolve('src/assets/app-config.runtime.js');
+  await writeFile(configPath, renderRuntimeConfig(config), { encoding: 'utf8', mode: 0o644 });
+
+  const angularCli = resolve('node_modules/@angular/cli/bin/ng.js');
+  const result = spawnSync(process.execPath, [angularCli, 'build', '--configuration', 'production'], { stdio: 'inherit' });
+  if (result.status !== 0) {
+    process.exit(result.status ?? 1);
+  }
+
+  await verifyProductionArtifact(resolve('www'), config);
+  console.log('Production artifact contains its validated runtime configuration loader and asset.');
+}
+
+if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
+  main().catch(error => {
+    console.error(error.message);
+    process.exitCode = 1;
+  });
+}

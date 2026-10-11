@@ -8,8 +8,9 @@ GeoScenery is an Ionic/Capacitor client backed by an ASP.NET Core API and SQL da
 dotnet test GeoScenery.Tests
 cd ClientApp
 npm ci
+npm run test:config
 npm test -- --watch=false --browsers=ChromeHeadless
-npm run build -- --configuration production
+npm run build
 ```
 
 ## Roles and permissions
@@ -69,12 +70,12 @@ Configure the production App Service settings from `GeoScenery.Api/appsettings.P
 The production client must be built through the build wrapper with the deployed API origin:
 
 ```powershell
-$env:GEOSCENERY_API_URL = "https://api.your-domain.example"
-$env:GEOSCENERY_PLATFORM_CONFIG_URL = "https://platform-collectionsofmine.your-domain.example"  # optional
+$env:GEOSCENERY_API_URL = Read-Host "Production API HTTPS origin"
+# Optional: set GEOSCENERY_PLATFORM_CONFIG_URL to the platform HTTPS origin.
 npm run build:production
 ```
 
-The wrapper validates both URLs (public HTTPS origins only), writes the runtime configuration to `ClientApp/src/assets/app-config.runtime.js`, and then runs the Angular production build. `index.html` loads that script and `environment.prod.ts` reads `window.__GEOSCENERY_CONFIG__` from it, so a direct `ng build --configuration production` without the generated runtime file produces a client that fails to start; CI currently runs the direct build, so production URL provisioning is wired into the deployment phase, not CI.
+In development, `environment.ts` continues to supply the existing localhost/native API origins and browser-only localhost platform origin. In production, `environment.prod.ts` reads `window.__GEOSCENERY_CONFIG__`, requires an API URL, and normalizes it to its HTTPS origin; the platform URL remains optional. `npm run build:production` requires `GEOSCENERY_API_URL`, validates configured values as public HTTPS origins, generates the ignored `src/assets/app-config.runtime.js`, runs Angular's production configuration, and verifies the built `www/index.html` loads that asset before the application bundle and that it contains the validated values. A direct `ng build --configuration production` does not generate this required asset and is not a supported production build path; use `npm run build` for local development builds. The CI workflow exercises the production wrapper with reserved `.test` fixture origins in explicit `--ci` mode; those validation-only build outputs are not deployment artifacts. The repository's deployment workflows currently deploy the API and migrations, not the frontend, so frontend hosting and the production origins remain deployment-specific decisions.
 
 ## Platform site identity
 

@@ -9,6 +9,7 @@
     "build": "ng build",
     "build:production": "node scripts/build-production.mjs",
     "test": "ng test",
+    "test:config": "node --test scripts/build-production.test.mjs",
     "lint": "ng lint",
     "e2e": "ng e2e",
     "cap:sync": "npm run build:production && npx cap sync",
