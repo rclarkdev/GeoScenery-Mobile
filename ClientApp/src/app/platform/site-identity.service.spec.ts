@@ -93,6 +93,28 @@ describe('SiteIdentityService', () => {
     });
   });
 
+  it('rejects non-object responses and non-string identity fields', async () => {
+    configure(platformOrigin);
+    const malformedResponses: unknown[] = [
+      null,
+      [],
+      'geoscenery',
+      { key: 42 },
+      { key: 'geoscenery', name: 42 }
+    ];
+
+    for (const response of malformedResponses) {
+      const initialization = service.initialize();
+      http.expectOne(endpoint).flush(response);
+
+      await initialization;
+
+      expect(service.currentState).toEqual({
+        status: 'unavailable', identity: null, failure: 'invalid-payload'
+      });
+    }
+  });
+
   it('rejects malformed optional identity metadata', async () => {
     configure(platformOrigin);
     for (const name of ['  ', 'N'.repeat(201), null]) {
@@ -206,5 +228,40 @@ describe('SiteIdentityService', () => {
       status: 'unavailable', identity: null, failure: 'invalid-config-url'
     });
     http.expectNone(() => true);
+  });
+
+  for (const origin of [
+    'http://platform.example',
+    'http://192.0.2.10',
+    'https://user:password@platform.example',
+    'https://platform.example/path',
+    'https://platform.example?query=1',
+    'https://platform.example#fragment'
+  ]) {
+    it(`rejects the unsafe platform origin ${origin}`, async () => {
+      configure(origin);
+
+      await service.initialize();
+
+      expect(service.currentState).toEqual({
+        status: 'unavailable', identity: null, failure: 'invalid-config-url'
+      });
+      http.expectNone(() => true);
+    });
+  }
+
+  it('allows the configured localhost HTTP origin for development', async () => {
+    const localEndpoint = 'http://localhost:5050/api/site/config';
+    configure('http://localhost:5050/');
+    const initialization = service.initialize();
+    const request = http.expectOne(localEndpoint);
+    request.flush({ key: 'geoscenery' });
+
+    await initialization;
+
+    expect(request.request.method).toBe('GET');
+    expect(service.currentState).toEqual({
+      status: 'available', identity: { key: 'geoscenery' }
+    });
   });
 });
